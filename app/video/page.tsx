@@ -49,7 +49,7 @@ export default function VideoPage() {
         ctaLabel="SCROLL"
         ctaHref="#videos"
         backgroundSrc="/media/hero-loop.mp4"
-        poster="/images/hero.jpg"
+        poster=""
       />
 
       {/* Social promo block */}

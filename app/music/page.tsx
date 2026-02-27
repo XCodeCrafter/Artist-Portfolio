@@ -1,31 +1,42 @@
-//artist-portfolio/app/music/page.tsx
+// artist-portfolio/app/music/page.tsx
 import HeroCinematic from "@/components/HeroCinematic";
-import MusicPlatforms from "@/components/MusicPlatforms";
+import MusicPlatforms_ext from "@/components/MusicPlatforms_ext";
 import NewsletterBlock from "@/components/NewsletterBlock";
+import SoundcloudCarousel from "@/components/SoundcloudCarousel";
 
 type Mix = {
-  title: string;
-  embedUrl: string; // SoundCloud iframe src
+  title?: string;
+  embedUrl: string;
 };
 
 const SPOTIFY_EMBED_URL =
-  "https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M?utm_source=generator"; // TODO: replace
+  "https://open.spotify.com/embed/artist/3j6ZTLub4b9G6huqfRDIIM?theme=0";
 
 const SOUNDCLOUD_MIXES: Mix[] = [
   {
-    title: "Live @ KaterBlau (Berlin) | Acid Bogen",
+    title: "",
     embedUrl:
-      "https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/308020520&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=true",
+      "https://api.soundcloud.com/tracks/soundcloud:tracks:247188263",
   },
   {
-    title: "Fusion Festival 2024 | Palapa Stage",
+    title: "",
     embedUrl:
-      "https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/308020520&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=true",
+      "https://api.soundcloud.com/tracks/soundcloud:tracks:2114365833",
   },
   {
-    title: "47 Katzen tanzen auf’m Tisch",
+    title: "",
     embedUrl:
-      "https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/308020520&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=true",
+      "https://api.soundcloud.com/tracks/soundcloud:tracks:2189419043",
+  },
+  {
+    title: "",
+    embedUrl:
+      "https://api.soundcloud.com/tracks/soundcloud:tracks:2159226369",
+  },
+  {
+    title: "",
+    embedUrl:
+      "https://api.soundcloud.com/tracks/soundcloud:tracks:2120089767",
   },
 ];
 
@@ -40,71 +51,57 @@ export default function MusicPage() {
         backgroundSrc="/images/music-hero.jpg"
       />
 
-      {/* Platforms row */}
-      <MusicPlatforms />
+      <div id="music">
+        <MusicPlatforms_ext />
 
-      {/* LATEST RELEASES */}
-      <section className="mx-auto max-w-[1400px] px-5 sm:px-8 py-14 sm:py-18">
-        <h2
-          className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
-          data-reveal="up"
-        >
-          LATEST RELEASES
-        </h2>
+        {/* LATEST RELEASES */}
+        <section className="mx-auto max-w-[1400px] px-5 sm:px-8 py-14 sm:py-18">
+          <h2
+            className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
+            data-reveal="up"
+          >
+            LATEST RELEASES
+          </h2>
 
-        <div
-          className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/5"
-          data-reveal="up"
-          data-reveal-delay="140"
-        >
-          <div className="relative h-[520px]">
-            <iframe
-              src={SPOTIFY_EMBED_URL}
-              title="Spotify Releases"
-              className="absolute inset-0 h-full w-full"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
+          <div
+            className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/5"
+            data-reveal="up"
+            data-reveal-delay="140"
+          >
+            <div className="relative h-[520px]">
+              <iframe
+                src={SPOTIFY_EMBED_URL}
+                title="Spotify Releases"
+                className="absolute inset-0 h-full w-full"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* LATEST MIXES */}
+        <section className="mx-auto max-w-[1400px] px-5 sm:px-8 pb-18">
+          <h2
+            className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
+            data-reveal="up"
+          >
+            LATEST MIXES
+          </h2>
+
+          <div className="mt-8">
+            <SoundcloudCarousel
+              items={SOUNDCLOUD_MIXES}
+              showTitles={false}   // ✅ žádný “Untitled Mix”
+              autoPlay={false}     // ✅ žádný autoplay
             />
           </div>
+        </section>
+
+        <div className="mt-16">
+          <NewsletterBlock />
         </div>
-      </section>
-
-      {/* LATEST MIXES */}
-      <section className="mx-auto max-w-[1400px] px-5 sm:px-8 pb-18">
-        <h2
-          className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
-          data-reveal="up"
-        >
-          LATEST MIXES
-        </h2>
-
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
-          {SOUNDCLOUD_MIXES.map((m, idx) => (
-            <div
-              key={m.title}
-              className="overflow-hidden rounded-3xl border border-white/10 bg-white/5"
-              data-reveal="up"
-              data-reveal-delay={String(120 + idx * 90)}
-            >
-              <div className="relative h-[340px]">
-                <iframe
-                  src={m.embedUrl}
-                  title={m.title}
-                  className="absolute inset-0 h-full w-full"
-                  allow="autoplay"
-                  loading="lazy"
-                />
-              </div>
-              <div className="p-5 text-white/75 text-sm">{m.title}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* NEWSLETTER */}
-      <div className="mt-16">
-  <NewsletterBlock />
-</div>
+      </div>
     </main>
   );
 }
