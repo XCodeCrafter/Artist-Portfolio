@@ -9,14 +9,17 @@ export default function BookingPage() {
         title="BOOKING"
         subtitle="CONTACT"
         ctaLabel="WRITE"
-        ctaHref="#booking"
+        ctaHref="#form"
         backgroundSrc="/images/booking-hero.jpg"
       />
 
     
-    <div id="form" className="pt-24 md:pt-32">
-          <BookingForm />
-      </div>
+    <section
+        id="form"
+        className="py-24 md:py-32 scroll-mt-24"
+      >
+        <BookingForm />
+      </section>
     </>
   );
 }
