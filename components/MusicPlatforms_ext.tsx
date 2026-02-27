@@ -1,6 +1,5 @@
-//artist-portfolio/components/MusicPlatforms.tsx
+//artist-portfolio/components/MusicPlatforms_ext.tsx
 import Image from "next/image";
-import Link from "next/link";
 import { FaSpotify, FaSoundcloud, FaApple } from "react-icons/fa";
 import { SiBeatport } from "react-icons/si";
 
@@ -8,7 +7,7 @@ type Card = {
   title: string;
   label: string;
   href: string;
-  icon: React.ReactNode; // real platform icon
+  icon: React.ReactNode;
   image: string;
 };
 
@@ -46,33 +45,7 @@ const CARDS: Card[] = [
 export default function MusicPlatforms() {
   return (
     <section className="mx-auto max-w-[1400px] px-5 sm:px-8 py-14 sm:py-18">
-      {/* header row */}
-      <div className="flex items-end justify-between gap-6">
-        <h2
-          className="text-5xl sm:text-7xl font-semibold tracking-tight accent"
-          data-reveal="up"
-          data-reveal-delay="250"
-        >
-          MUSIC
-        </h2>
-
-        <Link
-          href="/music"
-          className="group inline-flex items-center gap-3 pb-2 text-sm sm:text-base tracking-[0.28em] uppercase text-white/70 hover:text-white transition"
-          data-reveal="right"
-          data-reveal-delay="120"
-        >
-          <span className="relative">
-            View All Music
-            <span className="absolute left-0 -bottom-2 h-[2px] w-0 bg-[var(--accent)] transition-all duration-300 group-hover:w-full" />
-          </span>
-          <span className="translate-x-0 transition-transform duration-300 group-hover:translate-x-1">
-            →
-          </span>
-        </Link>
-      </div>
-
-      <div className="mt-8 grid gap-5 lg:grid-cols-4">
+      <div className="grid gap-5 lg:grid-cols-4">
         {CARDS.map((c, idx) => (
           <a
             key={c.title}

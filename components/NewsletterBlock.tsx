@@ -79,131 +79,84 @@ export default function Footer() {
   };
 
   const iconClass =
-    "w-7 h-7 shrink-0 transition text-white/60 hover:text-[var(--accent)] focus-visible:text-[var(--accent)]";
+    "w-8 h-8 transition-all duration-300 text-white/60 hover:text-[var(--accent)] hover:scale-110";
 
   const iconLinkClass =
-    "inline-flex items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40";
+    "inline-flex items-center justify-center rounded-2xl p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950";
 
   return (
     <>
-      <footer className="mx-auto max-w-[1400px] px-5 sm:px-8 py-16 sm:py-20">
-        <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-black/40 backdrop-blur-md p-8 sm:p-14 relative overflow-hidden">
-          {/* Subtle accent glow */}
-          <div className="absolute -top-40 -right-40 w-[400px] h-[400px] bg-[var(--accent)]/10 blur-[140px] rounded-full pointer-events-none" />
-
-          <div className="relative z-10">
+      <footer className="mx-auto max-w-5xl px-6 py-20">
+        <div className="rounded-3xl border border-white/10 bg-zinc-950/90 backdrop-blur-2xl p-10 md:p-16 relative">
+          <div className="max-w-2xl mx-auto text-center">
             {/* Big Title + CTA */}
-            <h2 className="text-4xl sm:text-6xl font-semibold tracking-tight text-[var(--accent)]">
+            <h2 className="text-5xl md:text-7xl font-light tracking-[-2px] text-[var(--accent)]">
               LET&apos;S CONNECT
             </h2>
-            <p className="mt-4 text-white/60 max-w-xl leading-relaxed">
-              Follow the journey. Explore releases. Book a session or just say hi.
+            <p className="mt-6 text-lg text-white/70 leading-relaxed">
+              Follow the journey. Explore releases. Send an email or just say hi.
             </p>
 
             {/* Primary CTA buttons */}
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/booking"
-                className="px-8 py-4 bg-[var(--accent)] text-white font-medium rounded-full hover:bg-[var(--accent)]/80 transition uppercase tracking-wider text-sm sm:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40"
+                className="px-10 py-5 bg-[var(--accent)] hover:bg-white text-zinc-950 font-medium rounded-2xl text-sm tracking-[0.5px] uppercase transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
-                Book Now
+                Send email
               </Link>
 
               <a
                 href="https://open.spotify.com/artist/tvuj-profil-id" // ← uprav na reálný link
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-4 border border-white/30 text-white/90 rounded-full hover:bg-white/10 transition flex items-center gap-3 uppercase tracking-wider text-sm sm:text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40"
+                className="px-8 py-5 border border-white/30 hover:bg-white/5 text-white/90 rounded-2xl flex items-center justify-center gap-3 text-sm tracking-[0.5px] uppercase transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60"
               >
-                <IconSpotify className="w-6 h-6" />
+                <IconSpotify className="w-5 h-5" />
                 Play on Spotify
               </a>
             </div>
 
             {/* Navigation */}
-            <div className="mt-12 flex flex-wrap gap-6 sm:gap-10 text-white/50 text-xs sm:text-sm tracking-[0.35em] uppercase">
+            <nav className="mt-16 flex flex-wrap justify-center gap-x-8 gap-y-2 text-xs tracking-[0.125em] uppercase text-white/60">
               {FOOTER_NAV.map((i) => (
                 <Link
                   key={i.label}
                   href={i.href}
                   aria-current={isActivePath(pathname, i.href) ? "page" : undefined}
-                  className={
-                    isActivePath(pathname, i.href)
-                      ? "text-[var(--accent)]"
-                      : "hover:text-[var(--accent)] transition"
-                  }
+                  className={`transition hover:text-white ${
+                    isActivePath(pathname, i.href) ? "text-[var(--accent)]" : ""
+                  }`}
                 >
                   {i.label}
                 </Link>
               ))}
-            </div>
+            </nav>
 
-            {/* Social icons */}
-            <div className="mt-10 flex flex-wrap gap-6">
-              <a
-                href="https://open.spotify.com/artist/..."
-                target="_blank"
-                rel="noopener noreferrer"
-                className={iconLinkClass}
-                aria-label="Spotify"
-              >
-                <IconSpotify className={iconClass} />
-              </a>
-
-              <a
-                href="https://youtube.com/..."
-                target="_blank"
-                rel="noopener noreferrer"
-                className={iconLinkClass}
-                aria-label="YouTube"
-              >
-                <IconYouTube className={iconClass} />
-              </a>
-
-              <a
-                href="https://instagram.com/..."
-                target="_blank"
-                rel="noopener noreferrer"
-                className={iconLinkClass}
-                aria-label="Instagram"
-              >
-                <IconInstagram className={iconClass} />
-              </a>
-
-              {/* Přidej další – TikTok, Bandcamp atd. */}
-            </div>
 
             {/* Contact */}
-            <div className="mt-10 text-white/70 text-sm">
-              <p>
-                Booking & inquiries:{" "}
-                <a
-                  href="mailto:booking@tvujartist.cz"
-                  className="hover:text-[var(--accent)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40 rounded"
-                >
-                  booking@tvujartist.cz
-                </a>
-              </p>
+            <div className="mt-12 text-sm text-white/70">
+              
             </div>
 
             {/* Location */}
-            <div className="mt-8 text-white/50 text-sm italic">
-              Based in Amsterdam, The Netherlands • Available worldwide for sessions, gigs & collaborations
+            <div className="mt-4 text-xs text-white/40 italic">
+              Based in Amsterdam, The Netherlands • Available worldwide
             </div>
           </div>
 
           {/* Bottom line */}
-          <div className="relative z-10 mt-16 pt-8 border-t border-white/10 text-white/30 text-sm flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-6 text-xs text-white/30">
             <span>© 2026 Franky Fugazi – All rights reserved.</span>
             <div className="flex gap-6">
               <Link href="/privacy" className="hover:text-white/60 transition">
-                Privacy Policy
+                Privacy
               </Link>
               <Link href="/terms" className="hover:text-white/60 transition">
                 Terms
               </Link>
             </div>
-            <span className="text-white/20">Designed & Developed with intent.</span>
+            <span>Designed with intent.</span>
           </div>
         </div>
       </footer>
@@ -212,11 +165,17 @@ export default function Footer() {
       {showBackToTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-8 right-8 z-50 p-4 bg-[var(--accent)] text-white rounded-full shadow-lg hover:bg-[var(--accent)]/80 transition opacity-90 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black/40"
+          className="fixed bottom-8 right-8 z-50 p-4 bg-[var(--accent)] text-white rounded-2xl shadow-xl hover:bg-white hover:text-zinc-950 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           aria-label="Back to top"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7" />
           </svg>
         </button>
       )}

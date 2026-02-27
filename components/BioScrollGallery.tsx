@@ -15,7 +15,7 @@ type BioScrollGalleryProps = {
 
   topLabel?: string; // "BIOGRAPHY"
   introText?: string; // short intro
-  caption?: string; // "New York • Producer • DJ"
+  caption?: string; // "Amsterdam • Producer • Singer"
 
   intervalMs?: number; // auto change interval (default 4500)
   pauseOnHover?: boolean; // default true
@@ -27,7 +27,7 @@ export default function BioScrollGallery({
   images,
   topLabel = "BIOGRAPHY",
   introText = "Emotion first. Genre second. The goal is a cinematic feeling that stays with you after the last kick fades out.",
-  caption = "New York • Producer • DJ",
+  caption = "Amsterdam • Producer • Singer",
   intervalMs = 4500,
   pauseOnHover = true,
   children,
