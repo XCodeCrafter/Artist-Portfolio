@@ -1,0 +1,148 @@
+/*artist-portfolio/styles/globals.css*/
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --accent: #ff3b1f;
+  --accent2: #b8001a;
+  --text-xs: 1.0rem;
+}
+
+/* --- Typography system ---
+   Provided by next/font variables:
+   --font-display : headings/brand
+   --font-body    : paragraphs/UI
+*/
+html {
+  font-family: var(--font-body), system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  text-rendering: geometricPrecision;
+}
+
+/* Headings default to display font */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display), var(--font-body), system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* Utilities (use anywhere) */
+.font-display {
+  font-family: var(--font-display), var(--font-body), system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.font-body {
+  font-family: var(--font-body), system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 3px;
+}
+
+/* Overlays */
+.noise {
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(255,255,255,0.05), transparent 40%),
+    radial-gradient(circle at 80% 30%, rgba(255,255,255,0.04), transparent 45%),
+    radial-gradient(circle at 40% 90%, rgba(255,255,255,0.03), transparent 40%);
+}
+
+.texture {
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(255,255,255,0.04), transparent 35%),
+    radial-gradient(circle at 85% 25%, rgba(255,255,255,0.03), transparent 40%),
+    linear-gradient(180deg, rgba(255,59,31,0.10), transparent 40%, rgba(184,0,26,0.10));
+}
+
+.gridlines {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 80px 80px;
+  background-position: center;
+  mask-image: radial-gradient(circle at center, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.2) 55%, transparent 75%);
+}
+
+/* Accent helpers */
+.accent { color: var(--accent); }
+.border-accent { border-color: rgba(255,59,31,0.35); }
+
+/* --- Parallax backdrop layers (shards) --- */
+.parallax-shards {
+  background-image:
+    url("/images/parallax/depth-3.png"),
+    url("/images/parallax/depth-2.png"),
+    url("/images/parallax/depth-1.png");
+  background-size: 45% 45%;            /* zoom out → méně viditelné opakování */
+  background-position: 50% 50%;
+  opacity: 0.7;                        /* base – pak přepisuješ v className */
+  mix-blend-mode: screen;
+  filter: contrast(1.05) brightness(1.1);
+}
+
+.mask-radial {
+  mask-image: radial-gradient(circle at center, #000 0%, #000 52%, transparent 78%);
+  -webkit-mask-image: radial-gradient(circle at center, #000 0%, #000 52%, transparent 78%);
+}
+
+/* mobil – ještě subtilnější */
+@media (max-width: 768px) {
+  .parallax-shards {
+    opacity: 0.13 !important;
+    background-size: 180% 180%;
+  }
+}
+
+/* =========================================================
+   Scroll reveal (global)
+   - data-reveal: element to animate
+   - data-reveal-from="right|left" optional direction
+========================================================= */
+
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  filter: blur(2px);
+  transition:
+    opacity 800ms ease,
+    transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 900ms ease;
+  will-change: transform, opacity, filter;
+}
+
+[data-reveal][data-reveal-from="right"] {
+  transform: translate3d(28px, 0, 0);
+}
+
+[data-reveal][data-reveal-from="left"] {
+  transform: translate3d(-28px, 0, 0);
+}
+
+[data-reveal].is-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  filter: blur(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+}
