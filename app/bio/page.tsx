@@ -24,7 +24,7 @@ export default function BioPage() {
           ]}
           topLabel=""
           introText=""
-          caption="New York • Producer • DJ"
+          caption="Amsterdam • Producer • Singer"
         >
          <p data-reveal="up" data-reveal-delay="140">
   I create music that moves between shadow and glow — hypnotic rhythm,
