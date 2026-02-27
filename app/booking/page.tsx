@@ -14,8 +14,8 @@ export default function BookingPage() {
       />
 
     
-      <div id="form">
-        <BookingForm />
+    <div id="form" className="pt-24 md:pt-32">
+          <BookingForm />
       </div>
     </>
   );
