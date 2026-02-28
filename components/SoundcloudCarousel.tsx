@@ -1,3 +1,4 @@
+//artist-portfolio\components\SoundcloudCarousel.tsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -39,6 +40,73 @@ function getPerView() {
   if (w < 640) return 1;
   if (w < 1024) return 2;
   return 4;
+}
+
+function SoundcloudCard({
+  mix,
+  src,
+  showTitles,
+}: {
+  mix: Mix;
+  src: string;
+  showTitles: boolean;
+}) {
+  const [interactive, setInteractive] = useState<boolean>(false);
+
+  // Auto-lock back after a while (prevents “iframe eats scroll forever”)
+  useEffect(() => {
+    if (!interactive) return;
+    const t = window.setTimeout(() => setInteractive(false), 9000);
+    return () => window.clearTimeout(t);
+  }, [interactive]);
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+      {showTitles && mix.title ? (
+        <div className="px-4 pt-3 text-sm font-medium tracking-wide text-white/85">
+          {mix.title}
+        </div>
+      ) : null}
+
+      <div className={showTitles && mix.title ? "px-3 pb-3 pt-2" : "p-3"}>
+        <div
+          className="relative h-[240px] w-full overflow-hidden rounded-xl"
+          // Optional for Lenis users: tells Lenis “don’t try to smooth-scroll inside this block”
+          data-lenis-prevent
+        >
+          {/* Shield */}
+          {!interactive ? (
+            <button
+              type="button"
+              className={[
+                "absolute inset-0 z-10 flex items-center justify-center",
+                "bg-black/10",
+                "text-white/80 opacity-0 hover:opacity-100",
+                "transition",
+              ].join(" ")}
+              onClick={() => setInteractive(true)}
+              aria-label="Activate SoundCloud embed"
+              title="Click to interact"
+            >
+              <span className="rounded-full border border-white/15 bg-black/45 px-4 py-2 text-xs tracking-[0.22em] uppercase">
+                Click to interact
+              </span>
+            </button>
+          ) : null}
+
+          <iframe
+            src={src}
+            title={mix.title ? `SoundCloud: ${mix.title}` : "SoundCloud track"}
+            className="absolute inset-0 h-full w-full"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
+            // Key part: while not interactive, iframe can’t steal wheel/touch
+            style={{ pointerEvents: interactive ? "auto" : "none" }}
+          />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function SoundcloudCarousel({
@@ -87,10 +155,8 @@ export default function SoundcloudCarousel({
       setIndex(next);
       return;
     }
-    // snap without animation
     el.style.transition = "none";
     setIndex(next);
-    // force reflow then restore transition
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     el.offsetHeight;
     el.style.transition = `transform ${transitionMs}ms cubic-bezier(0.2, 0.8, 0.2, 1)`;
@@ -99,13 +165,9 @@ export default function SoundcloudCarousel({
   const goNext = () => {
     if (!canNavigate) return;
 
-    // Behavior you requested:
-    // 0 => 1 => ... => maxIndex => back to 0 (no wrap-mixed window like 3,4,5,1)
     if (index >= maxIndex) {
       setAnimating(true);
-      // instant back to start (looks clean + deterministic for small counts like 5)
       snapTo(0);
-      // small timeout to avoid double clicks racing
       window.setTimeout(() => setAnimating(false), 60);
       return;
     }
@@ -161,7 +223,6 @@ export default function SoundcloudCarousel({
   const stepPct = 100 / perView;
   const translateX = `-${index * stepPct}%`;
 
-  // If not enough items, just render a stable grid
   if (n === 0) return null;
 
   if (n <= perView) {
@@ -172,28 +233,12 @@ export default function SoundcloudCarousel({
             {items.map((mix, i) => {
               const src = buildSoundcloudPlayerUrl(mix.embedUrl, autoPlay);
               return (
-                <div
+                <SoundcloudCard
                   key={i}
-                  className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
-                >
-                  {showTitles && mix.title ? (
-                    <div className="px-4 pt-3 text-sm font-medium tracking-wide text-white/85">
-                      {mix.title}
-                    </div>
-                  ) : null}
-
-                  <div className={showTitles && mix.title ? "px-3 pb-3 pt-2" : "p-3"}>
-                    <div className="relative h-[240px] w-full overflow-hidden rounded-xl">
-                      <iframe
-                        src={src}
-                        title={mix.title ? `SoundCloud: ${mix.title}` : "SoundCloud track"}
-                        className="absolute inset-0 h-full w-full"
-                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                        loading="lazy"
-                      />
-                    </div>
-                  </div>
-                </div>
+                  mix={mix}
+                  src={src}
+                  showTitles={showTitles}
+                />
               );
             })}
           </div>
@@ -219,29 +264,13 @@ export default function SoundcloudCarousel({
               <div
                 key={i}
                 className="shrink-0 px-2 py-4 sm:px-3 sm:py-5"
-                style={{
-                  width: `${stepPct}%`, // 100/perView
-                }}
+                style={{ width: `${stepPct}%` }}
               >
-                <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-                  {showTitles && mix.title ? (
-                    <div className="px-4 pt-3 text-sm font-medium tracking-wide text-white/85">
-                      {mix.title}
-                    </div>
-                  ) : null}
-
-                  <div className={showTitles && mix.title ? "px-3 pb-3 pt-2" : "p-3"}>
-                    <div className="relative h-[240px] w-full overflow-hidden rounded-xl">
-                      <iframe
-                        src={src}
-                        title={mix.title ? `SoundCloud: ${mix.title}` : "SoundCloud track"}
-                        className="absolute inset-0 h-full w-full"
-                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                        loading="lazy"
-                      />
-                    </div>
-                  </div>
-                </div>
+                <SoundcloudCard
+                  mix={mix}
+                  src={src}
+                  showTitles={showTitles}
+                />
               </div>
             );
           })}

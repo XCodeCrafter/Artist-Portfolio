@@ -1,4 +1,5 @@
 //artist-portfolio/components/SmoothScroll.tsx
+
 "use client";
 
 import { useEffect } from "react";
@@ -11,7 +12,6 @@ export default function SmoothScroll() {
       window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // Pokud má uživatel reduced motion, smooth scroll radši vypneme.
     if (reduce) return;
 
     const lenis = new Lenis({
@@ -19,8 +19,9 @@ export default function SmoothScroll() {
       smoothWheel: true,
       wheelMultiplier: 0.95,
       touchMultiplier: 1.05,
-      // Občas pomůže, když Lenis nesahá na touch/trackpad moc agresivně:
-      // syncTouch: true,
+      // Pokud chceš, můžeš později zkusit:
+      // smoothTouch: true,
+      // normalizeWheel: true,
     });
 
     let raf = 0;
@@ -48,27 +49,17 @@ export default function SmoothScroll() {
       history.pushState(null, "", href);
     };
 
-    // IMPORTANT: iframes někdy sežerou wheel → přepošleme ho Lenisu
-    const onWheel = (e: WheelEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-
-      // pokud jsi nad iframe (Spotify/SoundCloud/YT), nenecháme ho spolknout scroll
-      if (target.closest("iframe")) {
-        e.preventDefault();
-        // lenis.scrollTo umí i číslo (pozici)
-        const next = (lenis as unknown as { scroll: number }).scroll + e.deltaY;
-        lenis.scrollTo(next, { immediate: true });
-      }
+    const onResize = () => {
+      // Lenis needs to recalc after layout changes (iframes, images, carousel shifts…)
+      lenis.resize();
     };
 
     window.addEventListener("click", onClick);
-    // capture + passive:false je klíč (jinak preventDefault neprojde)
-    window.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    window.addEventListener("resize", onResize, { passive: true });
 
     return () => {
       window.removeEventListener("click", onClick);
-      window.removeEventListener("wheel", onWheel, true as unknown as EventListenerOptions);
+      window.removeEventListener("resize", onResize);
       cancelAnimationFrame(raf);
       lenis.destroy();
     };
