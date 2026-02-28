@@ -146,3 +146,24 @@ h1, h2, h3, h4, h5, h6 {
     transition: none !important;
   }
 }
+
+
+
+/* ---------------------------------------------------------
+   Basic UI heading (neutral, modern, minimal)
+   Use when display font is too expressive.
+---------------------------------------------------------- */
+
+.heading-ui {
+  font-family: var(--font-body), system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-rendering: optimizeLegibility;
+}
+
+.heading-ui-light {
+  font-family: var(--font-body), system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-rendering: optimizeLegibility;
+}
