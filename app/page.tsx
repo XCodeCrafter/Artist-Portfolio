@@ -11,7 +11,7 @@ export default function HomePage() {
       <HeroCinematic
         title="FRANKY FUGAZI"
         subtitle="MUSIC • PHOTOS • ILLUSTRATION"
-        ctaLabel="LEARN MORE"
+        ctaLabel=""
         ctaHref="#home-about"
         backgroundSrc="/images/hero.jpg"
       />
