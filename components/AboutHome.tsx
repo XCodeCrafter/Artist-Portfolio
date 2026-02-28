@@ -11,7 +11,7 @@ export default function AboutHome() {
         intensity={0.7}           // 0.4–0.9 → čím nižší, tím subtilnější (zkoušej 0.5–0.7)
         className={`
           z-0 h-full
-          opacity-[0.18] sm:opacity-[0.22]    // velmi jemně – jako na Niki Sadeki
+          opacity-[0.18] sm:opacity-[0.22]    // velmi jemně – 
           blur-[0.4px]                        // maličko soft
           mask-radial                         // mizí u krajů → klíčové pro čistý look
         `}
@@ -38,8 +38,9 @@ export default function AboutHome() {
 
             <p className="mt-6 text-white/75 leading-relaxed max-w-xl text-lg sm:text-xl">
               {/* sem dáš svoje 2–3 věty */}
-              DJ & producent z Brna. Tvořím temné, ale taneční zvuky – techno s nádechem melancholie a broken beatů. 
-              Přijď na set a dostaneš filmový trip bez zbytečných slov.
+              Guitarist with roots in England, now based in Amsterdam.
+              I craft moody yet energetic indie rock — shimmering guitars, raw emotion, and melodies that linger long after the last chord fades. 
+              Come to a show and you’ll get a cinematic ride without unnecessary words — just sound, atmosphere, and honest intensity.
             </p>
 
             <Link
