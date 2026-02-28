@@ -1,5 +1,6 @@
 // artist-portfolio/app/music/page.tsx
 import HeroCinematic from "@/components/HeroCinematic";
+import SpotifyEmbed from "@/components/SpotifyEmbed";
 import MusicPlatforms_ext from "@/components/MusicPlatforms_ext";
 import NewsletterBlock from "@/components/NewsletterBlock";
 import SoundcloudCarousel from "@/components/SoundcloudCarousel";
@@ -12,6 +13,7 @@ type Mix = {
 const SPOTIFY_EMBED_URL =
   "https://open.spotify.com/embed/artist/3j6ZTLub4b9G6huqfRDIIM?theme=0";
 
+  
 const SOUNDCLOUD_MIXES: Mix[] = [
   {
     title: "",
@@ -55,30 +57,28 @@ export default function MusicPage() {
         <MusicPlatforms_ext />
 
         {/* LATEST RELEASES */}
-        <section className="mx-auto max-w-[1400px] px-5 sm:px-8 py-14 sm:py-18">
-          <h2
-            className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
-            data-reveal="up"
-          >
-            LATEST RELEASES
-          </h2>
+<section className="mx-auto max-w-[1400px] px-5 sm:px-8 py-14 sm:py-18">
+  <h2
+    className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
+    data-reveal="up"
+  >
+    LATEST RELEASES
+  </h2>
 
-          <div
-            className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/5"
-            data-reveal="up"
-            data-reveal-delay="140"
-          >
-            <div className="relative h-[520px]">
-              <iframe
-                src={SPOTIFY_EMBED_URL}
-                title="Spotify Releases"
-                className="absolute inset-0 h-full w-full"
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                loading="lazy"
-              />
-            </div>
-          </div>
-        </section>
+  <div
+    className="mt-8"
+    data-reveal="up"
+    data-reveal-delay="140"
+  >
+    <SpotifyEmbed
+      embedUrl={SPOTIFY_EMBED_URL}
+      openUrl="https://open.spotify.com/artist/3j6ZTLub4b9G6huqfRDIIM"
+      title="Spotify Releases"
+      heightMobile={352}
+      heightDesktop={520}
+    />
+  </div>
+</section>
 
         {/* LATEST MIXES */}
         <section className="mx-auto max-w-[1400px] px-5 sm:px-8 pb-18">
