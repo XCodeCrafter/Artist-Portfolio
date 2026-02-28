@@ -74,8 +74,8 @@ export default function MusicPage() {
                 title="Spotify Releases"
                 className="absolute inset-0 h-full w-full"
                 allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                loading="lazy"
-              />
+                loading="eager"
+/>
             </div>
           </div>
         </section>
