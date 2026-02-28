@@ -24,7 +24,7 @@ const UPDATES: Update[] = [
   },
   {
     id: "u3",
-    text: "Blends indie, techno, and progressive sounds.",
+    text: "Blends indie, rock, and progressive sounds.",
     avatarSrc: "/images/avatar-3.jpg",
   },
   {
