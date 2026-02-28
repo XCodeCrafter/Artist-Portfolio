@@ -149,7 +149,7 @@ export default function HeroCinematic({
         className={[
           "relative z-10 flex items-center justify-center px-5 sm:px-8",
           // ✅ match the hero height so the text sits correctly
-          "min-h-[50svh] sm:min-h-[70svh] lg:min-h-[100svh]",
+          "min-h-[60svh] sm:min-h-[70svh] lg:min-h-[100svh]",
         ].join(" ")}
       >
         <motion.div
