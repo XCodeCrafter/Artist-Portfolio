@@ -1,0 +1,23 @@
+project_id = "artist-portfolio"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/admin/auth/callback"]
+jwt_expiry = 3600
+enable_signup = false
+enable_anonymous_sign_ins = false
+minimum_password_length = 12
+
+[auth.email]
+enable_signup = false
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = true
+max_frequency = "1m"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true

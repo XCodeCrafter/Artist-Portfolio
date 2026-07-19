@@ -5,22 +5,40 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run build",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:init": "supabase init",
+    "db:link": "supabase link",
+    "db:status": "supabase migration list",
+    "db:push:dry": "supabase db push --dry-run",
+    "db:push": "supabase db push",
+    "db:new": "supabase migration new",
+    "db:reset:local": "supabase db reset --local"
   },
   "dependencies": {
-    "next": "16.1.6",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.2",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
+    "framer-motion": "^12.42.2",
+    "next": "^16.2.10",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-icons": "^5.7.0",
+    "resend": "^6.17.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4",
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/node": "^20.19.43",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.10",
+    "tailwindcss": "^4.3.2",
     "typescript": "^5"
   }
 }
