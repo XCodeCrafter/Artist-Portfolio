@@ -319,7 +319,7 @@ Probehly bezpecnostni upravy:
 - contact API kontroluje stejny origin requestu
 - contact API blokuje bezne non-browser bot user-agenty
 - blokovane pokusy se zapisujou do `audit_logs` jako `security_contact_*`
-- analytics API ma limit velikosti, origin/referer check, bot filter a volitelny Redis rate limit
+- analytics API ma limit velikosti, origin/referer check, bot filter a povinny production Supabase rate limit
 - admin write actions maji same-origin guard proti cross-origin pokusum
 - admin/API routes maji `Cache-Control: no-store` a `X-Robots-Tag: noindex`
 - HSTS a `upgrade-insecure-requests` jsou zapnute jen pro production, ne pro localhost
@@ -386,7 +386,7 @@ Az budu chtit projekt dat online:
 5. Vlozit admina do `admin_profiles`.
 6. Nastavit Supabase Storage bucket pres migraci `0002_media_manager.sql`.
 7. Zalozit Resend nebo jinou emailovou konfiguraci.
-8. Zalozit Upstash Redis pro rate limiting.
+8. Aplikovat migraci `0018_database_rate_limits.sql` pro sdileny rate limiting.
 9. Nastavit env promenne ve Vercelu.
 10. Nasadit pres Vercel.
 11. Otestovat public web.
@@ -403,8 +403,6 @@ Pozdeji bude potreba nastavit:
 - `RESEND_API_KEY`
 - `BOOKING_TO_EMAIL`
 - `BOOKING_FROM_EMAIL`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -412,6 +410,7 @@ Pozdeji bude potreba nastavit:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_MEDIA_BUCKET`
 - `ADMIN_EMAILS`
+- `AUTH_SECURITY_SECRET`
 
 Pozor:
 

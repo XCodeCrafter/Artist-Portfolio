@@ -1,9 +1,9 @@
 import "server-only";
 
 import { headers } from "next/headers";
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 import { keyedDigest } from "@/lib/admin/security-secret";
+import { getClientIp } from "@/lib/security/request";
+import { consumeDatabaseRateLimit } from "@/lib/security/rate-limit";
 
 type AuthRateLimitKind = "login" | "password-reset" | "mfa";
 
@@ -18,38 +18,16 @@ type AuthRateLimitResult = {
   };
 };
 
-function getRedis() {
-  const url =
-    process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "";
-  const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN ||
-    process.env.KV_REST_API_TOKEN ||
-    "";
-
-  return url && token ? new Redis({ url, token }) : null;
-}
-
-function getClientIp(headerStore: Headers) {
-  const forwardedFor = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const candidate =
-    headerStore.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
-    forwardedFor ||
-    headerStore.get("x-real-ip")?.trim() ||
-    "unknown";
-
-  return candidate.slice(0, 80);
-}
-
 function limitsFor(kind: AuthRateLimitKind) {
   if (kind === "password-reset") {
-    return { account: 3, ip: 8, window: "1 h" as const };
+    return { account: 3, ip: 8, windowSeconds: 60 * 60 };
   }
 
   if (kind === "mfa") {
-    return { account: 8, ip: 20, window: "10 m" as const };
+    return { account: 8, ip: 20, windowSeconds: 10 * 60 };
   }
 
-  return { account: 5, ip: 12, window: "15 m" as const };
+  return { account: 5, ip: 12, windowSeconds: 15 * 60 };
 }
 
 export async function enforceAuthRateLimit(
@@ -63,9 +41,8 @@ export async function enforceAuthRateLimit(
   );
   const ipKey = keyedDigest("auth-rate-ip", getClientIp(headerStore));
   const auditMetadata = { accountKey, ipKey, rateLimitKind: kind };
-  const redis = getRedis();
 
-  if (!redis || !accountKey || !ipKey) {
+  if (!accountKey || !ipKey) {
     return {
       allowed: process.env.NODE_ENV !== "production",
       configured: false,
@@ -75,37 +52,28 @@ export async function enforceAuthRateLimit(
   }
 
   const limits = limitsFor(kind);
-  const accountLimiter = new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(limits.account, limits.window),
-    prefix: `portfolio:admin-auth:${kind}:account`,
-  });
-  const ipLimiter = new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(limits.ip, limits.window),
-    prefix: `portfolio:admin-auth:${kind}:ip`,
-  });
-  let accountResult;
-  let ipResult;
-  try {
-    [accountResult, ipResult] = await Promise.all([
-      accountLimiter.limit(accountKey),
-      ipLimiter.limit(ipKey),
-    ]);
-  } catch {
-    return {
-      allowed: false,
-      configured: true,
-      retryAfterSeconds: 60,
-      auditMetadata,
-    };
-  }
-  const resetAt = Math.max(accountResult.reset, ipResult.reset);
+  const [accountResult, ipResult] = await Promise.all([
+    consumeDatabaseRateLimit({
+      bucket: `admin-auth:${kind}:account`,
+      identifierHash: accountKey,
+      limit: limits.account,
+      windowSeconds: limits.windowSeconds,
+    }),
+    consumeDatabaseRateLimit({
+      bucket: `admin-auth:${kind}:ip`,
+      identifierHash: ipKey,
+      limit: limits.ip,
+      windowSeconds: limits.windowSeconds,
+    }),
+  ]);
 
   return {
-    allowed: accountResult.success && ipResult.success,
-    configured: true,
-    retryAfterSeconds: Math.max(1, Math.ceil((resetAt - Date.now()) / 1000)),
+    allowed: accountResult.allowed && ipResult.allowed,
+    configured: accountResult.configured && ipResult.configured,
+    retryAfterSeconds: Math.max(
+      accountResult.retryAfterSeconds,
+      ipResult.retryAfterSeconds
+    ),
     auditMetadata,
   };
 }

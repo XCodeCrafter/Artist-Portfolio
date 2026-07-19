@@ -32,6 +32,7 @@ export async function updateSession(
     path: "/",
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
+    priority: "high" as const,
   };
 
   const supabase = createServerClient(

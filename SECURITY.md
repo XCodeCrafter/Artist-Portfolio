@@ -14,8 +14,10 @@ Supabase Auth session elevated to `aal2` with TOTP MFA and a matching active
 fallback. Secrets belong only in the deployment environment and must never be
 committed or prefixed with `NEXT_PUBLIC_`.
 
-Production also requires Upstash auth throttling, `AUTH_SECURITY_SECRET`, public
-Supabase signup disabled, and migration `0015_admin_auth_hardening.sql` applied.
+Production also requires `AUTH_SECURITY_SECRET`, public Supabase signup
+disabled, and all migrations through `0018_database_rate_limits.sql` applied.
+Rate limiting is atomic in Supabase PostgreSQL and fails closed in production;
+no separate Redis or Upstash account is required.
 
 Before release, run `npm run check` and `npm run audit:prod`, confirm every
 readiness check in `/admin`, and verify `/api/health` from the production host.

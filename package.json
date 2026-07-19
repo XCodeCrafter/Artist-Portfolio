@@ -21,8 +21,6 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",
-    "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.38.0",
     "framer-motion": "^12.42.2",
     "next": "^16.2.10",
     "react": "^19.2.7",

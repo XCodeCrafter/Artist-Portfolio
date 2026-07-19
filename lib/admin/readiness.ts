@@ -10,6 +10,7 @@ import {
   hasSupabaseBrowserEnv,
 } from "@/lib/supabase/env";
 import { hasProductionSiteUrl } from "@/lib/site-url";
+import { probeDatabaseRateLimit } from "@/lib/security/rate-limit";
 
 export type ReadinessCheck = {
   id: string;
@@ -36,24 +37,28 @@ function hasEmailEnv() {
   );
 }
 
-function hasRedisEnv() {
-  return Boolean(
-    (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL) &&
-      (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)
-  );
-}
-
 async function inspectSupabase() {
   const fallback = {
     schemaOk: false,
     storageOk: false,
     ownerOk: false,
+    rateLimitOk: false,
   };
   const supabase = createAdminServiceClient();
   if (!supabase) return fallback;
 
   try {
-    const results = await Promise.all([
+    const [
+      settingsResult,
+      galleryResult,
+      mediaResult,
+      videosResult,
+      presentationResult,
+      recoveryResult,
+      rateLimitResult,
+      ownerResult,
+      bucketResult,
+    ] = await Promise.all([
       supabase
         .from("site_settings")
         .select("id, portfolio_type, display_font, body_font, ui_font")
@@ -74,6 +79,7 @@ async function inspectSupabase() {
         .limit(1),
       supabase.from("gallery_presentation").select("id").limit(1),
       supabase.from("admin_recovery_challenges").select("id").limit(1),
+      probeDatabaseRateLimit(supabase),
       supabase
         .from("admin_profiles")
         .select("user_id")
@@ -83,12 +89,18 @@ async function inspectSupabase() {
       supabase.storage.listBuckets(),
     ]);
 
-    const schemaOk = results.slice(0, 6).every((result) => !result.error);
-    const ownerResult = results[6];
-    const bucketResult = results[7];
+    const schemaOk = [
+      settingsResult,
+      galleryResult,
+      mediaResult,
+      videosResult,
+      presentationResult,
+      recoveryResult,
+    ].every((result) => !result.error);
 
     return {
       schemaOk,
+      rateLimitOk: rateLimitResult,
       ownerOk: !ownerResult.error && Boolean(ownerResult.data?.length),
       storageOk:
         !bucketResult.error &&
@@ -123,7 +135,12 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
   const [supabase, publicSignupDisabled] = await Promise.all([
     serviceConfigured
       ? inspectSupabase()
-      : Promise.resolve({ schemaOk: false, storageOk: false, ownerOk: false }),
+      : Promise.resolve({
+          schemaOk: false,
+          storageOk: false,
+          ownerOk: false,
+          rateLimitOk: false,
+        }),
     inspectAuthSettings(),
   ]);
 
@@ -165,7 +182,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       critical: true,
       detail: supabase.schemaOk
         ? "Required tables and columns are available."
-        : "Apply all Supabase migrations through 0015.",
+        : "Apply all Supabase migrations through 0018.",
       href: "/admin/security#health",
     },
     {
@@ -221,11 +238,12 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
     {
       id: "rate-limit",
       label: "Rate limiting",
-      ok: hasRedisEnv(),
+      ok: supabase.rateLimitOk && hasAuthSecuritySecret(),
       critical: true,
-      detail: hasRedisEnv()
-        ? "Upstash Redis rate limiting is configured."
-        : "Configure Upstash Redis before enabling admin authentication or public forms.",
+      detail:
+        supabase.rateLimitOk && hasAuthSecuritySecret()
+          ? "Atomic Supabase database rate limiting is available."
+          : "Apply migration 0018 and configure AUTH_SECURITY_SECRET.",
       href: "/admin/security#health",
     },
     {

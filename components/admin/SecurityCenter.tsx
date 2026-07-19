@@ -535,7 +535,8 @@ export default function SecurityCenter({
       id: "health",
       label: "Health",
       kicker: "Configuration",
-      description: "Supabase, service key, allowlist, Redis, and email checks.",
+      description:
+        "Supabase, service key, authorization, database rate limits, and email checks.",
       count: checks.filter((check) => !check.ok).length,
       node: <CheckGrid checks={checks} />,
     },

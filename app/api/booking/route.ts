@@ -1,12 +1,12 @@
-// artist-portfolio/app/api/booking/route.ts
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/admin/audit";
+import { keyedDigest } from "@/lib/admin/security-secret";
 import { createAdminServiceClient } from "@/lib/admin/service";
 import { normalizePortfolioType } from "@/lib/content/profile";
+import { getClientIp, getPseudonymousIpKey } from "@/lib/security/request";
+import { consumeDatabaseRateLimit } from "@/lib/security/rate-limit";
 import type { PortfolioType } from "@/lib/content";
 
 export const runtime = "nodejs";
@@ -31,29 +31,12 @@ const BookingSchema = z.object({
 const BOT_USER_AGENT_PATTERN =
   /\b(curl|wget|python-requests|httpie|scrapy|go-http-client|java\/|libwww-perl|masscan|nikto|sqlmap|zgrab|headlesschrome)\b/i;
 
-function getIp(req: Request) {
-  const xf = req.headers.get("x-forwarded-for");
-  const value = xf ? xf.split(",")[0] : req.headers.get("x-real-ip");
-  const sanitized = (value || "0.0.0.0")
-    .replace(/[^\w:.-]/g, "")
-    .slice(0, 80)
-    .trim();
-
-  if (sanitized) return sanitized;
-
-  return "0.0.0.0";
-}
-
-function jsonError(status: number, error: string) {
-  return NextResponse.json({ ok: false, error }, { status });
-}
-
-function hasRedisEnv() {
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-  const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
-
-  return Boolean(url && token);
+function jsonError(
+  status: number,
+  error: string,
+  headers?: Record<string, string>
+) {
+  return NextResponse.json({ ok: false, error }, { status, headers });
 }
 
 function sanitizeHeaderValue(value: string) {
@@ -159,7 +142,7 @@ async function writeSecurityEvent(
     tableName: "security_events",
     recordId: "/api/booking",
     metadata: {
-      ip: getIp(req),
+      ipKey: getPseudonymousIpKey(req.headers),
       userAgent: getUserAgent(req),
       origin: sanitizeHeaderValue(req.headers.get("origin") || ""),
       referer: sanitizeHeaderValue(req.headers.get("referer") || ""),
@@ -192,7 +175,7 @@ async function writeBookingInquiry(input: {
   message: string;
   portfolioType: PortfolioType;
   inquiryType: "booking" | "collaboration";
-  ip: string;
+  ipKey: string;
   userAgent: string;
 }) {
   const supabase = createAdminServiceClient();
@@ -205,7 +188,7 @@ async function writeBookingInquiry(input: {
     portfolio_type: input.portfolioType,
     inquiry_type: input.inquiryType,
     status: "new",
-    source_ip: input.ip,
+    source_ip: input.ipKey,
     user_agent: input.userAgent,
   };
 
@@ -220,7 +203,7 @@ async function writeBookingInquiry(input: {
       email: input.email,
       message: input.message,
       status: "new",
-      source_ip: input.ip,
+      source_ip: input.ipKey,
       user_agent: input.userAgent,
     });
 
@@ -326,29 +309,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, message: "Thanks!" });
     }
 
-    if (!hasRedisEnv()) {
-      return jsonError(500, "Server is not configured for rate limiting.");
-    }
-
-    const redis = Redis.fromEnv();
-    const ratelimit = new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(5, "1 m"),
-      analytics: true,
-      prefix: "rl:booking",
+    const ipKey = keyedDigest("public-rate-ip", getClientIp(req.headers));
+    const rateLimit = await consumeDatabaseRateLimit({
+      bucket: "public:booking:ip",
+      identifierHash: ipKey,
+      limit: 5,
+      windowSeconds: 60,
     });
 
-    const ip = getIp(req);
-    const rl = await ratelimit.limit(`ip:${ip}`);
-    if (!rl.success) {
+    if (!rateLimit.allowed) {
       await writeSecurityEvent(req, "security_contact_rate_limited", {
-        limit: rl.limit,
-        remaining: rl.remaining,
-        reset: rl.reset,
+        configured: rateLimit.configured,
+        limit: rateLimit.limit,
+        remaining: rateLimit.remaining,
+        retryAfterSeconds: rateLimit.retryAfterSeconds,
         portfolioType,
         inquiryType,
       });
-      return jsonError(429, "Too many requests. Try again in a minute.");
+
+      if (!rateLimit.configured) {
+        return jsonError(503, "Security service is temporarily unavailable.");
+      }
+
+      return jsonError(429, "Too many requests. Try again in a minute.", {
+        "Retry-After": String(rateLimit.retryAfterSeconds),
+      });
     }
 
     const apiKey = process.env.RESEND_API_KEY;
@@ -367,7 +352,7 @@ export async function POST(req: Request) {
       message,
       portfolioType,
       inquiryType,
-      ip,
+      ipKey,
       userAgent,
     });
 
@@ -390,7 +375,6 @@ export async function POST(req: Request) {
       "Message:",
       message,
       "",
-      `IP: ${ip}`,
       `Time: ${new Date().toISOString()}`,
     ].join("\n");
 

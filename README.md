@@ -10,9 +10,8 @@ analytics, security events, and an authenticated admin console.
 - React 19
 - TypeScript
 - Tailwind CSS 4
-- Supabase for portfolio content data
+- Supabase for content, authentication, and atomic rate limiting
 - Resend for booking email delivery
-- Upstash Redis for booking rate limiting
 
 ## Setup
 
@@ -36,8 +35,6 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.com
 RESEND_API_KEY=...
 BOOKING_TO_EMAIL=...
 BOOKING_FROM_EMAIL=...
-UPSTASH_REDIS_REST_URL=...
-UPSTASH_REDIS_REST_TOKEN=...
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
@@ -172,17 +169,24 @@ database and application authorization source, and stores short-lived one-time
 password recovery challenges. Run
 `supabase/migrations/0015_admin_auth_hardening.sql`.
 
+Migration `0018_database_rate_limits.sql` adds shared atomic rate limits for
+admin login, password recovery, MFA, contact submissions, and analytics. The
+counter table has RLS with no public policies, and its RPC is executable only by
+the server-side Supabase service role. Client IPs are stored only as keyed HMAC
+identifiers; Upstash or another Redis database is not required.
+
 ## Production Readiness
 
-1. Apply all Supabase migrations through `0015_admin_auth_hardening.sql`.
+1. Apply all Supabase migrations through `0018_database_rate_limits.sql`.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare
    Turnstile CAPTCHA for sign-in and recovery.
 3. Create Auth users only from the dashboard or trusted server tooling, then
    create matching active owner/admin profile rows.
-4. Configure the HTTPS site URL, Supabase keys, `AUTH_SECURITY_SECRET`, Resend,
-   and Upstash. Admin auth fails closed in production without Redis or the secret.
+4. Configure the HTTPS site URL, Supabase keys, `AUTH_SECURITY_SECRET`, and
+   Resend. Admin auth fails closed in production without migration 0018 or the
+   secret.
 5. For security-sensitive deployments, enable a session time-box, inactivity
    timeout, and single-session mode in Supabase Auth settings.
 6. Sign in once per admin and complete TOTP enrollment.
@@ -211,7 +215,9 @@ npm run db:push
 ## Security Notes
 
 - Do not commit `.env.local` or production secrets.
-- Booking submissions are validated with Zod, protected by dual honeypots, checked for same-origin browser submissions, rate-limited with Upstash, logged to audit logs when blocked, and sent through Resend when accepted.
-- Analytics events use payload limits, origin/referer checks, bot filters, metadata sanitizing, and optional Redis rate limiting.
+- Booking submissions are validated with Zod, protected by dual honeypots, checked for same-origin browser submissions, rate-limited atomically in Supabase, logged to audit logs when blocked, and sent through Resend when accepted.
+- Analytics events use payload limits, origin/referer checks, bot filters, metadata sanitizing, and mandatory production database rate limiting.
 - Admin write actions verify same-origin requests before changing content, media, inquiries, or admin profiles.
+- Supabase session cookies are `HttpOnly`, `Secure` in production, `SameSite=Lax`, high priority, and admin authorization requires an `aal2` MFA session.
+- Raw client IP addresses are not persisted by the application; rate-limit and audit identifiers use HMAC-SHA-256 with `AUTH_SECURITY_SECRET`.
 - Security headers and CSP are configured in `next.config.ts`; admin/API routes are marked `no-store` and `noindex`.

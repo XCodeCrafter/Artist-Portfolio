@@ -20,9 +20,11 @@ export default function PrivacyPage() {
           booking and inquiry messages submitted through the contact form.
         </p>
         <p>
-          Form submissions may include your name, email address, message, IP
-          address, and submission time. This data is used for spam prevention,
-          rate limiting, and replying to your inquiry.
+          Form submissions may include your name, email address, message, a
+          pseudonymous security identifier derived from your IP address, and
+          submission time. The raw IP address is not stored by the application.
+          This data is used for spam prevention, rate limiting, and replying to
+          your inquiry.
         </p>
         <p>
           The site may use privacy-conscious analytics to understand page views

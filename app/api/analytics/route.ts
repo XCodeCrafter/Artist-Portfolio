@@ -1,9 +1,10 @@
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/admin/audit";
+import { keyedDigest } from "@/lib/admin/security-secret";
 import { createAdminServiceClient } from "@/lib/admin/service";
+import { getClientIp, getPseudonymousIpKey } from "@/lib/security/request";
+import { consumeDatabaseRateLimit } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -42,17 +43,6 @@ function sanitizeHeaderValue(value?: string | null) {
     .replace(/[\u0000-\u001f\u007f]+/g, "")
     .trim()
     .slice(0, 220);
-}
-
-function getIp(req: Request) {
-  const xf = req.headers.get("x-forwarded-for");
-  const value = xf ? xf.split(",")[0] : req.headers.get("x-real-ip");
-  const sanitized = (value || "0.0.0.0")
-    .replace(/[^\w:.-]/g, "")
-    .slice(0, 80)
-    .trim();
-
-  return sanitized || "0.0.0.0";
 }
 
 function configuredOrigins(req: Request) {
@@ -102,14 +92,6 @@ function getRequestMeta(req: Request) {
     referrer: referrer.slice(0, 500),
     userAgent: userAgent.slice(0, 500),
   };
-}
-
-function hasRedisEnv() {
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-  const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
-
-  return Boolean(url && token);
 }
 
 function shouldBlockUserAgent(userAgent: string) {
@@ -174,7 +156,7 @@ async function writeSecurityEvent(
     tableName: "security_events",
     recordId: "/api/analytics",
     metadata: {
-      ip: getIp(req),
+      ipKey: getPseudonymousIpKey(req.headers),
       userAgent: sanitizeHeaderValue(req.headers.get("user-agent")),
       origin: sanitizeHeaderValue(req.headers.get("origin")),
       referer: sanitizeHeaderValue(req.headers.get("referer")),
@@ -227,27 +209,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (hasRedisEnv()) {
-    try {
-      const ratelimit = new Ratelimit({
-        redis: Redis.fromEnv(),
-        limiter: Ratelimit.slidingWindow(120, "1 m"),
-        analytics: true,
-        prefix: "rl:analytics",
-      });
-      const rl = await ratelimit.limit(`ip:${getIp(req)}`);
+  const ipKey = keyedDigest("public-rate-ip", getClientIp(req.headers));
+  const rateLimit = await consumeDatabaseRateLimit({
+    bucket: "public:analytics:ip",
+    identifierHash: ipKey,
+    limit: 120,
+    windowSeconds: 60,
+  });
 
-      if (!rl.success) {
-        await writeSecurityEvent(req, "security_analytics_rate_limited", {
-          limit: rl.limit,
-          remaining: rl.remaining,
-          reset: rl.reset,
-        });
-        return NextResponse.json({ ok: true });
-      }
-    } catch (error) {
-      console.error("Analytics rate limiter unavailable", error);
-    }
+  if (!rateLimit.allowed) {
+    await writeSecurityEvent(req, "security_analytics_rate_limited", {
+      configured: rateLimit.configured,
+      limit: rateLimit.limit,
+      remaining: rateLimit.remaining,
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+    });
+    return NextResponse.json({ ok: true });
   }
 
   const { error } = await supabase.from("analytics_events").insert({

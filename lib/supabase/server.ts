@@ -9,6 +9,7 @@ export async function createClient() {
     path: "/",
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
+    priority: "high" as const,
   };
 
   return createServerClient(getSupabaseUrl(), getSupabasePublishableKey(), {

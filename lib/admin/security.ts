@@ -8,6 +8,7 @@ import {
   hasAdminServiceEnv,
 } from "@/lib/admin/service";
 import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
+import { probeDatabaseRateLimit } from "@/lib/security/rate-limit";
 
 export type AdminProfile = {
   userId: string;
@@ -198,7 +199,10 @@ function mapAuditLog(row: AuditLogRow): AuditLogEntry {
   };
 }
 
-function getSecurityChecks(profiles: AdminProfile[]): SecurityCheck[] {
+function getSecurityChecks(
+  profiles: AdminProfile[],
+  databaseRateLimitReady: boolean
+): SecurityCheck[] {
   const allowedEmails = getAllowedAdminEmails();
   const hasServiceKey = hasAdminServiceEnv();
   const isProduction = process.env.NODE_ENV === "production";
@@ -243,12 +247,10 @@ function getSecurityChecks(profiles: AdminProfile[]): SecurityCheck[] {
             : "Production admin access requires a service key and an active owner profile.",
     },
     {
-      label: "Redis Rate Limit",
-      ok: Boolean(
-        (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL) &&
-          (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN)
-      ),
-      detail: "Admin auth and public form rate limiting depend on Upstash Redis.",
+      label: "Database Rate Limit",
+      ok: databaseRateLimitReady,
+      detail:
+        "Admin auth, contact, and analytics throttling use an atomic Supabase database function.",
     },
     {
       label: "Email Delivery",
@@ -340,7 +342,7 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
       profiles: [],
       auditLogs: [],
       securitySummary: emptySecurityEventSummary(),
-      checks: getSecurityChecks([]),
+      checks: getSecurityChecks([], false),
       allowedEmails,
       isConfigured: false,
       canManageAdmins: false,
@@ -353,14 +355,15 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
       profiles: [],
       auditLogs: [],
       securitySummary: emptySecurityEventSummary(),
-      checks: getSecurityChecks([]),
+      checks: getSecurityChecks([], false),
       allowedEmails,
       isConfigured: false,
       canManageAdmins: false,
     };
   }
 
-  const [profilesResult, logsResult, securityLogsResult] = await Promise.all([
+  const [profilesResult, logsResult, securityLogsResult, rateLimitResult] =
+    await Promise.all([
     supabase
       .from("admin_profiles")
       .select("*")
@@ -373,6 +376,7 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
       .limit(100)
       .returns<AuditLogRow[]>(),
     getSecurityEventLogs(),
+    probeDatabaseRateLimit(supabase),
   ]);
 
   const profiles = (profilesResult.data || []).map(mapAdminProfile);
@@ -382,12 +386,14 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
     profiles,
     auditLogs,
     securitySummary: buildSecurityEventSummary(securityLogsResult.logs),
-    checks: getSecurityChecks(profiles),
+    checks: getSecurityChecks(profiles, rateLimitResult),
     allowedEmails,
     isConfigured: true,
     canManageAdmins: currentAdmin.role === "owner",
     loadError:
-      profilesResult.error || logsResult.error || securityLogsResult.error
+      profilesResult.error ||
+      logsResult.error ||
+      securityLogsResult.error
         ? "Unable to load security data from Supabase."
         : undefined,
   };
