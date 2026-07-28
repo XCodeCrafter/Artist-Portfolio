@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -5,7 +6,13 @@ import { writeAuditLog } from "@/lib/admin/audit";
 import { keyedDigest } from "@/lib/admin/security-secret";
 import { createAdminServiceClient } from "@/lib/admin/service";
 import { normalizePortfolioType } from "@/lib/content/profile";
-import { getClientIp, getPseudonymousIpKey } from "@/lib/security/request";
+import { readJsonBodyWithLimit } from "@/lib/security/json-body";
+import { hasAllowedRequestOrigin } from "@/lib/security/origin";
+import {
+  getClientIp,
+  getPseudonymousIpKey,
+  getReferrerWithoutQuery,
+} from "@/lib/security/request";
 import { consumeDatabaseRateLimit } from "@/lib/security/rate-limit";
 import type { PortfolioType } from "@/lib/content";
 
@@ -47,54 +54,6 @@ function sanitizeHeaderValue(value: string) {
     .slice(0, 120);
 }
 
-function safeOrigin(value?: string | null) {
-  if (!value) return "";
-
-  try {
-    return new URL(value).origin;
-  } catch {
-    return "";
-  }
-}
-
-function configuredOrigins(req: Request) {
-  const origins = new Set<string>();
-  const host = req.headers.get("host");
-  const forwardedProto = req.headers.get("x-forwarded-proto");
-  const protocol =
-    forwardedProto || (host?.startsWith("localhost") ? "http" : "https");
-
-  if (host) {
-    origins.add(`${protocol}://${host}`);
-  }
-
-  const envOrigins = [
-    process.env.SITE_URL,
-    process.env.NEXT_PUBLIC_SITE_URL,
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
-  ];
-
-  for (const origin of envOrigins) {
-    const parsed = safeOrigin(origin);
-    if (parsed) origins.add(parsed);
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    origins.add("http://localhost:3000");
-    origins.add("http://127.0.0.1:3000");
-  }
-
-  return origins;
-}
-
-function hasAllowedOrigin(req: Request) {
-  const origin = safeOrigin(req.headers.get("origin"));
-  const refererOrigin = safeOrigin(req.headers.get("referer"));
-  const candidate = origin || refererOrigin;
-
-  return Boolean(candidate && configuredOrigins(req).has(candidate));
-}
-
 function getUserAgent(req: Request) {
   return (req.headers.get("user-agent") || "").slice(0, 500);
 }
@@ -103,33 +62,6 @@ function shouldBlockUserAgent(userAgent: string) {
   const value = userAgent.trim();
   if (!value) return true;
   return BOT_USER_AGENT_PATTERN.test(value);
-}
-
-async function readJsonWithLimit(req: Request) {
-  const raw = await req.text().catch(() => "");
-  const bytes = new TextEncoder().encode(raw).length;
-
-  if (bytes > MAX_REQUEST_BYTES) {
-    return {
-      ok: false as const,
-      status: 413,
-      error: "Payload is too large.",
-      action: "security_contact_payload_too_large",
-      metadata: { bytes },
-    };
-  }
-
-  try {
-    return { ok: true as const, body: JSON.parse(raw) as unknown, bytes };
-  } catch {
-    return {
-      ok: false as const,
-      status: 400,
-      error: "Invalid payload.",
-      action: "security_contact_invalid_payload",
-      metadata: { bytes },
-    };
-  }
 }
 
 async function writeSecurityEvent(
@@ -145,7 +77,7 @@ async function writeSecurityEvent(
       ipKey: getPseudonymousIpKey(req.headers),
       userAgent: getUserAgent(req),
       origin: sanitizeHeaderValue(req.headers.get("origin") || ""),
-      referer: sanitizeHeaderValue(req.headers.get("referer") || ""),
+      referer: sanitizeHeaderValue(getReferrerWithoutQuery(req.headers)),
       ...metadata,
     },
   });
@@ -241,23 +173,62 @@ async function writeBookingAnalytics(input: {
 
 export async function POST(req: Request) {
   try {
-    const contentLength = Number(req.headers.get("content-length") || "0");
-    if (contentLength > MAX_REQUEST_BYTES) {
-      await writeSecurityEvent(req, "security_contact_payload_too_large", {
-        contentLength,
+    const ipKey = keyedDigest("public-rate-ip", getClientIp(req.headers));
+    const admissionLimit = await consumeDatabaseRateLimit({
+      bucket: "public:booking:admission:ip",
+      identifierHash: ipKey,
+      limit: 30,
+      windowSeconds: 60,
+    });
+
+    if (!admissionLimit.allowed) {
+      if (admissionLimit.firstDenied) {
+        await writeSecurityEvent(req, "security_contact_rate_limited", {
+          bucket: "admission",
+          limit: admissionLimit.limit,
+          retryAfterSeconds: admissionLimit.retryAfterSeconds,
+        });
+      }
+
+      if (!admissionLimit.configured) {
+        return jsonError(503, "Security service is temporarily unavailable.");
+      }
+
+      return jsonError(429, "Too many requests. Try again in a minute.", {
+        "Retry-After": String(admissionLimit.retryAfterSeconds),
       });
-      return jsonError(413, "Payload is too large.");
     }
 
-    if (!hasAllowedOrigin(req)) {
+    if (!hasAllowedRequestOrigin(req.headers)) {
       await writeSecurityEvent(req, "security_contact_bad_origin");
       return jsonError(403, "Request origin is not allowed.");
     }
 
-    const bodyResult = await readJsonWithLimit(req);
+    const bodyResult = await readJsonBodyWithLimit(req, MAX_REQUEST_BYTES);
     if (!bodyResult.ok) {
-      await writeSecurityEvent(req, bodyResult.action, bodyResult.metadata);
-      return jsonError(bodyResult.status, bodyResult.error);
+      const payloadTooLarge = bodyResult.code === "payload-too-large";
+      await writeSecurityEvent(
+        req,
+        payloadTooLarge
+          ? "security_contact_payload_too_large"
+          : "security_contact_invalid_payload",
+        {
+          bytes: bodyResult.bytes,
+          reason: bodyResult.code,
+          ...(bodyResult.declaredLength === undefined
+            ? {}
+            : { declaredLength: bodyResult.declaredLength }),
+        }
+      );
+
+      if (bodyResult.status === 415) {
+        return jsonError(415, "Content-Type must be application/json.");
+      }
+
+      return jsonError(
+        bodyResult.status,
+        payloadTooLarge ? "Payload is too large." : "Invalid payload."
+      );
     }
 
     const parsed = BookingSchema.safeParse(bodyResult.body);
@@ -309,7 +280,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, message: "Thanks!" });
     }
 
-    const ipKey = keyedDigest("public-rate-ip", getClientIp(req.headers));
     const rateLimit = await consumeDatabaseRateLimit({
       bucket: "public:booking:ip",
       identifierHash: ipKey,
@@ -318,14 +288,13 @@ export async function POST(req: Request) {
     });
 
     if (!rateLimit.allowed) {
-      await writeSecurityEvent(req, "security_contact_rate_limited", {
-        configured: rateLimit.configured,
-        limit: rateLimit.limit,
-        remaining: rateLimit.remaining,
-        retryAfterSeconds: rateLimit.retryAfterSeconds,
-        portfolioType,
-        inquiryType,
-      });
+      if (rateLimit.firstDenied) {
+        await writeSecurityEvent(req, "security_contact_rate_limited", {
+          bucket: "submission",
+          limit: rateLimit.limit,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        });
+      }
 
       if (!rateLimit.configured) {
         return jsonError(503, "Security service is temporarily unavailable.");
@@ -391,7 +360,8 @@ export async function POST(req: Request) {
       await writeAuditLog({
         action: "booking_email_failed",
         tableName: "booking_inquiries",
-        recordId: email,
+        recordId:
+          keyedDigest("booking-email-record", email) || randomUUID(),
         metadata: {
           portfolioType,
           inquiryType,

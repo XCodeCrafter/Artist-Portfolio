@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -33,6 +34,7 @@ import {
 import CopyButton from "@/components/admin/CopyButton";
 import ActionButton from "@/components/admin/ActionButton";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
+import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import {
   deleteMediaAsset,
   deleteMediaGalleryImage,
@@ -425,6 +427,7 @@ function ImagePreview({
       fill
       sizes="(min-width: 1280px) 50vw, 100vw"
       src={src}
+      unoptimized={src.startsWith("https://")}
     />
   );
 }
@@ -865,7 +868,7 @@ function StatCard({
   value: number | string;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/10 bg-white/[0.055] p-4 backdrop-blur-2xl">
+    <div className="rounded-[18px] border border-white/9 bg-[#101012]/88 p-4">
       <div className="flex items-center justify-between gap-4">
         <p className={labelClass}>{label}</p>
         <span className="text-white/50">{icon}</span>
@@ -889,7 +892,7 @@ function MediaOverview({
   const totalSize = assets.reduce((sum, asset) => sum + asset.fileSize, 0);
 
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <section className="grid gap-3 grid-cols-2 xl:grid-cols-5">
       <StatCard icon={<FaPhotoVideo />} label="Assets" value={assets.length} />
       <StatCard icon={<FaImage />} label="Images" value={imageCount} />
       <StatCard icon={<FaVideo />} label="Videos" value={videoCount} />
@@ -904,22 +907,33 @@ function MediaOverview({
 }
 
 function ModeTabs({
+  hasUnsavedChanges,
   mode,
   onChange,
+  portfolioType,
 }: {
+  hasUnsavedChanges: boolean;
   mode: MediaMode;
   onChange: (mode: MediaMode) => void;
+  portfolioType: PortfolioType;
 }) {
   const items: Array<{ key: MediaMode; label: string; detail: string }> = [
-    {
-      key: "studio",
-      label: "Gallery Studio",
-      detail: "Edit the public page from top to bottom",
-    },
+    ...(portfolioType === "actor"
+      ? [
+          {
+            key: "studio" as const,
+            label: "Gallery Studio",
+            detail: "Hero, introduction, and public mosaic",
+          },
+        ]
+      : []),
     {
       key: "showreel",
-      label: "Showreel Studio",
-      detail: "Hero, featured reel, scenes, and clips",
+      label: portfolioType === "actor" ? "Showreel Studio" : "Video Studio",
+      detail:
+        portfolioType === "actor"
+          ? "Hero, featured reel, scenes, and clips"
+          : "Hero, featured video, music videos, and clips",
     },
     {
       key: "library",
@@ -929,7 +943,22 @@ function ModeTabs({
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="rounded-[22px] border border-white/9 bg-[#0f0f11]/90 p-3">
+      {hasUnsavedChanges ? (
+        <div className="mb-2 flex justify-end">
+          <span
+            className="inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-100"
+            role="status"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+            Unsaved changes
+          </span>
+        </div>
+      ) : null}
+      <nav
+        aria-label="Media workspaces"
+        className="grid gap-1 sm:grid-cols-3"
+      >
       {items.map((item) => {
         const active = item.key === mode;
 
@@ -937,22 +966,23 @@ function ModeTabs({
           <button
             aria-pressed={active}
             className={cx(
-              "rounded-[24px] border p-4 text-left transition duration-300",
+              "min-h-14 rounded-xl border px-3 py-2.5 text-left transition",
               active
-                ? "border-white/25 bg-white/[0.13] text-white"
-                : "border-white/10 bg-white/[0.045] text-white/60 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                ? "border-white/14 bg-white/[0.09] text-white"
+                : "border-transparent text-white/50 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"
             )}
             key={item.key}
             onClick={() => onChange(item.key)}
             type="button"
           >
-            <span className="block text-lg font-semibold">{item.label}</span>
-            <span className="mt-1 block text-sm text-white/45">
+            <span className="block text-xs font-semibold">{item.label}</span>
+            <span className="mt-1 block truncate text-[10px] text-white/32">
               {item.detail}
             </span>
           </button>
         );
       })}
+      </nav>
     </div>
   );
 }
@@ -1559,18 +1589,21 @@ function ShowreelHeroEditor({
   assets,
   content,
   disabled,
+  portfolioType,
 }: {
   assets: MediaAsset[];
   content: EditablePortfolioContent;
   disabled: boolean;
+  portfolioType: PortfolioType;
 }) {
   const hero = content.heroes.find((item) => item.pageSlug === "video");
   if (!hero) return null;
+  const pageLabel = portfolioType === "actor" ? "Showreel" : "Video";
 
   return (
     <section className={`${sectionClass} scroll-mt-6`} id="showreel-hero">
-      <p className={labelClass}>01 / Showreel page</p>
-      <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">Showreel Hero</h2>
+      <p className={labelClass}>01 / {pageLabel} page</p>
+      <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">{pageLabel} Hero</h2>
       <form action={saveShowreelHero} className="mt-5">
         <fieldset disabled={disabled}>
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -1600,7 +1633,7 @@ function ShowreelHeroEditor({
               <input name="sortOrder" type="hidden" value={hero.sortOrder} />
             </div>
           </div>
-          <div className="mt-5 flex justify-end"><ActionButton className={buttonClass} disabled={disabled} pendingLabel="Saving...">Save showreel hero</ActionButton></div>
+          <div className="mt-5 flex justify-end"><ActionButton className={buttonClass} disabled={disabled} pendingLabel="Saving...">Save {pageLabel.toLowerCase()} hero</ActionButton></div>
         </fieldset>
       </form>
     </section>
@@ -1612,11 +1645,13 @@ function ShowreelVideoEditor({
   disabled,
   item,
   mode = "edit",
+  portfolioType,
 }: {
   assets: MediaAsset[];
   disabled: boolean;
   item: EditableVideoItem;
   mode?: "edit" | "new";
+  portfolioType: PortfolioType;
 }) {
   const initialSource =
     item.platform.toLowerCase() === "upload"
@@ -1712,7 +1747,7 @@ function ShowreelVideoEditor({
 
           <div className="mt-4"><p className={labelClass}>Thumbnail</p><MediaAssetPicker assets={assets} defaultValue={item.thumbnailSrc} kind="image" name="thumbnailSrc" /></div>
           <div className="mt-4 grid gap-3">
-            <label className="flex h-11 items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-3 text-sm text-white/75"><input className="h-4 w-4 accent-white" defaultChecked={item.isFeatured} name="isFeatured" type="checkbox" /> Featured reel</label>
+            <label className="flex h-11 items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-3 text-sm text-white/75"><input className="h-4 w-4 accent-white" defaultChecked={item.isFeatured} name="isFeatured" type="checkbox" /> {portfolioType === "actor" ? "Featured reel" : "Featured video"}</label>
             <PublishedAndOrder isPublished={item.isPublished} sortOrder={item.sortOrder} />
           </div>
           <div className="mt-5 flex justify-end"><ActionButton className={buttonClass} disabled={disabled} pendingLabel="Saving...">{mode === "new" ? "Add video" : "Save video"}</ActionButton></div>
@@ -1727,24 +1762,27 @@ function ShowreelStudio({
   assets,
   content,
   disabled,
+  portfolioType,
 }: {
   assets: MediaAsset[];
   content: EditablePortfolioContent;
   disabled: boolean;
+  portfolioType: PortfolioType;
 }) {
   const videos = [...content.videos].sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured) || a.sortOrder - b.sortOrder);
   const copy = content.videoPresentation;
+  const pageLabel = portfolioType === "actor" ? "Showreel" : "Video";
   return (
     <div className="grid gap-6">
       <div className="sticky top-4 z-30 flex flex-col gap-3 rounded-2xl border border-emerald-300/15 bg-[#101312]/95 p-4 shadow-2xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-        <nav aria-label="Showreel Studio sections" className="flex flex-wrap gap-2">
+        <nav aria-label={`${pageLabel} Studio sections`} className="flex flex-wrap gap-2">
           {[["showreel-hero", "01 Hero"], ["showreel-copy", "02 Page text"], ["showreel-videos", "03 Videos"]].map(([href, label]) => (
             <a className="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-white/65 transition hover:bg-white hover:text-black" href={`#${href}`} key={href}>{label}</a>
           ))}
         </nav>
-        <Link className={secondaryButtonClass} href="/video" rel="noreferrer" target="_blank"><FaExternalLinkAlt /> Open public Showreel</Link>
+        <Link className={secondaryButtonClass} href="/video" rel="noreferrer" target="_blank"><FaExternalLinkAlt /> Open public {pageLabel}</Link>
       </div>
-      <ShowreelHeroEditor assets={assets} content={content} disabled={disabled} />
+      <ShowreelHeroEditor assets={assets} content={content} disabled={disabled} portfolioType={portfolioType} />
       <section className={`${sectionClass} scroll-mt-6`} id="showreel-copy">
         <p className={labelClass}>02 / Page introduction</p>
         <div className="mt-4 rounded-lg border border-white/10 bg-black/30 p-6 sm:p-8">
@@ -1771,8 +1809,8 @@ function ShowreelStudio({
       <section className={`${sectionClass} scroll-mt-6`} id="showreel-videos">
         <div className="flex items-end justify-between gap-4"><div><p className={labelClass}>03 / Video sequence</p><h2 className="heading-ui mt-2 text-2xl font-semibold text-white">Featured reel, scenes, and clips</h2></div><span className="text-sm text-white/45">{videos.length} items</span></div>
         <div className="mt-6 grid gap-4 xl:grid-cols-2">
-          {videos.map((item) => <ShowreelVideoEditor assets={assets} disabled={disabled} item={item} key={item.id} />)}
-          <ShowreelVideoEditor assets={assets} disabled={disabled} item={{ id: "", title: "", description: "", embedUrl: "", platform: "upload", thumbnailSrc: "", videoType: "showreel", isFeatured: videos.length === 0, sortOrder: nextSort(videos), isPublished: true }} mode="new" />
+          {videos.map((item) => <ShowreelVideoEditor assets={assets} disabled={disabled} item={item} key={item.id} portfolioType={portfolioType} />)}
+          <ShowreelVideoEditor assets={assets} disabled={disabled} item={{ id: "", title: "", description: "", embedUrl: "", platform: "upload", thumbnailSrc: "", videoType: portfolioType === "actor" ? "showreel" : "music_video", isFeatured: videos.length === 0, sortOrder: nextSort(videos), isPublished: true }} mode="new" portfolioType={portfolioType} />
         </div>
       </section>
     </div>
@@ -1914,6 +1952,20 @@ function filterAssets(
     });
 }
 
+function replaceMediaModeInUrl(nextMode: MediaMode) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("view", nextMode);
+  url.searchParams.delete("status");
+  url.hash = "";
+  const search = url.searchParams.toString();
+
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${url.pathname}${search ? `?${search}` : ""}`
+  );
+}
+
 export default function MediaManager({
   assets,
   content,
@@ -1932,6 +1984,14 @@ export default function MediaManager({
   const [filter, setFilter] = useState<MediaFilter>("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<MediaSort>("order");
+  const {
+    clearDirty,
+    confirmDiscard,
+    hasUnsavedChanges,
+    markDirty,
+  } = useUnsavedChangesGuard();
+  const previousInitialModeRef = useRef(initialMode);
+  const expectedRestoredModeRef = useRef<MediaMode | null>(null);
   const assetListId = "media-asset-url-options";
   const gallerySrcSet = useMemo(
     () =>
@@ -1959,22 +2019,59 @@ export default function MediaManager({
   );
   const nextGallerySort = nextSort(galleryImages);
 
-  function changeMode(nextMode: MediaMode) {
-    setMode(nextMode);
+  useEffect(() => {
+    if (initialMode === previousInitialModeRef.current) return;
 
-    const url = new URL(window.location.href);
-    url.searchParams.set("view", nextMode);
-    url.searchParams.delete("status");
-    url.hash = "";
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${url.pathname}?${url.searchParams.toString()}`
-    );
+    if (initialMode === expectedRestoredModeRef.current) {
+      previousInitialModeRef.current = initialMode;
+      expectedRestoredModeRef.current = null;
+      return;
+    }
+
+    previousInitialModeRef.current = initialMode;
+
+    if (!confirmDiscard()) {
+      expectedRestoredModeRef.current = mode;
+      replaceMediaModeInUrl(mode);
+      return;
+    }
+
+    expectedRestoredModeRef.current = null;
+    const nextMode = initialMode;
+    const timeoutId = window.setTimeout(() => setMode(nextMode), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [confirmDiscard, initialMode, mode]);
+
+  function changeMode(nextMode: MediaMode) {
+    if (nextMode === mode || !confirmDiscard()) return;
+
+    setMode(nextMode);
+    replaceMediaModeInUrl(nextMode);
   }
 
   return (
-    <div className="grid gap-6">
+    <div
+      className="grid gap-6"
+      onChangeCapture={(event) => {
+        const target = event.target;
+        if (target instanceof Element && target.closest("form")) markDirty();
+      }}
+      onClickCapture={(event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const button = target.closest("button");
+        if (
+          button instanceof HTMLButtonElement &&
+          button.type === "button" &&
+          button.closest("form")
+        ) {
+          markDirty();
+        }
+      }}
+      onSubmit={(event) => {
+        if (!event.defaultPrevented) clearDirty();
+      }}
+    >
       <StatusNotice
         contentIsConfigured={contentIsConfigured}
         contentLoadError={contentLoadError}
@@ -1983,9 +2080,14 @@ export default function MediaManager({
         status={status}
       />
 
+      <ModeTabs
+        hasUnsavedChanges={hasUnsavedChanges}
+        mode={mode}
+        onChange={changeMode}
+        portfolioType={portfolioType}
+      />
       <MediaOverview assets={assets} galleryImages={galleryImages} />
       <UploadPanel disabled={mediaDisabled} sortOrder={nextSort(assets)} />
-      <ModeTabs mode={mode} onChange={changeMode} />
 
       <datalist id={assetListId}>
         {assets
@@ -2008,6 +2110,7 @@ export default function MediaManager({
           assets={assets}
           content={content}
           disabled={contentDisabled}
+          portfolioType={portfolioType}
         />
       ) : mode === "library" ? (
         <section className={sectionClass}>

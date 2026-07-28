@@ -3,12 +3,13 @@ import AdaptiveHero from "@/components/AdaptiveHero";
 import NewsletterBlock from "@/components/NewsletterBlock";
 import ShowreelWorks from "@/components/ShowreelWorks";
 import { getPortfolioContent } from "@/lib/content";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Video",
-  description: "Showreel, scenes, music videos, and selected motion work.",
-  alternates: { canonical: "/video" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getPortfolioContent();
+
+  return createPageMetadata(content, "video");
+}
 
 export default async function VideoPage() {
   const content = await getPortfolioContent();

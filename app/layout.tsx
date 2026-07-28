@@ -13,7 +13,7 @@ import {
   getFontFamily,
   getGoogleFontsStylesheetUrl,
 } from "@/lib/content/fonts";
-import { getSiteUrl } from "@/lib/site-url";
+import { createRootMetadata } from "@/lib/seo";
 
 type TypographyStyle = CSSProperties & {
   "--font-display": string;
@@ -23,40 +23,8 @@ type TypographyStyle = CSSProperties & {
 
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getPortfolioContent();
-  const artistName = content.settings.artistName;
-  const description = content.settings.description;
 
-  return {
-    metadataBase: new URL(getSiteUrl()),
-    title: {
-      default: artistName,
-      template: `%s | ${artistName}`,
-    },
-    description,
-    applicationName: artistName,
-    alternates: { canonical: "/" },
-    openGraph: {
-      type: "website",
-      siteName: artistName,
-      title: artistName,
-      description,
-      images: [
-        {
-          url: "/opengraph-image",
-          width: 1200,
-          height: 630,
-          alt: `${artistName} portfolio`,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: artistName,
-      description,
-      images: ["/twitter-image"],
-    },
-    icons: { icon: [{ url: "/favicon.ico" }] },
-  };
+  return createRootMetadata(content);
 }
 
 export default async function RootLayout({

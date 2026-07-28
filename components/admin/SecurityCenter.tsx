@@ -1,6 +1,7 @@
 "use client";
 
 import ActionButton from "@/components/admin/ActionButton";
+import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 
 import { useEffect, useState, type ReactNode } from "react";
 import {
@@ -44,22 +45,35 @@ const statusCopy: Record<string, string> = {
 };
 
 const sectionClass =
-  "scroll-mt-28 rounded-[28px] border border-white/12 bg-white/[0.07] p-5 shadow-[0_22px_80px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:p-6";
+  "scroll-mt-28 rounded-[22px] border border-white/9 bg-[#0f0f11]/92 p-4 shadow-[0_18px_65px_rgba(0,0,0,0.24)] sm:p-5";
 const itemClass =
-  "rounded-[24px] border border-white/10 bg-black/24 p-4 shadow-[0_16px_55px_rgba(0,0,0,0.18)] transition duration-300 hover:border-white/18 hover:bg-white/[0.055]";
-const labelClass = "text-xs font-medium uppercase tracking-[0.18em] text-white/45";
+  "rounded-[18px] border border-white/9 bg-black/24 p-4 transition duration-200 hover:border-white/15";
+const labelClass =
+  "text-[11px] font-semibold uppercase tracking-[0.16em] text-white/46";
 const inputClass =
-  "mt-2 w-full rounded-2xl border border-white/10 bg-black/28 px-3.5 py-2.5 text-sm text-white outline-none transition duration-300 placeholder:text-white/25 focus:border-white/35 focus:bg-black/36 disabled:cursor-not-allowed disabled:opacity-50";
+  "mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/30 disabled:cursor-not-allowed disabled:opacity-50";
 const buttonClass =
-  "inline-flex h-10 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-black transition duration-300 hover:bg-white/85 disabled:cursor-not-allowed disabled:opacity-45";
+  "inline-flex min-h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/84 disabled:cursor-not-allowed disabled:opacity-45";
 const dangerButtonClass =
-  "inline-flex h-10 items-center justify-center rounded-2xl border border-red-300/25 px-4 text-sm font-semibold text-red-100 transition duration-300 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-45";
+  "inline-flex min-h-10 items-center justify-center rounded-xl border border-rose-300/22 px-4 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/12 disabled:cursor-not-allowed disabled:opacity-45";
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(iso));
+}
+
+function formatShortDay(iso: string) {
+  return new Intl.DateTimeFormat("en", {
+    weekday: "short",
+    timeZone: "UTC",
+  }).format(new Date(`${iso}T00:00:00.000Z`));
+}
+
+function humanizeAction(action: string) {
+  const value = action.replaceAll("_", " ");
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function Field({
@@ -148,12 +162,18 @@ function CheckGrid({ checks }: { checks: SecurityCheck[] }) {
               <h3 className="font-semibold text-white">{check.label}</h3>
               <span
                 className={`rounded-md border px-2 py-1 text-xs ${
-                  check.ok
+                  check.verification === "implemented"
+                    ? "border-sky-300/20 bg-sky-400/[0.07] text-sky-100/72"
+                    : check.ok
                     ? "border-emerald-300/25 bg-emerald-500/10 text-emerald-100"
                     : "border-red-300/25 bg-red-500/10 text-red-100"
                 }`}
               >
-                {check.ok ? "OK" : "Needs attention"}
+                {check.verification === "implemented"
+                  ? "Implemented"
+                  : check.ok
+                    ? "Verified"
+                    : "Needs attention"}
               </span>
             </div>
             <p className="mt-3 text-sm leading-6 text-white/55">
@@ -169,24 +189,132 @@ function CheckGrid({ checks }: { checks: SecurityCheck[] }) {
 function SecurityStatCard({
   label,
   value,
-  tone = "neutral",
+  detail,
 }: {
   label: string;
   value: number | string;
-  tone?: "neutral" | "warning";
+  detail: string;
 }) {
   return (
-    <div
-      className={`rounded-[24px] border p-4 shadow-[0_16px_55px_rgba(0,0,0,0.18)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 ${
-        tone === "warning"
-          ? "border-amber-300/25 bg-amber-400/10"
-          : "border-white/10 bg-white/[0.055] hover:border-white/18 hover:bg-white/[0.085]"
-      }`}
-    >
-      <div className="text-xs uppercase tracking-[0.18em] text-white/45">
+    <div className="rounded-[18px] border border-white/9 bg-white/[0.04] p-4">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
         {label}
       </div>
-      <div className="mt-3 text-3xl font-semibold text-white">{value}</div>
+      <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
+        {value}
+      </div>
+      <p className="mt-2 text-[11px] leading-5 text-white/34">{detail}</p>
+    </div>
+  );
+}
+
+function SecurityTimeline({ summary }: { summary: SecurityEventSummary }) {
+  const max = Math.max(...summary.daily.map((day) => day.total), 1);
+  const series = [
+    { key: "contact" as const, label: "Contact", color: "bg-[#ff4d2e]" },
+    { key: "analytics" as const, label: "Analytics", color: "bg-sky-300" },
+    { key: "admin" as const, label: "Admin", color: "bg-rose-300" },
+    { key: "auth" as const, label: "Auth", color: "bg-amber-300" },
+    {
+      key: "operations" as const,
+      label: "Operations",
+      color: "bg-violet-300",
+    },
+  ];
+
+  return (
+    <div className="rounded-[18px] border border-white/9 bg-black/22 p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className={labelClass}>Seven-day timeline</p>
+          <h3 className="heading-ui mt-2 text-lg font-semibold text-white">
+            Security signals by surface
+          </h3>
+        </div>
+        <div className="flex flex-wrap gap-3 text-[10px] text-white/42">
+          {series.map((item) => (
+            <span className="inline-flex items-center gap-1.5" key={item.key}>
+              <span className={`h-2 w-2 rounded-sm ${item.color}`} />
+              {item.label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="mt-6 grid h-48 grid-cols-7 items-end gap-2 border-b border-white/8">
+        {summary.daily.map((day) => (
+          <div
+            aria-label={`${formatShortDay(day.label)}: ${day.total} security signals`}
+            className="group relative flex h-full flex-col justify-end"
+            key={day.label}
+            tabIndex={0}
+          >
+            <div
+              className="flex w-full flex-col-reverse overflow-hidden rounded-t-md"
+              style={{ height: `${(day.total / max) * 100}%` }}
+            >
+              {series.map((item) =>
+                day[item.key] > 0 ? (
+                  <span
+                    className={`min-h-1 w-full ${item.color}`}
+                    key={item.key}
+                    style={{
+                      height: `${(day[item.key] / Math.max(day.total, 1)) * 100}%`,
+                    }}
+                  />
+                ) : null
+              )}
+            </div>
+            <span className="pointer-events-none absolute -top-7 left-1/2 z-10 hidden w-max -translate-x-1/2 rounded-lg border border-white/10 bg-black/95 px-2 py-1 text-[10px] text-white/70 group-hover:block group-focus:block">
+              {formatShortDay(day.label)} · {day.total} signals
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 grid grid-cols-7 gap-2 text-center text-[9px] text-white/28">
+        {summary.daily.map((day) => (
+          <span key={day.label}>{formatShortDay(day.label)}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReasonBreakdown({ summary }: { summary: SecurityEventSummary }) {
+  const reasons = [
+    { label: "Honeypot caught", value: summary.honeypot7d },
+    { label: "Rate limited", value: summary.rateLimited7d },
+    { label: "Bad request origin", value: summary.badOrigin7d },
+    { label: "Invalid payload", value: summary.invalidPayload7d },
+    { label: "Oversized payload", value: summary.oversizedPayload7d },
+    { label: "Submitted too fast", value: summary.tooFast7d },
+    { label: "Suspicious client", value: summary.suspiciousUserAgent7d },
+  ];
+  const max = Math.max(...reasons.map((item) => item.value), 1);
+
+  return (
+    <div className="rounded-[18px] border border-white/9 bg-black/22 p-4 sm:p-5">
+      <p className={labelClass}>Protection reasons</p>
+      <h3 className="heading-ui mt-2 text-lg font-semibold text-white">
+        What the guards stopped
+      </h3>
+      <div className="mt-5 grid gap-4">
+        {reasons.map((reason) => (
+          <div key={reason.label}>
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-white/52">{reason.label}</span>
+              <span className="font-semibold tabular-nums text-white">
+                {reason.value}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+              <div
+                className="h-full rounded-full bg-emerald-300/72"
+                style={{ width: `${(reason.value / max) * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -216,63 +344,75 @@ function SecurityCountersSection({
 
   return (
     <section className={sectionClass}>
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className={labelClass}>Threat Monitor</p>
-          <h2 className="heading-ui mt-2 text-2xl text-white">
-            Blocked Activity
+          <p className={labelClass}>Protection activity</p>
+          <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
+            Guards working in real time
           </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/42">
+            Blocked requests are successful defenses, not a failed security
+            state. Configuration problems are shown separately in Health.
+          </p>
         </div>
-        <span className="text-sm text-white/45">
-          {summary.latestAt ? `Latest ${formatDate(summary.latestAt)}` : "No events yet"}
+        <span
+          className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] ${
+            summary.isCapped
+              ? "border-amber-300/20 bg-amber-400/[0.07] text-amber-100/72"
+              : "border-white/9 text-white/38"
+          }`}
+        >
+          {summary.isCapped
+            ? "Partial data · 1,000-event cap"
+            : summary.latestAt
+            ? `Latest ${formatDate(summary.latestAt)}`
+            : "No signals yet"}
         </span>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SecurityStatCard
-          label="Threat events 24h"
-          tone={summary.total24h > 0 ? "warning" : "neutral"}
+          detail="All blocked or failed security-sensitive actions"
+          label="Signals · 24 hours"
           value={summary.total24h}
         />
-        <SecurityStatCard label="Threat events 7d" value={summary.total7d} />
         <SecurityStatCard
-          label="Contact blocked"
+          detail="Contact form requests stopped by active guards"
+          label="Contact protected · 7d"
           value={summary.contactBlocked7d}
         />
         <SecurityStatCard
-          label="Analytics blocked"
-          value={summary.analyticsBlocked7d}
+          detail="Failed or denied login, MFA, and recovery attempts"
+          label="Auth failures · 7d"
+          value={summary.authFailures7d}
         />
-        <SecurityStatCard label="Admin blocked" value={summary.adminBlocked7d} />
-        <SecurityStatCard label="Honeypot traps" value={summary.honeypot7d} />
-        <SecurityStatCard label="Rate limited" value={summary.rateLimited7d} />
-        <SecurityStatCard label="Bad origins" value={summary.badOrigin7d} />
         <SecurityStatCard
-          label="Invalid payloads"
-          value={summary.invalidPayload7d}
-        />
-        <SecurityStatCard label="Too fast" value={summary.tooFast7d} />
-        <SecurityStatCard
-          label="Suspicious clients"
-          value={summary.suspiciousUserAgent7d}
+          detail="Email delivery and session-revoke failures"
+          label="Operations alerts · 7d"
+          value={summary.operationsFailures7d}
         />
       </div>
 
-      <div className="mt-5 rounded-lg border border-white/10 bg-black/25 p-4">
-        <div className="text-xs uppercase tracking-[0.18em] text-white/45">
-          Active protections
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <SecurityTimeline summary={summary} />
+        <ReasonBreakdown summary={summary} />
+      </div>
+
+      <details className="mt-4 rounded-[18px] border border-white/9 bg-black/22 p-4">
+        <summary className="cursor-pointer text-xs font-semibold text-white/52">
+          View implemented protection coverage
+        </summary>
+        <div className="mt-4 flex flex-wrap gap-2">
           {protections.map((protection) => (
             <span
-              className="rounded-md border border-emerald-300/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100"
+              className="rounded-full border border-emerald-300/14 bg-emerald-500/[0.06] px-3 py-1.5 text-xs text-emerald-100/68"
               key={protection}
             >
               {protection}
             </span>
           ))}
         </div>
-      </div>
+      </details>
     </section>
   );
 }
@@ -388,7 +528,18 @@ function AdminProfileForm({
 
       {profile ? (
         <div className="mt-3 flex flex-wrap justify-end gap-2">
-          <form action={resetAdminMfa}>
+          <form
+            action={resetAdminMfa}
+            onSubmit={(event) => {
+              if (
+                !window.confirm(
+                  `Reset MFA for ${profile.email}? They will need to enroll again.`
+                )
+              ) {
+                event.preventDefault();
+              }
+            }}
+          >
             <input name="userId" type="hidden" value={profile.userId} />
             <ActionButton
               className={dangerButtonClass}
@@ -398,7 +549,18 @@ function AdminProfileForm({
               Reset MFA
             </ActionButton>
           </form>
-          <form action={deleteAdminProfile}>
+          <form
+            action={deleteAdminProfile}
+            onSubmit={(event) => {
+              if (
+                !window.confirm(
+                  `Delete the admin profile for ${profile.email}? This cannot be undone.`
+                )
+              ) {
+                event.preventDefault();
+              }
+            }}
+          >
             <input name="userId" type="hidden" value={profile.userId} />
             <ActionButton
               className={dangerButtonClass}
@@ -467,7 +629,9 @@ function AuditLogSection({ auditLogs }: { auditLogs: AuditLogEntry[] }) {
             <div className={itemClass} key={entry.id}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h3 className="font-semibold text-white">{entry.action}</h3>
+                  <h3 className="font-semibold text-white">
+                    {humanizeAction(entry.action)}
+                  </h3>
                   <p className="mt-1 text-xs text-white/45">
                     {entry.tableName || "system"}
                     {entry.recordId ? ` / ${entry.recordId}` : ""}
@@ -477,11 +641,16 @@ function AuditLogSection({ auditLogs }: { auditLogs: AuditLogEntry[] }) {
                   {formatDate(entry.createdAt)}
                 </span>
               </div>
-              <div className="mt-3 grid gap-2 text-xs text-white/45 sm:grid-cols-2">
+              <div className="mt-3 text-xs text-white/42">
                 <div>Actor: {entry.actorId || "unknown"}</div>
-                <pre className="overflow-auto rounded-md border border-white/10 bg-black/35 p-3 text-white/50">
-                  {JSON.stringify(entry.metadata, null, 2)}
-                </pre>
+                <details className="mt-3 rounded-xl border border-white/8 bg-black/24 px-3 py-2">
+                  <summary className="cursor-pointer font-semibold text-white/46">
+                    View technical details
+                  </summary>
+                  <pre className="mt-3 overflow-auto border-t border-white/7 pt-3 text-[11px] leading-5 text-white/42">
+                    {JSON.stringify(entry.metadata, null, 2)}
+                  </pre>
+                </details>
               </div>
             </div>
           ))}
@@ -491,6 +660,95 @@ function AuditLogSection({ auditLogs }: { auditLogs: AuditLogEntry[] }) {
           No audit logs yet.
         </div>
       )}
+    </section>
+  );
+}
+
+function SecurityPosture({
+  checks,
+  profiles,
+  summary,
+}: {
+  checks: SecurityCheck[];
+  profiles: AdminProfile[];
+  summary: SecurityEventSummary;
+}) {
+  const passed = checks.filter((check) => check.ok).length;
+  const attention = checks.length - passed;
+  const score = checks.length ? Math.round((passed / checks.length) * 100) : 0;
+
+  return (
+    <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
+      <article
+        className={`relative overflow-hidden rounded-[22px] border p-5 ${
+          attention
+            ? "border-amber-300/18 bg-amber-400/[0.055]"
+            : "border-emerald-300/16 bg-emerald-400/[0.05]"
+        }`}
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.09),transparent_67%)]" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className={labelClass}>Security posture</p>
+            <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
+              {attention ? "Attention recommended" : "Portfolio protected"}
+            </h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-white/46">
+              {attention
+                ? `${attention} configuration check${attention === 1 ? "" : "s"} need review.`
+                : "All available configuration checks are passing."}
+              {" "}Blocked activity below means the guards worked.
+            </p>
+          </div>
+          <div
+            className="grid h-24 w-24 shrink-0 place-items-center rounded-full p-2"
+            style={{
+              background: `conic-gradient(#6ee7b7 ${score}%, rgba(255,255,255,0.08) ${score}% 100%)`,
+            }}
+          >
+            <div className="grid h-full w-full place-items-center rounded-full bg-[#101012] text-center">
+              <span>
+                <span className="block text-2xl font-semibold text-white">
+                  {score}%
+                </span>
+                <span className="text-[9px] uppercase tracking-[0.12em] text-white/32">
+                  checks
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+        <div className="rounded-[18px] border border-white/9 bg-white/[0.04] p-4">
+          <p className={labelClass}>Passing</p>
+          <p className="mt-3 text-3xl font-semibold text-white">
+            {passed}/{checks.length}
+          </p>
+          <p className="mt-2 text-[11px] text-white/32">
+            Configuration checks
+          </p>
+        </div>
+        <div className="rounded-[18px] border border-white/9 bg-white/[0.04] p-4">
+          <p className={labelClass}>Protected · 7d</p>
+          <p className="mt-3 text-3xl font-semibold text-white">
+            {summary.total7d}
+          </p>
+          <p className="mt-2 text-[11px] text-white/32">
+            Security signals handled
+          </p>
+        </div>
+        <div className="rounded-[18px] border border-white/9 bg-white/[0.04] p-4">
+          <p className={labelClass}>Admins</p>
+          <p className="mt-3 text-3xl font-semibold text-white">
+            {profiles.filter((profile) => profile.isActive).length}
+          </p>
+          <p className="mt-2 text-[11px] text-white/32">
+            Active access profiles
+          </p>
+        </div>
+      </div>
     </section>
   );
 }
@@ -517,6 +775,14 @@ export default function SecurityCenter({
   status,
 }: SecurityCenterProps) {
   const [activeSectionId, setActiveSectionId] = useState("health");
+  const {
+    clearDirty,
+    confirmDiscard,
+    hasUnsavedChanges,
+    markDirty,
+  } = useUnsavedChangesGuard(
+    "You have unsaved admin profile changes. Switch views and discard them?"
+  );
 
   useEffect(() => {
     const syncHash = () => {
@@ -583,6 +849,9 @@ export default function SecurityCenter({
     sections.find((section) => section.id === activeSectionId) || sections[0];
 
   function openSection(id: string) {
+    if (id === activeSection.id) return;
+    if (!confirmDiscard()) return;
+
     setActiveSectionId(id);
     window.history.replaceState(
       null,
@@ -595,61 +864,82 @@ export default function SecurityCenter({
   }
 
   return (
-    <div className="grid gap-6">
+    <div
+      className="grid gap-4"
+      onChangeCapture={markDirty}
+      onSubmit={(event) => {
+        if (!event.defaultPrevented) clearDirty();
+      }}
+    >
       <StatusNotice
         isConfigured={isConfigured}
         loadError={loadError}
         status={status}
       />
 
-      <div>
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className={labelClass}>Workspace</p>
-            <h2 className="heading-ui mt-2 text-2xl font-semibold tracking-tight text-white">
-              Security Modules
-            </h2>
-          </div>
-          <span className="text-sm text-white/45">{activeSection.label}</span>
+      {securitySummary.isCapped ? (
+        <div
+          className="rounded-xl border border-amber-300/22 bg-amber-400/[0.08] px-4 py-3 text-sm leading-6 text-amber-100/80"
+          role="status"
+        >
+          The seven-day query reached its 1,000-event limit. Security totals
+          shown here are minimums; open the Supabase audit_logs table for the
+          full history.
         </div>
+      ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <SecurityPosture
+        checks={checks}
+        profiles={profiles}
+        summary={securitySummary}
+      />
+
+      <div className="rounded-[22px] border border-white/9 bg-[#0f0f11]/90 p-3">
+        {hasUnsavedChanges ? (
+          <div
+            className="mb-2 rounded-lg border border-amber-300/18 bg-amber-400/[0.06] px-3 py-2 text-[11px] text-amber-100/70"
+            role="status"
+          >
+            Unsaved admin profile changes
+          </div>
+        ) : null}
+        <nav
+          aria-label="Security views"
+          className="grid gap-1 sm:grid-cols-5"
+        >
           {sections.map((section) => {
             const active = section.id === activeSection.id;
 
             return (
               <button
                 aria-pressed={active}
-                className={`min-h-[154px] rounded-[24px] border p-4 text-left shadow-[0_16px_55px_rgba(0,0,0,0.18)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 ${
+                className={`min-h-12 rounded-xl border px-3 py-2 text-left transition ${
                   active
-                    ? "border-white/24 bg-white/[0.13] text-white"
-                    : "border-white/10 bg-white/[0.055] text-white/70 hover:border-white/18 hover:bg-white/[0.09] hover:text-white"
+                    ? "border-white/14 bg-white/[0.09] text-white"
+                    : "border-transparent text-white/48 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"
                 }`}
                 key={section.id}
                 onClick={() => openSection(section.id)}
                 type="button"
               >
-                <span className="block text-xs uppercase tracking-[0.18em] text-white/45">
-                  {section.kicker}
-                </span>
-                <span className="mt-3 block text-lg font-semibold">
+                <span className="flex items-center justify-between gap-2 text-xs font-semibold">
                   {section.label}
+                  {typeof section.count === "number" ? (
+                    <span className="rounded-full border border-white/8 px-1.5 py-0.5 text-[9px] tabular-nums text-white/36">
+                      {section.count}
+                    </span>
+                  ) : null}
                 </span>
-                <span className="mt-2 block text-sm leading-6 text-white/50">
+                <span className="mt-1 hidden truncate text-[10px] text-white/30 lg:block">
                   {section.description}
                 </span>
-                {typeof section.count === "number" ? (
-                  <span className="mt-3 inline-flex rounded-md border border-white/10 px-2 py-1 text-xs text-white/45">
-                    {section.count}
-                  </span>
-                ) : null}
               </button>
             );
           })}
-        </div>
+        </nav>
       </div>
 
-      <div className="mt-6 scroll-mt-28" id="security-workspace">
+      <div className="scroll-mt-28" id="security-workspace">
         {activeSection.node}
       </div>
     </div>

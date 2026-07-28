@@ -61,7 +61,7 @@ export default function AboutHome({
             <div className="relative overflow-hidden rounded-3xl bg-black/40 ring-1 ring-white/10 backdrop-blur-[2px]">
               <div className="relative aspect-[3/4] lg:aspect-[4/5]">
                 <Image
-                  src={content.imageSrc}
+                  src={content.imageSrc || "/images/about.jpg"}
                   alt={content.imageAlt}
                   fill
                   priority

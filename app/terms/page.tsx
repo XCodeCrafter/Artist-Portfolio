@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { getPortfolioContent } from "@/lib/content";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Terms",
-  description: "Terms for using this artist portfolio.",
-  alternates: { canonical: "/terms" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getPortfolioContent();
+
+  return createPageMetadata(content, "terms");
+}
 
 export default function TermsPage() {
   return (

@@ -48,12 +48,40 @@ const uploadMetadataSchema = mediaMetadataSchema.omit({ id: true }).extend({
   id: idValue.optional(),
 });
 
+const INTERNAL_MEDIA_BASE = "https://portfolio.invalid";
+
 function isSafeMediaUrl(value: string) {
   if (!value) return true;
-  if (value.startsWith("/") && !value.startsWith("//")) return true;
 
   try {
-    return new URL(value).protocol === "https:";
+    if (value.startsWith("//")) return false;
+    if (value.startsWith("/")) {
+      return new URL(value, INTERNAL_MEDIA_BASE).origin === INTERNAL_MEDIA_BASE;
+    }
+
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+function isSafeImageUrl(value: string) {
+  if (!value) return true;
+  if (value.startsWith("/")) return isSafeMediaUrl(value);
+
+  const storageBase = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!storageBase) return false;
+
+  try {
+    const imageUrl = new URL(value);
+    const storageUrl = new URL(storageBase);
+    return (
+      isSafeMediaUrl(value) &&
+      storageUrl.protocol === "https:" &&
+      imageUrl.origin === storageUrl.origin &&
+      imageUrl.pathname.startsWith("/storage/v1/object/public/")
+    );
   } catch {
     return false;
   }
@@ -66,7 +94,14 @@ function isSafeCtaUrl(value: string) {
 function isSafeEmbedUrl(value: string) {
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:") return false;
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      (url.port && url.port !== "443")
+    ) {
+      return false;
+    }
 
     return [
       "open.spotify.com",
@@ -85,7 +120,7 @@ function isSafeEmbedUrl(value: string) {
 const galleryImageMetadataSchema = z.object({
   id: idValue,
   title: z.string().trim().min(1).max(180),
-  src: z.string().trim().min(1).max(1000).refine(isSafeMediaUrl),
+  src: z.string().trim().min(1).max(1000).refine(isSafeImageUrl),
   alt: z.string().trim().max(220),
   caption: z.string().trim().max(600),
   category: z.string().trim().max(80),
@@ -104,21 +139,37 @@ const galleryPresentationSchema = z.object({
   interludeEyebrow: z.string().trim().max(220),
   interludeTitle: z.string().trim().min(1).max(500),
   interludeVideoSrc: z.string().trim().max(1200).refine(isSafeMediaUrl),
-  interludePosterSrc: z.string().trim().max(1200).refine(isSafeMediaUrl),
+  interludePosterSrc: z.string().trim().max(1200).refine(isSafeImageUrl),
   storyLabel: z.string().trim().min(1).max(220),
   storyScrollLabel: z.string().trim().max(220),
 });
 
-const galleryHeroSchema = z.object({
-  title: z.string().trim().min(1).max(220),
-  subtitle: z.string().trim().max(220),
-  ctaLabel: z.string().trim().max(220),
-  ctaHref: z.string().trim().max(1200).refine(isSafeCtaUrl),
-  backgroundSrc: z.string().trim().min(1).max(1200).refine(isSafeMediaUrl),
-  posterSrc: z.string().trim().max(1200).refine(isSafeMediaUrl),
-  mediaType: z.enum(["image", "video"]),
-  sortOrder: z.coerce.number().int().min(0).max(9999),
-});
+const galleryHeroSchema = z
+  .object({
+    title: z.string().trim().min(1).max(220),
+    subtitle: z.string().trim().max(220),
+    ctaLabel: z.string().trim().max(220),
+    ctaHref: z.string().trim().max(1200).refine(isSafeCtaUrl),
+    backgroundSrc: z
+      .string()
+      .trim()
+      .min(1)
+      .max(1200)
+      .refine(isSafeMediaUrl),
+    posterSrc: z.string().trim().max(1200).refine(isSafeImageUrl),
+    mediaType: z.enum(["image", "video"]),
+    sortOrder: z.coerce.number().int().min(0).max(9999),
+  })
+  .superRefine((hero, context) => {
+    if (hero.mediaType === "image" && !isSafeImageUrl(hero.backgroundSrc)) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Choose a local hero image or one uploaded to this site's media library.",
+        path: ["backgroundSrc"],
+      });
+    }
+  });
 
 const showreelVideoSchema = z
   .object({
@@ -131,7 +182,7 @@ const showreelVideoSchema = z
       .string()
       .trim()
       .max(1200)
-      .refine(isSafeMediaUrl),
+      .refine(isSafeImageUrl),
     videoType: z.enum([
       "showreel",
       "scene",
@@ -535,9 +586,7 @@ export async function finalizeMediaUpload(input: unknown) {
     file_size: actualSize,
     mime_type: verifiedMimeType,
     metadata: {
-      originalName: parsed.data.fileName,
       uploadedAt: new Date().toISOString(),
-      uploadedBy: admin.email,
     },
   });
 

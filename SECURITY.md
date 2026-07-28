@@ -15,9 +15,17 @@ fallback. Secrets belong only in the deployment environment and must never be
 committed or prefixed with `NEXT_PUBLIC_`.
 
 Production also requires `AUTH_SECURITY_SECRET`, public Supabase signup
-disabled, and all migrations through `0018_database_rate_limits.sql` applied.
+disabled, and all migrations through
+`0020_rate_limit_security_signals.sql` applied.
 Rate limiting is atomic in Supabase PostgreSQL and fails closed in production;
-no separate Redis or Upstash account is required.
+the first denial in each fixed window is recorded for Security Center
+monitoring without logging every retry. No separate Redis or Upstash account is
+required.
+
+Invoke the service-role-only `cleanup_security_retention(...)` RPC from a
+trusted scheduler. The public media bucket is not suitable for confidential
+drafts, even when a database row has `is_published=false`.
 
 Before release, run `npm run check` and `npm run audit:prod`, confirm every
-readiness check in `/admin`, and verify `/api/health` from the production host.
+readiness check in `/admin`, and verify `/api/health` as a lightweight liveness
+endpoint from the production host.

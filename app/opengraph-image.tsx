@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getPortfolioContent } from "@/lib/content";
+import { getSeoIdentity } from "@/lib/seo";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
@@ -7,7 +8,7 @@ export const contentType = "image/png";
 
 export default async function OpenGraphImage() {
   const content = await getPortfolioContent();
-  const artistName = content.settings.artistName;
+  const { brandName, description, personName } = getSeoIdentity(content);
   const portfolioLabel =
     content.settings.portfolioType === "actor"
       ? "Actor / Gallery / Showreel"
@@ -29,13 +30,13 @@ export default async function OpenGraphImage() {
         }}
       >
         <div style={{ fontSize: 18, letterSpacing: 8, opacity: 0.75 }}>
-          ARTIST PORTFOLIO
+          {brandName.toUpperCase()}
         </div>
         <div style={{ fontSize: 70, fontWeight: 700, marginTop: 18 }}>
-          {artistName}
+          {personName}
         </div>
         <div style={{ fontSize: 26, opacity: 0.8, marginTop: 16, maxWidth: 900 }}>
-          {content.settings.description}
+          {description}
         </div>
         <div style={{ marginTop: 30, fontSize: 18, opacity: 0.65, letterSpacing: 2 }}>
           {portfolioLabel}

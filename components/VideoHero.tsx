@@ -214,6 +214,7 @@ export default function VideoHero({
                       </motion.span>
                     );
                   })}
+                  {wIdx < wordLetters.length - 1 ? " " : null}
                 </span>
               ))}
             </span>

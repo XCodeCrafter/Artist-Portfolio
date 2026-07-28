@@ -6,6 +6,7 @@ import { createAdminServiceClient } from "@/lib/admin/service";
 export type DatabaseRateLimitResult = {
   allowed: boolean;
   configured: boolean;
+  firstDenied: boolean;
   limit: number;
   remaining: number;
   retryAfterSeconds: number;
@@ -20,6 +21,7 @@ type DatabaseRateLimitInput = {
 
 type RateLimitRow = {
   allowed?: unknown;
+  first_denied?: unknown;
   remaining?: unknown;
   retry_after_seconds?: unknown;
 };
@@ -30,6 +32,7 @@ function unavailableResult(limit: number, configured: boolean) {
   return {
     allowed: process.env.NODE_ENV !== "production",
     configured,
+    firstDenied: false,
     limit,
     remaining: 0,
     retryAfterSeconds: 60,
@@ -93,6 +96,7 @@ export async function consumeDatabaseRateLimit(
     return {
       allowed: row.allowed,
       configured: true,
+      firstDenied: row.first_denied === true,
       limit: input.limit,
       remaining: Math.max(0, Math.trunc(row.remaining)),
       retryAfterSeconds: Math.max(1, Math.trunc(row.retry_after_seconds)),
@@ -122,6 +126,7 @@ export async function probeDatabaseRateLimit(
     return (
       Boolean(row) &&
       typeof row?.allowed === "boolean" &&
+      typeof row?.first_denied === "boolean" &&
       typeof row?.remaining === "number" &&
       typeof row?.retry_after_seconds === "number"
     );

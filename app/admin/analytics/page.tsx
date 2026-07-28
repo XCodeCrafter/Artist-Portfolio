@@ -3,6 +3,7 @@ import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAnalyticsSummary } from "@/lib/admin/analytics";
 import { getBookingInquiries } from "@/lib/admin/inquiries";
+import { getPortfolioContent } from "@/lib/content";
 
 export const metadata = {
   title: "Admin Analytics",
@@ -17,17 +18,19 @@ export default async function AdminAnalyticsPage({
 }) {
   const admin = await requireAdmin();
   const params = await searchParams;
-  const [analyticsResult, inquiriesResult] = await Promise.all([
+  const [analyticsResult, inquiriesResult, content] = await Promise.all([
     getAnalyticsSummary(),
     getBookingInquiries(),
+    getPortfolioContent(),
   ]);
 
   return (
     <AdminShell
       active="analytics"
       adminEmail={admin.email}
-      description="Track traffic, outbound clicks, conversion events, and incoming collaboration or booking messages."
-      title="Analytics"
+      description="Understand visitor trends, page performance, contact activity, and incoming collaboration or booking messages."
+      portfolioType={content.settings.portfolioType}
+      title="Insights"
     >
       <AnalyticsDashboard
         analytics={analyticsResult.summary}

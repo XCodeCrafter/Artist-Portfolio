@@ -1,17 +1,36 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isAllowedAdmin } from "@/lib/admin/auth";
-import { writeAuditLog } from "@/lib/admin/audit";
+import { keyedDigest } from "@/lib/admin/security-secret";
 import {
   clearAdminRecoveryChallenge,
   issueAdminRecoveryChallenge,
 } from "@/lib/admin/recovery";
 import { getSiteUrl } from "@/lib/site-url";
+import { getClientIp } from "@/lib/security/request";
+import { consumeDatabaseRateLimit } from "@/lib/security/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
-  const code = request.nextUrl.searchParams.get("code");
+  const rawCode = request.nextUrl.searchParams.get("code");
+  const code = rawCode && rawCode.length <= 2048 ? rawCode : null;
 
   if (code) {
+    const callbackLimit = await consumeDatabaseRateLimit({
+      bucket: "admin-auth:recovery-callback:ip",
+      identifierHash: keyedDigest(
+        "auth-rate-ip",
+        getClientIp(request.headers)
+      ),
+      limit: 12,
+      windowSeconds: 15 * 60,
+    });
+
+    if (!callbackLimit.allowed) {
+      return NextResponse.redirect(
+        new URL("/admin/forgot-password?error=invalid-link", getSiteUrl())
+      );
+    }
+
     const supabase = await createClient();
     const exchange = await supabase.auth.exchangeCodeForSession(code);
     const error = exchange.error;
@@ -36,17 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     await clearAdminRecoveryChallenge();
-    await supabase.auth.signOut();
-
-    await writeAuditLog({
-      action: "admin_password_reset_link_failed",
-      tableName: "auth",
-      recordId: "password-recovery",
-      metadata: {
-        reason: error?.name || "invalid-recovery-context",
-        redirectType: data.redirectType || "unknown",
-      },
-    });
+    if (data.session) await supabase.auth.signOut();
   }
 
   return NextResponse.redirect(

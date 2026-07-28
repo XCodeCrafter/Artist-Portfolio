@@ -315,7 +315,7 @@ export const FALLBACK_CONTENT: PortfolioContent = {
     introEyebrow: "Artist gallery - selected frames",
     introTitle: "A visual archive with room to breathe.",
     interludeLabel: "The Interlude",
-    interludeMeta: "Amsterdam / 2026 / In progress",
+    interludeMeta: "Portfolio / In progress",
     interludeEyebrow: "A quiet study in motion",
     interludeTitle: "Between the frames, the work keeps moving.",
     interludeVideoSrc: "",

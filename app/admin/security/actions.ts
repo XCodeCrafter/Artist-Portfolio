@@ -169,6 +169,26 @@ export async function resetAdminMfa(formData: FormData) {
   });
   if (factors.error) redirectToStatus("mfa-reset-error");
 
+  // Revoke first: if the database RPC is unavailable, no factor is removed
+  // while an existing aal2 session remains usable.
+  const revokedSessions = await supabase.rpc("revoke_admin_user_sessions", {
+    target_user_id: parsed.data.userId,
+  });
+  if (revokedSessions.error) {
+    console.error(revokedSessions.error);
+    await writeAuditLog({
+      actorId: admin.id,
+      action: "security_admin_mfa_session_revoke_failed",
+      tableName: "auth",
+      recordId: parsed.data.userId,
+      metadata: {
+        factorCount: factors.data.factors.length,
+        errorCode: revokedSessions.error.code || "unknown",
+      },
+    });
+    redirectToStatus("mfa-reset-error");
+  }
+
   for (const factor of factors.data.factors) {
     const result = await supabase.auth.admin.mfa.deleteFactor({
       id: factor.id,

@@ -20,23 +20,32 @@ export default async function AdminMediaPage({
 }) {
   const admin = await requireAdmin();
   const params = await searchParams;
-  const initialMode: MediaMode = ["studio", "showreel", "library"].includes(
-    params.view || ""
-  )
-    ? (params.view as MediaMode)
-    : "studio";
   const [mediaResult, contentResult] = await Promise.all([
     getMediaAssets(),
     getEditablePortfolioContent(),
   ]);
+  const portfolioType = contentResult.content.settings.portfolioType;
+  const requestedMode = ["studio", "showreel", "library"].includes(
+    params.view || ""
+  )
+    ? (params.view as MediaMode)
+    : undefined;
+  const initialMode: MediaMode =
+    requestedMode === "studio" && portfolioType !== "actor"
+      ? "showreel"
+      : requestedMode || (portfolioType === "actor" ? "studio" : "showreel");
 
   return (
     <AdminShell
       active="media"
       adminEmail={admin.email}
-      description="Upload assets, manage storage metadata, and decide which photos appear in the public gallery from one place."
-      portfolioType={contentResult.content.settings.portfolioType}
-      title="Media Hub"
+      description={
+        portfolioType === "actor"
+          ? "Upload and organize photos and video, then shape the public Gallery or Showreel in a dedicated visual studio."
+          : "Upload and organize artwork and video, then shape the public Video page in a dedicated visual studio."
+      }
+      portfolioType={portfolioType}
+      title="Media library"
     >
       <MediaManager
         assets={mediaResult.assets}
@@ -46,7 +55,7 @@ export default async function AdminMediaPage({
         isConfigured={mediaResult.isConfigured}
         initialMode={initialMode}
         loadError={mediaResult.loadError}
-        portfolioType={contentResult.content.settings.portfolioType}
+        portfolioType={portfolioType}
         status={params.status}
       />
     </AdminShell>

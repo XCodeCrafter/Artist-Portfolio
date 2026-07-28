@@ -43,11 +43,19 @@ SUPABASE_SERVICE_ROLE_KEY=...
 SUPABASE_MEDIA_BUCKET=portfolio-media
 AUTH_SECURITY_SECRET=at-least-32-random-characters
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=optional-public-site-key
+GOOGLE_SITE_VERIFICATION=optional-search-console-token
+SECURITY_CONTACT_EMAIL=public-security-contact@example.com
+TRUSTED_PROXY=false
+ALLOW_FALLBACK_CONTENT=false
 ```
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` is supported for legacy projects. New Supabase projects can use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
 `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY` are required for production admin access, admin content editing, and audit logs. They must never be exposed to the browser.
+
+Production content fails closed when Supabase is unavailable so a stale demo
+identity cannot be indexed. `ALLOW_FALLBACK_CONTENT=true` is only for local
+loopback development; the application ignores it for public site URLs.
 
 ## Content Model
 
@@ -55,6 +63,23 @@ The editable portfolio content is modeled in `supabase/migrations/0001_initial_s
 Fallback seed content lives in `lib/content/fallback.ts`, so the site still builds without Supabase credentials.
 
 ## Admin Access
+
+The authenticated admin follows the same page order as the public portfolio:
+
+- `/admin` mirrors the live navigation with one-click page previews and editors.
+- `/admin/content` opens the page-first Site Editor for Home, Bio, Music,
+  Booking/Contact, global brand settings, and the shared footer.
+- `/admin/media` provides the actor Gallery/Showreel studios or the musician
+  Video Studio, plus upload and library tools.
+- `/admin/analytics` shows a complete 30-calendar-day traffic series, period
+  comparisons, page rankings, conversion context, and the inquiry inbox.
+- `/admin/security` separates configuration health from successfully blocked
+  activity, authentication failures, operational alerts, access, and audit
+  details.
+
+All editors keep server-side validation, same-origin checks, audit logging, and
+immediate live saves. There is no draft/publish layer yet, so every successful
+save updates the public portfolio.
 
 Batch 2 adds Supabase Auth based admin login at `/admin/login`.
 
@@ -144,7 +169,14 @@ The `/booking` page stays a minimal name/email/message form, but actor mode now 
 Run `supabase/migrations/0010_simple_contact_workflow.sql` to add the inquiry metadata columns and index.
 
 Batch 13 adds security event counters.
-The contact and analytics APIs record blocked spam/security events into `public.audit_logs` using `security_*` actions. Admin write actions also verify same-origin requests before mutating content or access. The main admin dashboard shows 24-hour threat events and 7-day honeypot traps, while `/admin/security` shows detailed counters for honeypots, rate limits, invalid payloads, bad origins, too-fast submissions, suspicious clients, analytics blocks, and admin origin blocks.
+The contact and analytics APIs record a bounded set of blocked spam/security
+events into `public.audit_logs` using `security_*` actions. Admin write actions
+also verify same-origin requests before mutating content or access. The main
+admin dashboard shows 24-hour threat events and 7-day honeypot traps, while
+`/admin/security` shows counters for logged invalid payloads, bad origins,
+too-fast submissions, suspicious clients, analytics blocks, and admin-origin
+blocks. Rate-limited attempts are intentionally not logged per request; the
+readiness panel verifies that the shared limiter is operational.
 
 Run `supabase/migrations/0011_security_event_counters.sql` to add the audit-log index used by the security counters.
 
@@ -175,9 +207,39 @@ counter table has RLS with no public policies, and its RPC is executable only by
 the server-side Supabase service role. Client IPs are stored only as keyed HMAC
 identifiers; Upstash or another Redis database is not required.
 
+Migration `0019_security_retention_and_media_privacy.sql` removes uploader
+identity and original-filename metadata, revokes public access to the retention
+function, and adds `cleanup_security_retention(...)` for a trusted scheduler.
+Schedule that service-role RPC outside the database migration. The current
+storage bucket is public: `is_published=false` controls presentation, not file
+confidentiality, so do not upload private drafts to it.
+
+Migration `0020_rate_limit_security_signals.sql` extends the atomic rate-limit
+RPC with a one-shot denial marker. The app writes one audit signal for the first
+blocked request in each fixed window, so the Security Center receives live
+rate-limit data without writing an audit row for every attacker retry.
+
+## Search and AI discovery
+
+- `/robots.txt` allows public search/discovery crawlers, blocks `/api`, and
+  separates search-oriented AI crawlers from selected training-only crawlers.
+- `/sitemap.xml` lists only active public routes and their relevant images.
+- `/llms.txt` provides an experimental, human-readable portfolio map. It is not
+  a Google ranking signal.
+- `/.well-known/security.txt` publishes the configured security contact.
+- Canonical URLs, page-specific Open Graph/Twitter metadata, a web manifest,
+  and `WebSite`, `Person`, and `ProfilePage` structured data are generated from
+  the published content.
+
+Set one canonical HTTPS `SITE_URL`/`NEXT_PUBLIC_SITE_URL`, add the exact
+verification token from Google Search Console as `GOOGLE_SITE_VERIFICATION`,
+deploy, and submit `/sitemap.xml` in Search Console. Keep the site name, person
+name, visible headings, biography, social profiles, and metadata factually
+consistent in the admin content.
+
 ## Production Readiness
 
-1. Apply all Supabase migrations through `0018_database_rate_limits.sql`.
+1. Apply all Supabase migrations through `0020_rate_limit_security_signals.sql`.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare
@@ -192,8 +254,12 @@ identifiers; Upstash or another Redis database is not required.
 6. Sign in once per admin and complete TOTP enrollment.
 7. Confirm all checks pass in `/admin`, then test recovery, MFA, upload, and
    contact delivery.
-8. Monitor `GET /api/health`; HTTP 200 means the service key and database are available.
-9. Run `npm run check` and `npm run audit:prod` before a release.
+8. Monitor `GET /api/health` as a lightweight process liveness check. Use the
+   authenticated `/admin` readiness panel for database, storage, email, and
+   rate-limit integration checks.
+9. Schedule the service-role-only `cleanup_security_retention(...)` RPC and
+   choose a private staging bucket if unpublished media must remain secret.
+10. Run `npm run check` and `npm run audit:prod` before a release.
 
 ## Scripts
 
@@ -215,9 +281,12 @@ npm run db:push
 ## Security Notes
 
 - Do not commit `.env.local` or production secrets.
-- Booking submissions are validated with Zod, protected by dual honeypots, checked for same-origin browser submissions, rate-limited atomically in Supabase, logged to audit logs when blocked, and sent through Resend when accepted.
+- Booking submissions are validated with Zod, protected by dual honeypots, checked for same-origin browser submissions, rate-limited atomically in Supabase, logged once per blocked rate-limit window, and sent through Resend when accepted.
 - Analytics events use payload limits, origin/referer checks, bot filters, metadata sanitizing, and mandatory production database rate limiting.
 - Admin write actions verify same-origin requests before changing content, media, inquiries, or admin profiles.
 - Supabase session cookies are `HttpOnly`, `Secure` in production, `SameSite=Lax`, high priority, and admin authorization requires an `aal2` MFA session.
 - Raw client IP addresses are not persisted by the application; rate-limit and audit identifiers use HMAC-SHA-256 with `AUTH_SECURITY_SECRET`.
+- Browser write requests use an explicit origin allowlist. On self-hosted
+  deployments, set `TRUSTED_PROXY=true` only when a trusted reverse proxy
+  overwrites forwarding headers and direct access to the app is blocked.
 - Security headers and CSP are configured in `next.config.ts`; admin/API routes are marked `no-store` and `noindex`.

@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getPortfolioContent } from "@/lib/content";
+import { getSeoIdentity } from "@/lib/seo";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
@@ -7,6 +8,7 @@ export const contentType = "image/png";
 
 export default async function TwitterImage() {
   const content = await getPortfolioContent();
+  const { brandName, description, personName } = getSeoIdentity(content);
 
   return new ImageResponse(
     (
@@ -24,13 +26,13 @@ export default async function TwitterImage() {
         }}
       >
         <div style={{ fontSize: 18, letterSpacing: 8, opacity: 0.8 }}>
-          {content.settings.artistName.toUpperCase()}
+          {brandName.toUpperCase()}
         </div>
         <div style={{ fontSize: 74, fontWeight: 800, marginTop: 16 }}>
-          Artist Portfolio
+          {personName}
         </div>
         <div style={{ fontSize: 26, opacity: 0.8, marginTop: 16, maxWidth: 920 }}>
-          {content.settings.description}
+          {description}
         </div>
       </div>
     ),

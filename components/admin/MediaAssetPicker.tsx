@@ -104,6 +104,7 @@ export default function MediaAssetPicker({
               fill
               sizes="(min-width: 1280px) 45vw, 100vw"
               src={value}
+              unoptimized={value.startsWith("https://")}
             />
           )
         ) : (
@@ -194,6 +195,7 @@ export default function MediaAssetPicker({
                     fill
                     sizes="220px"
                     src={asset.src}
+                    unoptimized={asset.src.startsWith("https://")}
                   />
                 )}
                 <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-black/78 px-2 py-1 text-[10px] text-white">

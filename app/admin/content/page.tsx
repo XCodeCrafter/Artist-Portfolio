@@ -27,9 +27,9 @@ export default async function AdminContentPage({
     <AdminShell
       active="content"
       adminEmail={admin.email}
-      description="Edit every public content area from a clear page map. Home and Bio live here; Gallery and Showreel link directly to their media studios."
+      description="Edit the portfolio the way visitors experience it: page by page, section by section, with a visual mirror beside every form."
       portfolioType={content.settings.portfolioType}
-      title="Content Studio"
+      title="Site editor"
     >
       <ContentEditor
         content={content}

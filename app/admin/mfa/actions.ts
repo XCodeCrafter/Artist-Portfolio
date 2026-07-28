@@ -118,13 +118,19 @@ export async function verifyMfaCode(
 
   const rateLimit = await enforceAuthRateLimit("mfa", admin.email);
   if (!rateLimit.allowed) {
-    await writeAuditLog({
-      actorId: admin.id,
-      action: "security_admin_mfa_rate_limited",
-      tableName: "auth",
-      recordId: admin.id,
-      metadata: rateLimit.auditMetadata,
-    });
+    if (rateLimit.firstDenied) {
+      await writeAuditLog({
+        actorId: admin.id,
+        action: "security_admin_mfa_rate_limited",
+        tableName: "security_events",
+        recordId: admin.id,
+        metadata: {
+          ...rateLimit.auditMetadata,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        },
+      });
+    }
+
     return {
       ok: false,
       message: rateLimit.configured

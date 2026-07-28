@@ -2,12 +2,15 @@
   "name": "artist-portfolio",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run build",
-    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "audit:prod": "npm audit --omit=dev --audit-level=moderate",
     "start": "next start",
     "lint": "eslint",
     "db:init": "supabase init",
@@ -19,14 +22,14 @@
     "db:reset:local": "supabase db reset --local"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.110.2",
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.8",
     "framer-motion": "^12.42.2",
-    "next": "^16.2.10",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "next": "^16.2.11",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "react-icons": "^5.7.0",
-    "resend": "^6.17.2",
+    "resend": "^6.18.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -35,8 +38,12 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.10",
+    "eslint-config-next": "^16.2.11",
     "tailwindcss": "^4.3.2",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "^8.5.16",
+    "sharp": "^0.35.3"
   }
 }

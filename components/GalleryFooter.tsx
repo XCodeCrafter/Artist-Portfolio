@@ -395,6 +395,14 @@ export default function GalleryFooter({
           <span>
             © {currentYear} {artistName}. All rights reserved.
           </span>
+          <nav aria-label="Legal" className="flex items-center gap-5">
+            <Link className="transition-colors hover:text-white" href="/privacy">
+              Privacy
+            </Link>
+            <Link className="transition-colors hover:text-white" href="/terms">
+              Terms
+            </Link>
+          </nav>
           <Link
             className="group inline-flex items-center gap-5 font-display text-xs font-semibold uppercase tracking-[0.28em] text-white/76 transition-colors hover:text-white"
             href="/"

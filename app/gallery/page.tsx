@@ -5,12 +5,13 @@ import GalleryFooter from "@/components/GalleryFooter";
 import GalleryShowcase from "@/components/GalleryShowcase";
 import { getPortfolioContent } from "@/lib/content";
 import { isModuleEnabled } from "@/lib/content/modules";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Gallery",
-  description: "Selected portraits, visual stories, and artist portfolio work.",
-  alternates: { canonical: "/gallery" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getPortfolioContent();
+
+  return createPageMetadata(content, "gallery");
+}
 
 export default async function GalleryPage() {
   const content = await getPortfolioContent();

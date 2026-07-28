@@ -3,7 +3,13 @@ import { z } from "zod";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { keyedDigest } from "@/lib/admin/security-secret";
 import { createAdminServiceClient } from "@/lib/admin/service";
-import { getClientIp, getPseudonymousIpKey } from "@/lib/security/request";
+import { readJsonBodyWithLimit } from "@/lib/security/json-body";
+import { hasAllowedRequestOrigin } from "@/lib/security/origin";
+import {
+  getClientIp,
+  getPseudonymousIpKey,
+  getReferrerWithoutQuery,
+} from "@/lib/security/request";
 import { consumeDatabaseRateLimit } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
@@ -12,30 +18,67 @@ const MAX_ANALYTICS_BYTES = 8 * 1024;
 const BOT_USER_AGENT_PATTERN =
   /\b(curl|wget|python-requests|httpie|scrapy|go-http-client|java\/|libwww-perl|masscan|nikto|sqlmap|zgrab|headlesschrome)\b/i;
 
-const AnalyticsEventSchema = z.object({
-  eventName: z.enum(["page_view", "outbound_click", "booking_submit"]),
-  pagePath: z.string().trim().max(300).default(""),
-  targetLabel: z.string().trim().max(220).default(""),
-  targetUrl: z.string().trim().max(1200).default(""),
-  metadata: z.record(z.string(), z.unknown()).optional().default({}),
-});
+const PUBLIC_PAGE_PATHS = [
+  "/",
+  "/bio",
+  "/booking",
+  "/gallery",
+  "/music",
+  "/privacy",
+  "/terms",
+  "/video",
+] as const;
 
-function isTrackablePath(path: string) {
-  if (!path) return false;
-  if (path.startsWith("/admin")) return false;
-  if (path.startsWith("/api")) return false;
-  return true;
-}
+const PublicPagePathSchema = z.enum(PUBLIC_PAGE_PATHS);
+const PageViewMetadataSchema = z
+  .object({
+    title: z.string().trim().max(300).optional(),
+  })
+  .strict()
+  .optional()
+  .default({});
+const EmptyMetadataSchema = z.object({}).strict().optional().default({});
 
-function safeOrigin(value?: string | null) {
-  if (!value) return "";
-
+function isSafeHttpsUrl(value: string) {
   try {
-    return new URL(value).origin;
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      Boolean(url.hostname) &&
+      !url.username &&
+      !url.password
+    );
   } catch {
-    return "";
+    return false;
   }
 }
+
+const SafeHttpsUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(1200)
+  .refine(isSafeHttpsUrl)
+  // Destination origin is sufficient for aggregate analytics and avoids
+  // retaining query strings or fragments that may contain user data.
+  .transform((value) => new URL(value).origin);
+
+const AnalyticsEventSchema = z.discriminatedUnion("eventName", [
+  z.object({
+    eventName: z.literal("page_view"),
+    pagePath: PublicPagePathSchema,
+    targetLabel: z.literal("").optional().default(""),
+    targetUrl: z.literal("").optional().default(""),
+    metadata: PageViewMetadataSchema,
+  }),
+  z.object({
+    eventName: z.literal("outbound_click"),
+    pagePath: PublicPagePathSchema,
+    targetLabel: z.string().trim().max(220).optional().default(""),
+    targetUrl: SafeHttpsUrlSchema,
+    metadata: EmptyMetadataSchema,
+  }),
+]);
 
 function sanitizeHeaderValue(value?: string | null) {
   return (value || "")
@@ -45,51 +88,11 @@ function sanitizeHeaderValue(value?: string | null) {
     .slice(0, 220);
 }
 
-function configuredOrigins(req: Request) {
-  const origins = new Set<string>();
-  const host = req.headers.get("host");
-  const forwardedProto = req.headers.get("x-forwarded-proto");
-  const protocol =
-    forwardedProto || (host?.startsWith("localhost") ? "http" : "https");
-
-  if (host) {
-    origins.add(`${protocol}://${host}`);
-  }
-
-  for (const value of [
-    process.env.SITE_URL,
-    process.env.NEXT_PUBLIC_SITE_URL,
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
-  ]) {
-    const origin = safeOrigin(value);
-    if (origin) origins.add(origin);
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    origins.add("http://localhost:3000");
-    origins.add("http://127.0.0.1:3000");
-  }
-
-  return origins;
-}
-
-function hasAllowedOriginOrReferer(req: Request) {
-  const origins = configuredOrigins(req);
-  const origin = safeOrigin(req.headers.get("origin"));
-  if (origin) return origins.has(origin);
-
-  const refererOrigin = safeOrigin(req.headers.get("referer"));
-  if (refererOrigin) return origins.has(refererOrigin);
-
-  return false;
-}
-
 function getRequestMeta(req: Request) {
   const userAgent = req.headers.get("user-agent") || "";
-  const referrer = req.headers.get("referer") || "";
 
   return {
-    referrer: referrer.slice(0, 500),
+    referrer: getReferrerWithoutQuery(req.headers),
     userAgent: userAgent.slice(0, 500),
   };
 }
@@ -98,52 +101,6 @@ function shouldBlockUserAgent(userAgent: string) {
   const value = userAgent.trim();
   if (!value) return true;
   return BOT_USER_AGENT_PATTERN.test(value);
-}
-
-function sanitizeMetadata(metadata: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(metadata)
-      .slice(0, 20)
-      .map(([key, value]) => {
-        const safeKey = key.replace(/[^\w:.-]/g, "").slice(0, 80) || "meta";
-        if (
-          typeof value === "string" ||
-          typeof value === "number" ||
-          typeof value === "boolean" ||
-          value === null
-        ) {
-          return [
-            safeKey,
-            typeof value === "string" ? value.slice(0, 500) : value,
-          ];
-        }
-
-        return [safeKey, String(value).slice(0, 500)];
-      })
-  );
-}
-
-async function readJsonWithLimit(req: Request) {
-  const raw = await req.text().catch(() => "");
-  const bytes = new TextEncoder().encode(raw).length;
-
-  if (bytes > MAX_ANALYTICS_BYTES) {
-    return {
-      ok: false as const,
-      action: "security_analytics_payload_too_large",
-      metadata: { bytes },
-    };
-  }
-
-  try {
-    return { ok: true as const, body: JSON.parse(raw) as unknown };
-  } catch {
-    return {
-      ok: false as const,
-      action: "security_analytics_invalid_payload",
-      metadata: { bytes },
-    };
-  }
 }
 
 async function writeSecurityEvent(
@@ -159,22 +116,33 @@ async function writeSecurityEvent(
       ipKey: getPseudonymousIpKey(req.headers),
       userAgent: sanitizeHeaderValue(req.headers.get("user-agent")),
       origin: sanitizeHeaderValue(req.headers.get("origin")),
-      referer: sanitizeHeaderValue(req.headers.get("referer")),
+      referer: sanitizeHeaderValue(getReferrerWithoutQuery(req.headers)),
       ...metadata,
     },
   });
 }
 
 export async function POST(req: Request) {
-  const contentLength = Number(req.headers.get("content-length") || "0");
-  if (contentLength > MAX_ANALYTICS_BYTES) {
-    await writeSecurityEvent(req, "security_analytics_payload_too_large", {
-      contentLength,
-    });
+  const ipKey = keyedDigest("public-rate-ip", getClientIp(req.headers));
+  const admissionLimit = await consumeDatabaseRateLimit({
+    bucket: "public:analytics:ip",
+    identifierHash: ipKey,
+    limit: 120,
+    windowSeconds: 60,
+  });
+
+  if (!admissionLimit.allowed) {
+    if (admissionLimit.firstDenied) {
+      await writeSecurityEvent(req, "security_analytics_rate_limited", {
+        bucket: "admission",
+        limit: admissionLimit.limit,
+        retryAfterSeconds: admissionLimit.retryAfterSeconds,
+      });
+    }
     return NextResponse.json({ ok: true });
   }
 
-  if (!hasAllowedOriginOrReferer(req)) {
+  if (!hasAllowedRequestOrigin(req.headers)) {
     await writeSecurityEvent(req, "security_analytics_bad_origin");
     return NextResponse.json({ ok: true });
   }
@@ -185,9 +153,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const bodyResult = await readJsonWithLimit(req);
+  const bodyResult = await readJsonBodyWithLimit(req, MAX_ANALYTICS_BYTES);
   if (!bodyResult.ok) {
-    await writeSecurityEvent(req, bodyResult.action, bodyResult.metadata);
+    await writeSecurityEvent(
+      req,
+      bodyResult.code === "payload-too-large"
+        ? "security_analytics_payload_too_large"
+        : "security_analytics_invalid_payload",
+      {
+        bytes: bodyResult.bytes,
+        reason: bodyResult.code,
+        ...(bodyResult.declaredLength === undefined
+          ? {}
+          : { declaredLength: bodyResult.declaredLength }),
+      }
+    );
     return NextResponse.json({ ok: true });
   }
 
@@ -200,32 +180,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  if (!isTrackablePath(parsed.data.pagePath)) {
-    return NextResponse.json({ ok: true });
-  }
-
   const supabase = createAdminServiceClient();
   if (!supabase) {
     return NextResponse.json({ ok: true });
   }
 
-  const ipKey = keyedDigest("public-rate-ip", getClientIp(req.headers));
-  const rateLimit = await consumeDatabaseRateLimit({
-    bucket: "public:analytics:ip",
-    identifierHash: ipKey,
-    limit: 120,
-    windowSeconds: 60,
-  });
-
-  if (!rateLimit.allowed) {
-    await writeSecurityEvent(req, "security_analytics_rate_limited", {
-      configured: rateLimit.configured,
-      limit: rateLimit.limit,
-      remaining: rateLimit.remaining,
-      retryAfterSeconds: rateLimit.retryAfterSeconds,
-    });
-    return NextResponse.json({ ok: true });
-  }
+  const clientMetadata =
+    parsed.data.eventName === "page_view" && parsed.data.metadata.title
+      ? { title: parsed.data.metadata.title }
+      : {};
 
   const { error } = await supabase.from("analytics_events").insert({
     event_name: parsed.data.eventName,
@@ -233,7 +196,7 @@ export async function POST(req: Request) {
     target_label: parsed.data.targetLabel,
     target_url: parsed.data.targetUrl,
     metadata: {
-      ...sanitizeMetadata(parsed.data.metadata),
+      ...clientMetadata,
       ...getRequestMeta(req),
     },
   });

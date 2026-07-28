@@ -3,12 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { FaArrowDown, FaArrowUp, FaPlus, FaTrash } from "react-icons/fa";
+import {
+  FaArrowDown,
+  FaArrowUp,
+  FaExternalLinkAlt,
+  FaGlobe,
+  FaImages,
+  FaPalette,
+  FaPlay,
+  FaPlus,
+  FaTrash,
+} from "react-icons/fa";
 import ActionButton from "@/components/admin/ActionButton";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
+import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
 import {
-  getActivePageSlugs,
+  getPublicModules,
   isModuleEnabled,
 } from "@/lib/content/modules";
 import {
@@ -220,7 +231,7 @@ function HomeSnapshot({ content }: { content: EditablePortfolioContent }) {
       <div className="mt-4 grid gap-4">
         <HeroSnapshot content={content} pageSlug="home" />
         <div className="grid overflow-hidden rounded-lg border border-white/10 bg-black/30 lg:grid-cols-2">
-          <div className="relative min-h-72"><Image alt={content.aboutHome.imageAlt || "Home about preview"} className="object-cover" fill sizes="50vw" src={content.aboutHome.imageSrc} /></div>
+          <div className="relative min-h-72"><Image alt={content.aboutHome.imageAlt || "Home about preview"} className="object-cover" fill sizes="50vw" src={content.aboutHome.imageSrc || "/images/about.jpg"} /></div>
           <div className="flex flex-col justify-center p-6 sm:p-8"><p className={labelClass}>About</p><h3 className="heading-ui mt-3 text-3xl text-white">{content.aboutHome.heading}</h3><p className="mt-4 line-clamp-6 text-sm leading-6 text-white/60">{content.aboutHome.body}</p></div>
         </div>
         <div className="relative aspect-[16/7] min-h-72 overflow-hidden rounded-lg border border-white/10 bg-black">
@@ -274,6 +285,225 @@ function BioSnapshot({ content }: { content: EditablePortfolioContent }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function MusicSnapshot({ content }: { content: EditablePortfolioContent }) {
+  const visiblePlatforms = content.musicPlatforms
+    .filter((item) => item.isPublished)
+    .slice(0, 4);
+
+  return (
+    <section className={sectionClass}>
+      <p className={labelClass}>Public page snapshot</p>
+      <div className="mt-4 grid gap-4">
+        <HeroSnapshot content={content} pageSlug="music" />
+        <div className="grid gap-3 rounded-lg border border-white/10 bg-black/30 p-4 sm:grid-cols-2">
+          {visiblePlatforms.length ? (
+            visiblePlatforms.map((platform) => (
+              <div
+                className="relative min-h-44 overflow-hidden rounded-lg border border-white/10 bg-[#131315]"
+                key={platform.id}
+              >
+                {platform.imageSrc ? (
+                  <Image
+                    alt=""
+                    className="object-cover opacity-60"
+                    fill
+                    sizes="240px"
+                    src={platform.imageSrc}
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-4">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                    {platform.label || "Listen"}
+                  </p>
+                  <p className="mt-1 text-base font-semibold text-white">
+                    {platform.title}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-lg border border-dashed border-white/12 p-8 text-center text-sm text-white/40 sm:col-span-2">
+              Music cards will appear here.
+            </div>
+          )}
+        </div>
+        <div className="rounded-lg border border-white/10 bg-black/30 p-5">
+          <p className={labelClass}>SoundCloud sequence</p>
+          <p className="mt-3 text-2xl font-semibold text-white">
+            {content.soundcloudTracks.filter((item) => item.isPublished).length}{" "}
+            published track
+            {content.soundcloudTracks.filter((item) => item.isPublished)
+              .length === 1
+              ? ""
+              : "s"}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BookingSnapshot({ content }: { content: EditablePortfolioContent }) {
+  return (
+    <section className={sectionClass}>
+      <p className={labelClass}>Public page snapshot</p>
+      <div className="mt-4 grid gap-4">
+        <HeroSnapshot content={content} pageSlug="booking" />
+        <div className="rounded-lg border border-white/10 bg-black/30 p-6 sm:p-8">
+          <p className={labelClass}>
+            {content.settings.portfolioType === "actor"
+              ? "Casting & representation"
+              : "Bookings & collaborations"}
+          </p>
+          <h3 className="heading-ui mt-3 text-3xl text-white">
+            Start a conversation
+          </h3>
+          <p className="mt-4 max-w-xl text-sm leading-6 text-white/58">
+            {content.settings.contactBlurb}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/50">
+            <span className="rounded-full border border-white/10 px-3 py-1.5">
+              {content.settings.location || "Location not set"}
+            </span>
+            <span className="rounded-full border border-white/10 px-3 py-1.5">
+              Contact form
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BrandSnapshot({ content }: { content: EditablePortfolioContent }) {
+  return (
+    <section className={sectionClass}>
+      <p className={labelClass}>Global identity preview</p>
+      <div className="mt-4 overflow-hidden rounded-lg border border-white/10 bg-[#09090a]">
+        <div className="border-b border-white/8 px-5 py-4">
+          <p className="text-[10px] uppercase tracking-[0.32em] text-white/52">
+            {content.settings.artistName}
+          </p>
+        </div>
+        <div className="bg-[radial-gradient(circle_at_80%_20%,rgba(255,59,31,0.24),transparent_35%)] p-6 sm:p-8">
+          <p className="text-xs uppercase tracking-[0.22em] text-[#ff715b]">
+            {content.settings.tagline || content.settings.portfolioType}
+          </p>
+          <h3 className="mt-5 max-w-lg font-display text-4xl leading-[1.05] text-white sm:text-5xl">
+            {content.settings.artistName}
+          </h3>
+          <p className="mt-5 max-w-xl font-body text-sm leading-6 text-white/58">
+            {content.settings.description}
+          </p>
+          <button
+            className="mt-7 min-h-10 rounded-xl bg-white px-4 font-ui text-xs font-semibold text-black"
+            type="button"
+          >
+            Example action
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FooterSnapshot({ content }: { content: EditablePortfolioContent }) {
+  const visibleLinks = content.socialLinks.filter((item) => item.isPublished);
+
+  return (
+    <section className={sectionClass}>
+      <p className={labelClass}>Shared footer preview</p>
+      <div className="mt-4 rounded-lg border border-white/10 bg-[#09090a] p-6 sm:p-8">
+        <p className="font-display text-4xl text-white">
+          {content.settings.artistName}
+        </p>
+        <p className="mt-3 max-w-md text-sm leading-6 text-white/52">
+          {content.settings.tagline}
+          {content.settings.location
+            ? ` · ${content.settings.location}`
+            : ""}
+        </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {visibleLinks.map((link) => (
+            <span
+              className="inline-flex min-h-9 items-center gap-2 rounded-full border border-white/10 px-3 text-xs text-white/62"
+              key={link.id}
+            >
+              <SocialPlatformIcon
+                className="text-sm"
+                href={link.href}
+                iconKey={link.iconKey}
+                label={link.label}
+                platform={link.platform}
+              />
+              {link.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StudioWorkspace({
+  description,
+  editor,
+  label,
+  preview,
+  publicHref,
+}: {
+  description: string;
+  editor: ReactNode;
+  label: string;
+  preview: ReactNode;
+  publicHref: string;
+}) {
+  return (
+    <div className="grid items-start gap-5 2xl:grid-cols-[minmax(390px,0.82fr)_minmax(0,1.18fr)]">
+      <aside className="min-w-0 2xl:sticky 2xl:top-4">
+        <div className="rounded-[24px] border border-white/10 bg-[#0d0d0f]/94 p-3 shadow-[0_22px_75px_rgba(0,0,0,0.28)]">
+          <div className="flex items-center justify-between gap-3 px-1 pb-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#ff3b1f]" />
+                <p className="truncate text-xs font-semibold text-white/80">
+                  {label}
+                </p>
+              </div>
+              <p className="mt-1 truncate text-[11px] text-white/34">
+                {description}
+              </p>
+            </div>
+            <Link
+              aria-label={`Open ${label} on the public site`}
+              className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[11px] font-semibold text-white/60 transition hover:bg-white hover:text-black"
+              href={publicHref}
+              rel="noreferrer"
+              target="_blank"
+            >
+              View
+              <FaExternalLinkAlt className="text-[9px]" />
+            </Link>
+          </div>
+          <div className="max-h-[calc(100vh-9.5rem)] overflow-y-auto rounded-[18px] bg-black/35 p-2">
+            {preview}
+          </div>
+        </div>
+      </aside>
+      <div className="min-w-0">
+        <div className="mb-4 rounded-[20px] border border-white/9 bg-white/[0.045] px-4 py-3">
+          <p className="text-xs leading-5 text-white/48">
+            The editor follows the same order as the public page. Save each
+            block when it is ready; the preview refreshes after saving.
+          </p>
+        </div>
+        <div className="grid gap-5">{editor}</div>
+      </div>
+    </div>
   );
 }
 
@@ -464,7 +694,19 @@ function DeleteForm({
   disabled: boolean;
 }) {
   return (
-    <form action={action} className="mt-3 flex justify-end">
+    <form
+      action={action}
+      className="mt-3 flex justify-end"
+      onSubmit={(event) => {
+        if (
+          !window.confirm(
+            `Delete “${id}”? This removes it from the public portfolio and cannot be undone.`
+          )
+        ) {
+          event.preventDefault();
+        }
+      }}
+    >
       <input name="id" type="hidden" value={id} />
       <ActionButton
         className={dangerButtonClass}
@@ -515,119 +757,209 @@ function StatusNotice({
 function SiteSettingsForm({
   content,
   disabled,
+  mode = "brand",
 }: {
   content: EditablePortfolioContent;
   disabled: boolean;
+  mode?: "brand" | "contact" | "music";
 }) {
+  const visibleFields =
+    mode === "brand"
+      ? new Set([
+          "portfolioType",
+          "footerEffect",
+          "artistName",
+          "displayFont",
+          "bodyFont",
+          "uiFont",
+          "tagline",
+          "description",
+        ])
+      : mode === "contact"
+        ? new Set(["location", "contactBlurb"])
+        : new Set(["spotifyArtistUrl", "spotifyEmbedUrl"]);
+  const hiddenSettings: Record<string, string> = {
+    portfolioType: content.settings.portfolioType,
+    footerEffect: content.settings.footerEffect,
+    artistName: content.settings.artistName,
+    displayFont: content.settings.displayFont,
+    bodyFont: content.settings.bodyFont,
+    uiFont: content.settings.uiFont,
+    tagline: content.settings.tagline,
+    description: content.settings.description,
+    location: content.settings.location,
+    spotifyArtistUrl: content.settings.spotifyArtistUrl,
+    spotifyEmbedUrl: content.settings.spotifyEmbedUrl,
+    contactBlurb: content.settings.contactBlurb,
+  };
+  const copy = {
+    brand: {
+      kicker: "Global design",
+      title: "Brand & typography",
+      description:
+        "Identity, portfolio mode, type system, and the visual behavior shared by every page.",
+      returnSection: "settings",
+    },
+    contact: {
+      kicker: "Contact section",
+      title: "Contact details",
+      description:
+        "Location and supporting copy shown around the public inquiry form.",
+      returnSection: "booking",
+    },
+    music: {
+      kicker: "Music integrations",
+      title: "Spotify profile",
+      description:
+        "Artist and embed links used by the music page and footer destinations.",
+      returnSection: "music-links",
+    },
+  }[mode];
+
   return (
-    <form action={updateSiteSettings} className={sectionClass} id="settings">
-      <SectionHeader kicker="Identity" title="Site Settings" />
+    <form
+      action={updateSiteSettings}
+      className={sectionClass}
+      id={mode === "brand" ? "settings" : `${mode}-settings`}
+    >
+      <SectionHeader kicker={copy.kicker} title={copy.title} />
+      <p className="-mt-2 mb-5 max-w-2xl text-sm leading-6 text-white/48">
+        {copy.description}
+      </p>
       <fieldset disabled={disabled}>
+        <input
+          name="returnSection"
+          type="hidden"
+          value={copy.returnSection}
+        />
+        {Object.entries(hiddenSettings)
+          .filter(([name]) => !visibleFields.has(name))
+          .map(([name, value]) => (
+            <input key={name} name={name} type="hidden" value={value} />
+          ))}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Artist name">
-            <TextInput
-              defaultValue={content.settings.artistName}
-              name="artistName"
-              required
-            />
-          </Field>
-          <Field label="Profile type">
-            <select
-              className={inputClass}
-              defaultValue={content.settings.portfolioType}
-              name="portfolioType"
-            >
-              <option value="musician">musician</option>
-              <option value="actor">actor</option>
-            </select>
-          </Field>
-          <FooterEffectPicker
-            defaultValue={content.settings.footerEffect}
-          />
-          <div className="sm:col-span-2 mt-3 border-t border-white/10 pt-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-              Typography
-            </p>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">
-              Display stays reserved for hero and section headings. Body keeps
-              paragraphs readable, while UI covers navigation, buttons, and
-              compact headings.
-            </p>
-          </div>
-          <Field label="Display / headings">
-            <select
-              className={inputClass}
-              defaultValue={content.settings.displayFont}
-              name="displayFont"
-            >
-              {DISPLAY_FONT_OPTIONS.map((font) => (
-                <option key={font.key} value={font.key}>
-                  {font.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Body / paragraphs">
-            <select
-              className={inputClass}
-              defaultValue={content.settings.bodyFont}
-              name="bodyFont"
-            >
-              {BODY_FONT_OPTIONS.map((font) => (
-                <option key={font.key} value={font.key}>
-                  {font.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="UI / navigation and buttons">
-            <select
-              className={inputClass}
-              defaultValue={content.settings.uiFont}
-              name="uiFont"
-            >
-              {UI_FONT_OPTIONS.map((font) => (
-                <option key={font.key} value={font.key}>
-                  {font.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Footer tagline / discipline">
-            <TextInput defaultValue={content.settings.tagline} name="tagline" />
-          </Field>
-          <Field label="Location">
-            <TextInput
-              defaultValue={content.settings.location}
-              name="location"
-            />
-          </Field>
-          <Field label="Spotify artist URL">
-            <TextInput
-              defaultValue={content.settings.spotifyArtistUrl}
-              name="spotifyArtistUrl"
-            />
-          </Field>
-          <Field label="Spotify embed URL" wide>
-            <TextInput
-              defaultValue={content.settings.spotifyEmbedUrl}
-              name="spotifyEmbedUrl"
-            />
-          </Field>
-          <Field label="Description" wide>
-            <TextArea
-              defaultValue={content.settings.description}
-              name="description"
-              rows={4}
-            />
-          </Field>
-          <Field label="Contact & footer blurb" wide>
-            <TextArea
-              defaultValue={content.settings.contactBlurb}
-              name="contactBlurb"
-              rows={4}
-            />
-          </Field>
+          {mode === "brand" ? (
+            <>
+              <Field label="Artist name">
+                <TextInput
+                  defaultValue={content.settings.artistName}
+                  name="artistName"
+                  required
+                />
+              </Field>
+              <Field label="Portfolio mode">
+                <select
+                  className={inputClass}
+                  defaultValue={content.settings.portfolioType}
+                  name="portfolioType"
+                >
+                  <option value="musician">Musician</option>
+                  <option value="actor">Actor</option>
+                </select>
+              </Field>
+              <Field label="Tagline / discipline" wide>
+                <TextInput
+                  defaultValue={content.settings.tagline}
+                  name="tagline"
+                />
+              </Field>
+              <Field label="Site description" wide>
+                <TextArea
+                  defaultValue={content.settings.description}
+                  name="description"
+                  rows={4}
+                />
+              </Field>
+              <div className="sm:col-span-2 mt-3 border-t border-white/10 pt-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/52">
+                  Typography
+                </p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/48">
+                  Display type shapes the portfolio headlines. Body and UI
+                  fonts keep stories and controls readable.
+                </p>
+              </div>
+              <Field label="Display / headings">
+                <select
+                  className={inputClass}
+                  defaultValue={content.settings.displayFont}
+                  name="displayFont"
+                >
+                  {DISPLAY_FONT_OPTIONS.map((font) => (
+                    <option key={font.key} value={font.key}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Body / paragraphs">
+                <select
+                  className={inputClass}
+                  defaultValue={content.settings.bodyFont}
+                  name="bodyFont"
+                >
+                  {BODY_FONT_OPTIONS.map((font) => (
+                    <option key={font.key} value={font.key}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="UI / navigation and buttons" wide>
+                <select
+                  className={inputClass}
+                  defaultValue={content.settings.uiFont}
+                  name="uiFont"
+                >
+                  {UI_FONT_OPTIONS.map((font) => (
+                    <option key={font.key} value={font.key}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <FooterEffectPicker
+                defaultValue={content.settings.footerEffect}
+              />
+            </>
+          ) : null}
+
+          {mode === "contact" ? (
+            <>
+              <Field label="Location">
+                <TextInput
+                  defaultValue={content.settings.location}
+                  name="location"
+                />
+              </Field>
+              <Field label="Contact introduction" wide>
+                <TextArea
+                  defaultValue={content.settings.contactBlurb}
+                  name="contactBlurb"
+                  rows={5}
+                />
+              </Field>
+            </>
+          ) : null}
+
+          {mode === "music" ? (
+            <>
+              <Field label="Spotify artist URL" wide>
+                <TextInput
+                  defaultValue={content.settings.spotifyArtistUrl}
+                  name="spotifyArtistUrl"
+                  type="url"
+                />
+              </Field>
+              <Field label="Spotify embed URL" wide>
+                <TextInput
+                  defaultValue={content.settings.spotifyEmbedUrl}
+                  name="spotifyEmbedUrl"
+                  type="url"
+                />
+              </Field>
+            </>
+          ) : null}
         </div>
         <SaveRow disabled={disabled} />
       </fieldset>
@@ -640,18 +972,20 @@ function HeroForms({
   content,
   disabled,
   activePageSlugs,
+  returnSection = "home",
 }: {
   assets: MediaAsset[];
   content: EditablePortfolioContent;
   disabled: boolean;
   activePageSlugs: PageSlug[];
+  returnSection?: string;
 }) {
   const heroes = content.heroes.filter((hero) =>
     activePageSlugs.includes(hero.pageSlug)
   );
 
   return (
-    <section className={sectionClass} id="heroes">
+    <section className={sectionClass} id={`${returnSection}-hero`}>
       <SectionHeader
         count={heroes.length}
         kicker="Page headers"
@@ -673,6 +1007,11 @@ function HeroForms({
                 </span>
               </div>
               <input name="pageSlug" type="hidden" value={hero.pageSlug} />
+              <input
+                name="returnSection"
+                type="hidden"
+                value={returnSection}
+              />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Title">
                   <TextInput defaultValue={hero.title} name="title" required />
@@ -1762,78 +2101,205 @@ export default function ContentEditor({
 }: ContentEditorProps) {
   const disabled = !isConfigured || Boolean(loadError);
   const portfolioType = content.settings.portfolioType;
-  const activePageSlugs = getActivePageSlugs(portfolioType);
   const musicEnabled = isModuleEnabled(portfolioType, "music");
   const actorEnabled = portfolioType === "actor";
-  const supportPageSlugs = activePageSlugs.filter(
-    (slug) => !["home", "bio", "gallery", "video"].includes(slug)
-  );
   const sections = useMemo<ContentWorkspaceSection[]>(
     () => [
       {
         id: "home",
-        label: "Home Studio",
+        label: "Home",
         kicker: "Public page",
-        description: "Hero, about, Interlude, Freelancer Life, images, and homepage copy.",
+        description:
+          "Hero, About, Interlude, and Freelancer Life in public page order.",
         count: 4,
         node: (
-          <div className="grid gap-6">
-            <HomeSnapshot content={content} />
-            <HeroForms assets={assets} activePageSlugs={["home"]} content={content} disabled={disabled} />
-            <HomePresentationForm assets={assets} content={content} disabled={disabled} />
-          </div>
+          <StudioWorkspace
+            description="Live content, rendered as a compact page mirror"
+            editor={
+              <>
+                <HeroForms
+                  activePageSlugs={["home"]}
+                  assets={assets}
+                  content={content}
+                  disabled={disabled}
+                  returnSection="home"
+                />
+                <HomePresentationForm
+                  assets={assets}
+                  content={content}
+                  disabled={disabled}
+                />
+              </>
+            }
+            label="Home page"
+            preview={<HomeSnapshot content={content} />}
+            publicHref="/"
+          />
         ),
       },
       {
         id: "bio",
-        label: "Bio Studio",
+        label: "Bio",
         kicker: "Public page",
         description: "Hero, portraits, biography, resume, and credits in page order.",
         count: content.bio.galleryImages.length + content.bio.paragraphs.length,
         node: (
-          <div className="grid gap-6">
-            <BioSnapshot content={content} />
-            <HeroForms assets={assets} activePageSlugs={["bio"]} content={content} disabled={disabled} />
-            <BioForms assets={assets} content={content} disabled={disabled} isActor={actorEnabled} />
-            {actorEnabled ? <ActorResumeSection content={content} disabled={disabled} /> : null}
-            {actorEnabled ? <ActorCreditsSection disabled={disabled} items={content.actorCredits} /> : null}
-          </div>
+          <StudioWorkspace
+            description="Portraits and story, in the same order visitors see them"
+            editor={
+              <>
+                <HeroForms
+                  activePageSlugs={["bio"]}
+                  assets={assets}
+                  content={content}
+                  disabled={disabled}
+                  returnSection="bio"
+                />
+                <BioForms
+                  assets={assets}
+                  content={content}
+                  disabled={disabled}
+                  isActor={actorEnabled}
+                />
+                {actorEnabled ? (
+                  <ActorResumeSection
+                    content={content}
+                    disabled={disabled}
+                  />
+                ) : null}
+                {actorEnabled ? (
+                  <ActorCreditsSection
+                    disabled={disabled}
+                    items={content.actorCredits}
+                  />
+                ) : null}
+              </>
+            }
+            label="Bio page"
+            preview={<BioSnapshot content={content} />}
+            publicHref="/bio"
+          />
+        ),
+      },
+      ...(musicEnabled
+        ? [
+            {
+              id: "music-links",
+              label: "Music",
+              kicker: "Public page",
+              description:
+                "Hero, Spotify, platform cards, releases, and SoundCloud mixes.",
+              count:
+                content.musicPlatforms.length +
+                content.soundcloudTracks.length,
+              node: (
+                <StudioWorkspace
+                  description="Music destinations, releases, and listening sequence"
+                  editor={
+                    <>
+                      <HeroForms
+                        activePageSlugs={["music"]}
+                        assets={assets}
+                        content={content}
+                        disabled={disabled}
+                        returnSection="music-links"
+                      />
+                      <SiteSettingsForm
+                        content={content}
+                        disabled={disabled}
+                        mode="music"
+                      />
+                      <MusicLinksSection
+                        assets={assets}
+                        disabled={disabled}
+                        items={content.musicPlatforms}
+                      />
+                      <TracksSection
+                        disabled={disabled}
+                        items={content.soundcloudTracks}
+                      />
+                    </>
+                  }
+                  label="Music page"
+                  preview={<MusicSnapshot content={content} />}
+                  publicHref="/music"
+                />
+              ),
+            },
+          ]
+        : []),
+      {
+        id: "booking",
+        label: portfolioType === "actor" ? "Contact" : "Booking",
+        kicker: "Public page",
+        description:
+          "Hero, location, contact introduction, and inquiry form context.",
+        node: (
+          <StudioWorkspace
+            description="Contact introduction and the public inquiry experience"
+            editor={
+              <>
+                <HeroForms
+                  activePageSlugs={["booking"]}
+                  assets={assets}
+                  content={content}
+                  disabled={disabled}
+                  returnSection="booking"
+                />
+                <SiteSettingsForm
+                  content={content}
+                  disabled={disabled}
+                  mode="contact"
+                />
+              </>
+            }
+            label={portfolioType === "actor" ? "Contact page" : "Booking page"}
+            preview={<BookingSnapshot content={content} />}
+            publicHref="/booking"
+          />
         ),
       },
       {
         id: "settings",
-        label: "Profile & Fonts",
-        kicker: "Shared settings",
-        description: "Identity, profile mode, typography, location, and contact page.",
+        label: "Brand & style",
+        kicker: "Site-wide",
+        description:
+          "Artist identity, portfolio mode, typography, description, and footer effect.",
         node: (
-          <div className="grid gap-6">
-            <SiteSettingsForm content={content} disabled={disabled} />
-            {supportPageSlugs.length ? <HeroForms assets={assets} activePageSlugs={supportPageSlugs} content={content} disabled={disabled} /> : null}
-          </div>
+          <StudioWorkspace
+            description="Global choices that shape every public page"
+            editor={
+              <SiteSettingsForm content={content} disabled={disabled} />
+            }
+            label="Brand system"
+            preview={<BrandSnapshot content={content} />}
+            publicHref="/"
+          />
         ),
       },
       {
         id: "socials",
-        label: "Footer Links",
-        kicker: "Footer & navigation",
-        description: "Choose platforms, profile URLs, visibility, and display order.",
+        label: "Footer & social",
+        kicker: "Site-wide",
+        description:
+          "Social destinations, visibility, icons, and display order.",
         count: content.socialLinks.length,
         node: (
-          <SocialLinksSection
-            disabled={disabled}
-            items={content.socialLinks}
-            portfolioType={portfolioType}
+          <StudioWorkspace
+            description="Shared across the bottom of every portfolio page"
+            editor={
+              <SocialLinksSection
+                disabled={disabled}
+                items={content.socialLinks}
+                portfolioType={portfolioType}
+              />
+            }
+            label="Shared footer"
+            preview={<FooterSnapshot content={content} />}
+            publicHref="/"
           />
         ),
       },
-      ...(musicEnabled ? [{
-        id: "music-links",
-        label: "Music",
-        kicker: "Music page",
-        description: "Streaming destinations, releases, and SoundCloud embeds.",
-        count: content.musicPlatforms.length + content.soundcloudTracks.length,
-        node: <div className="grid gap-6"><MusicLinksSection assets={assets} disabled={disabled} items={content.musicPlatforms} /><TracksSection disabled={disabled} items={content.soundcloudTracks} /></div>,
-      }] : []),
     ],
     [
       actorEnabled,
@@ -1842,10 +2308,15 @@ export default function ContentEditor({
       disabled,
       musicEnabled,
       portfolioType,
-      supportPageSlugs,
     ]
   );
   const [activeSectionId, setActiveSectionId] = useState("home");
+  const {
+    clearDirty,
+    confirmDiscard,
+    hasUnsavedChanges,
+    markDirty,
+  } = useUnsavedChangesGuard();
 
   useEffect(() => {
     const syncHash = () => {
@@ -1862,13 +2333,19 @@ export default function ContentEditor({
 
   const sectionAliases: Record<string, string> = {
     heroes: "home",
+    "home-hero": "home",
     "home-about": "home",
     "home-interlude": "home",
     "home-freelancer-life": "home",
+    "bio-hero": "bio",
     "actor-resume": "bio",
     "actor-credits": "bio",
     "bio-gallery": "bio",
     "bio-paragraphs": "bio",
+    "music-links-hero": "music-links",
+    "music-settings": "music-links",
+    "booking-hero": "booking",
+    "contact-settings": "booking",
     updates: "home",
     tracks: "music-links",
   };
@@ -1877,6 +2354,8 @@ export default function ContentEditor({
     sections.find((section) => section.id === resolvedSectionId) || sections[0];
 
   function openSection(id: string) {
+    if (id === activeSection?.id) return;
+    if (!confirmDiscard()) return;
     setActiveSectionId(id);
     window.history.replaceState(
       null,
@@ -1888,93 +2367,204 @@ export default function ContentEditor({
       ?.scrollIntoView({ block: "start" });
   }
 
+  const publicPageItems = getPublicModules(portfolioType).map((page) => {
+    const sectionId =
+      page.key === "home"
+        ? "home"
+        : page.key === "bio"
+          ? "bio"
+          : page.key === "music"
+            ? "music-links"
+            : page.key === "contact"
+              ? "booking"
+              : "";
+    const editorHref =
+      page.key === "gallery"
+        ? "/admin/media?view=studio"
+        : page.key === "video" || page.key === "showreel"
+          ? "/admin/media?view=showreel"
+          : "";
+    const icon =
+      page.key === "gallery" ? (
+        <FaImages />
+      ) : page.key === "video" || page.key === "showreel" ? (
+        <FaPlay />
+      ) : (
+        <FaGlobe />
+      );
+
+    return {
+      ...page,
+      sectionId,
+      editorHref,
+      icon,
+    };
+  });
+  const sharedSections = sections.filter((section) =>
+    ["settings", "socials"].includes(section.id)
+  );
+
   return (
-    <div className="grid gap-6">
+    <div
+      className="grid gap-4"
+      onChangeCapture={markDirty}
+      onClickCapture={(event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const button = target.closest("button");
+        if (
+          button instanceof HTMLButtonElement &&
+          button.type === "button" &&
+          button.closest("form")
+        ) {
+          markDirty();
+        }
+      }}
+      onSubmit={(event) => {
+        if (!event.defaultPrevented) clearDirty();
+      }}
+    >
       <StatusNotice
         isConfigured={isConfigured}
         loadError={loadError}
         status={status}
       />
 
-      <div>
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className={labelClass}>Workspace</p>
-            <h2 className="heading-ui mt-2 text-2xl font-semibold tracking-tight text-white">
-              Page Studios
+      <div className="grid items-start gap-4 xl:grid-cols-[250px_minmax(0,1fr)]">
+        <aside className="rounded-[22px] border border-white/9 bg-[#0d0d0f]/88 p-3 shadow-[0_18px_65px_rgba(0,0,0,0.24)] xl:sticky xl:top-4">
+          <div className="px-2 pb-2 pt-1">
+            <p className={labelClass}>Portfolio map</p>
+            <h2 className="heading-ui mt-2 text-lg font-semibold text-white">
+              Edit by page
             </h2>
+            <p className="mt-2 text-xs leading-5 text-white/38">
+              Matches the order of your public navigation.
+            </p>
           </div>
-          <span className="text-sm text-white/45">
-            {activeSection?.label || "Home Studio"}
-          </span>
-        </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {sections.map((section) => {
-            const active = section.id === activeSection?.id;
-
-            return (
-              <button
-                aria-pressed={active}
-                className={`min-h-[158px] rounded-[24px] border p-4 text-left shadow-[0_16px_55px_rgba(0,0,0,0.18)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 ${
-                  active
-                    ? "border-white/24 bg-white/[0.13] text-white"
-                    : "border-white/10 bg-white/[0.055] text-white/70 hover:border-white/18 hover:bg-white/[0.09] hover:text-white"
-                }`}
-                key={section.id}
-                onClick={() => openSection(section.id)}
-                type="button"
-              >
-                <span className="block text-xs uppercase tracking-[0.18em] text-white/45">
-                  {section.kicker}
-                </span>
-                <span className="mt-3 block text-lg font-semibold">
-                  {section.label}
-                </span>
-                <span className="mt-2 block text-sm leading-6 text-white/50">
-                  {section.description}
-                </span>
-                {typeof section.count === "number" ? (
-                  <span className="mt-3 inline-flex rounded-md border border-white/10 px-2 py-1 text-xs text-white/45">
-                    {section.count} items
+          <nav
+            aria-label="Public page editors"
+            className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-1"
+          >
+            {publicPageItems.map((page, index) => {
+              const active = page.sectionId === activeSection?.id;
+              const contentNode = (
+                <>
+                  <span
+                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border text-xs ${
+                      active
+                        ? "border-[#ff7059]/30 bg-[#ff3b1f] text-white"
+                        : "border-white/8 bg-white/[0.04] text-white/40"
+                    }`}
+                  >
+                    {page.icon}
                   </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <span className="text-[9px] font-normal tabular-nums text-white/24">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span className="truncate">{page.label}</span>
+                    </span>
+                    <span className="mt-0.5 block truncate text-[10px] text-white/32">
+                      {page.description}
+                    </span>
+                  </span>
+                  {page.editorHref ? (
+                    <FaExternalLinkAlt className="shrink-0 text-[9px] text-white/26" />
+                  ) : null}
+                </>
+              );
+              const className = `flex min-h-14 items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${
+                active
+                  ? "border-white/14 bg-white/[0.09] text-white"
+                  : "border-transparent text-white/56 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"
+              }`;
 
-        <section className="mt-5 rounded-[24px] border border-white/10 bg-black/20 p-4 sm:p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className={labelClass}>Public content map</p>
-              <h3 className="heading-ui mt-2 text-xl font-semibold text-white">Every public page has one clear editor</h3>
+              return page.editorHref ? (
+                <Link
+                  className={className}
+                  href={page.editorHref}
+                  key={`${page.key}-${page.href}`}
+                >
+                  {contentNode}
+                </Link>
+              ) : (
+                <button
+                  aria-pressed={active}
+                  className={className}
+                  key={`${page.key}-${page.href}`}
+                  onClick={() => openSection(page.sectionId)}
+                  type="button"
+                >
+                  {contentNode}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="mx-2 my-3 border-t border-white/8" />
+          <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/28">
+            Site-wide
+          </p>
+          <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
+            {sharedSections.map((section) => {
+              const active = section.id === activeSection?.id;
+              const icon =
+                section.id === "settings" ? <FaPalette /> : <FaGlobe />;
+
+              return (
+                <button
+                  aria-pressed={active}
+                  className={`flex min-h-12 items-center gap-3 rounded-xl border px-2.5 py-2 text-left text-sm font-semibold transition ${
+                    active
+                      ? "border-white/14 bg-white/[0.09] text-white"
+                      : "border-transparent text-white/50 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"
+                  }`}
+                  key={section.id}
+                  onClick={() => openSection(section.id)}
+                  type="button"
+                >
+                  <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/8 bg-white/[0.04] text-[11px] text-white/42">
+                    {icon}
+                  </span>
+                  {section.label}
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <div className="min-w-0">
+          <div className="mb-4 flex flex-col gap-3 rounded-[22px] border border-white/9 bg-white/[0.045] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className={labelClass}>{activeSection?.kicker}</p>
+              <h2 className="heading-ui mt-1 text-xl font-semibold text-white">
+                {activeSection?.label}
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-white/40">
+                {activeSection?.description}
+              </p>
             </div>
-            <span className="text-xs text-white/40">Page order → editor location</span>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {[
-              { href: "#home", label: "Home", detail: "Hero · About · Interlude · 4 Freelancer scenes" },
-              { href: "#bio", label: "Bio", detail: "Hero · portraits · paragraphs · resume" },
-              { href: "/admin/media?view=studio", label: "Gallery", detail: "Hero · introduction · mosaic images" },
-              { href: "/admin/media?view=showreel", label: "Showreel", detail: "Hero · page copy · featured reel · clips" },
-              { href: musicEnabled ? "#music-links" : "#settings", label: musicEnabled ? "Music" : "Contact", detail: musicEnabled ? "Hero · platform cards · releases · mixes" : "Hero · location · contact copy" },
-              { href: "#socials", label: "Footer & navigation", detail: "Location · effect · social destinations" },
-            ].map((entry) => (
-              <Link className="group rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition hover:border-white/22 hover:bg-white/[0.07]" href={entry.href} key={entry.label}>
-                <span className="flex items-center justify-between gap-3 text-sm font-semibold text-white/85">
-                  {entry.label}
-                  <span aria-hidden="true" className="text-white/30 transition group-hover:translate-x-0.5 group-hover:text-white/70">→</span>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {hasUnsavedChanges ? (
+                <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-amber-300/16 bg-amber-400/[0.06] px-3 text-xs text-amber-100/68">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+                  Unsaved changes
                 </span>
-                <span className="mt-2 block text-xs leading-5 text-white/42">{entry.detail}</span>
-              </Link>
-            ))}
+              ) : null}
+              {typeof activeSection?.count === "number" ? (
+                <span className="inline-flex min-h-8 items-center rounded-full border border-white/9 px-3 text-xs tabular-nums text-white/45">
+                  {activeSection.count} items
+                </span>
+              ) : null}
+            </div>
           </div>
-        </section>
-      </div>
 
-      <div className="mt-6 scroll-mt-28" id="content-workspace">
-        {activeSection?.node}
+          <div className="scroll-mt-28" id="content-workspace">
+            {activeSection?.node}
+          </div>
+        </div>
       </div>
     </div>
   );

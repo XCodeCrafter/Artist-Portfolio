@@ -32,6 +32,7 @@ const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] =
     : [];
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   reactStrictMode: true,
   images: {
     remotePatterns,
@@ -49,7 +50,8 @@ const nextConfig: NextConfig = {
       { key: "Origin-Agent-Cluster", value: "?1" },
       {
         key: "Permissions-Policy",
-        value: "camera=(), microphone=(), geolocation=()",
+        value:
+          "accelerometer=(), browsing-topics=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
       },
       ...(isDev
         ? []

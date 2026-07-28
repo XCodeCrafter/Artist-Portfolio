@@ -28,7 +28,6 @@ export function createContentSecurityPolicy(nonce: string) {
     "https://api.soundcloud.com",
     "https://w.soundcloud.com",
     "https://challenges.cloudflare.com",
-    "https://*.supabase.co",
     ...(supabaseOrigin ? [supabaseOrigin] : []),
     ...(isDev
       ? [
@@ -43,7 +42,6 @@ export function createContentSecurityPolicy(nonce: string) {
     "'self'",
     "data:",
     "blob:",
-    "https://*.supabase.co",
     ...(supabaseOrigin ? [supabaseOrigin] : []),
   ].join(" ");
   const frameSrc = [
@@ -68,6 +66,7 @@ export function createContentSecurityPolicy(nonce: string) {
     "font-src 'self' data: https://fonts.gstatic.com",
     `media-src ${assetSrc}`,
     `script-src ${scriptSrc}`,
+    "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     `connect-src ${connectSrc}`,
     "worker-src 'self' blob:",

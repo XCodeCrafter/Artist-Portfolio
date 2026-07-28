@@ -7,12 +7,13 @@ import NewsletterBlock from "@/components/NewsletterBlock";
 import SoundcloudCarousel from "@/components/SoundcloudCarousel";
 import SpotifyEmbed from "@/components/SpotifyEmbed";
 import { getPortfolioContent } from "@/lib/content";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Music",
-  description: "Releases, selected tracks, and official listening links.",
-  alternates: { canonical: "/music" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getPortfolioContent();
+
+  return createPageMetadata(content, "music");
+}
 
 export default async function MusicPage() {
   const content = await getPortfolioContent();

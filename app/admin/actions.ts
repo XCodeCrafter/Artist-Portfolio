@@ -109,12 +109,17 @@ export async function loginAdmin(
   const rateLimit = await enforceAuthRateLimit("login", email);
 
   if (!rateLimit.allowed) {
-    await writeAuditLog({
-      action: "security_admin_login_rate_limited",
-      tableName: "auth",
-      recordId: "login",
-      metadata: rateLimit.auditMetadata,
-    });
+    if (rateLimit.firstDenied) {
+      await writeAuditLog({
+        action: "security_admin_login_rate_limited",
+        tableName: "security_events",
+        recordId: "admin-login",
+        metadata: {
+          ...rateLimit.auditMetadata,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        },
+      });
+    }
 
     return {
       ok: false,
@@ -201,12 +206,18 @@ export async function requestPasswordReset(
   const { captchaToken, email } = parsedRequest.data;
   const rateLimit = await enforceAuthRateLimit("password-reset", email);
   if (!rateLimit.allowed) {
-    await writeAuditLog({
-      action: "security_admin_password_reset_rate_limited",
-      tableName: "auth",
-      recordId: "password-recovery",
-      metadata: rateLimit.auditMetadata,
-    });
+    if (rateLimit.firstDenied) {
+      await writeAuditLog({
+        action: "security_admin_password_reset_rate_limited",
+        tableName: "security_events",
+        recordId: "password-recovery",
+        metadata: {
+          ...rateLimit.auditMetadata,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        },
+      });
+    }
+
     await keepResetResponseUniform(startedAt);
     return GENERIC_RESET_SUCCESS;
   }

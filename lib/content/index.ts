@@ -225,8 +225,11 @@ function mapHeroes(rows: PageHeroRow[]): Record<PageSlug, HeroContent> {
   return heroes;
 }
 
-function mapHomeUpdates(rows: HomeUpdateRow[]): HomeUpdate[] {
-  if (!rows.length) return FALLBACK_CONTENT.homeUpdates;
+function mapHomeUpdates(
+  rows: HomeUpdateRow[],
+  allowFallback = true
+): HomeUpdate[] {
+  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.homeUpdates : [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -250,8 +253,11 @@ function mapAboutHome(row?: AboutHomeRow): AboutHomeContent {
   };
 }
 
-function mapSocialLinks(rows: SocialLinkRow[]): SocialLink[] {
-  if (!rows.length) return FALLBACK_CONTENT.socialLinks;
+function mapSocialLinks(
+  rows: SocialLinkRow[],
+  allowFallback = true
+): SocialLink[] {
+  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.socialLinks : [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -262,8 +268,11 @@ function mapSocialLinks(rows: SocialLinkRow[]): SocialLink[] {
   }));
 }
 
-function mapMusicPlatforms(rows: MusicPlatformRow[]): MusicPlatformLink[] {
-  if (!rows.length) return FALLBACK_CONTENT.musicPlatforms;
+function mapMusicPlatforms(
+  rows: MusicPlatformRow[],
+  allowFallback = true
+): MusicPlatformLink[] {
+  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.musicPlatforms : [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -275,8 +284,11 @@ function mapMusicPlatforms(rows: MusicPlatformRow[]): MusicPlatformLink[] {
   }));
 }
 
-function mapSoundcloudTracks(rows: SoundcloudTrackRow[]): SoundcloudTrack[] {
-  if (!rows.length) return FALLBACK_CONTENT.soundcloudTracks;
+function mapSoundcloudTracks(
+  rows: SoundcloudTrackRow[],
+  allowFallback = true
+): SoundcloudTrack[] {
+  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.soundcloudTracks : [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -285,8 +297,13 @@ function mapSoundcloudTracks(rows: SoundcloudTrackRow[]): SoundcloudTrack[] {
   }));
 }
 
-function mapBioGalleryImages(rows: BioGalleryImageRow[]): BioGalleryImage[] {
-  if (!rows.length) return FALLBACK_CONTENT.bio.galleryImages;
+function mapBioGalleryImages(
+  rows: BioGalleryImageRow[],
+  allowFallback = true
+): BioGalleryImage[] {
+  if (!rows.length) {
+    return allowFallback ? FALLBACK_CONTENT.bio.galleryImages : [];
+  }
 
   return rows.map((row) => ({
     id: row.id,
@@ -295,8 +312,11 @@ function mapBioGalleryImages(rows: BioGalleryImageRow[]): BioGalleryImage[] {
   }));
 }
 
-function mapGalleryImages(rows: GalleryImageRow[]): GalleryImage[] {
-  if (!rows.length) return FALLBACK_CONTENT.galleryImages;
+function mapGalleryImages(
+  rows: GalleryImageRow[],
+  allowFallback = true
+): GalleryImage[] {
+  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.galleryImages : [];
 
   return rows.map((row, index) => ({
     id: row.id,
@@ -394,8 +414,11 @@ function mapBioProfile(row?: BioProfileRow) {
   };
 }
 
-function mapBioParagraphs(rows: BioParagraphRow[]): BioParagraph[] {
-  if (!rows.length) return FALLBACK_CONTENT.bio.paragraphs;
+function mapBioParagraphs(
+  rows: BioParagraphRow[],
+  allowFallback = true
+): BioParagraph[] {
+  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.bio.paragraphs : [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -404,8 +427,8 @@ function mapBioParagraphs(rows: BioParagraphRow[]): BioParagraph[] {
   }));
 }
 
-function mapVideos(rows: VideoRow[]): VideoItem[] {
-  if (!rows.length) return FALLBACK_CONTENT.videos;
+function mapVideos(rows: VideoRow[], allowFallback = true): VideoItem[] {
+  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.videos : [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -443,8 +466,11 @@ function mapActorResume(row?: ActorResumeRow): ActorResume {
   };
 }
 
-function mapActorCredits(rows: ActorCreditRow[]): ActorCredit[] {
-  if (!rows.length) return FALLBACK_CONTENT.actorCredits;
+function mapActorCredits(
+  rows: ActorCreditRow[],
+  allowFallback = true
+): ActorCredit[] {
+  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.actorCredits : [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -465,131 +491,137 @@ function normalizeActorCreditType(value?: string | null): ActorCreditType {
 }
 
 async function readSupabaseContent(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  allowFallback: boolean
 ): Promise<PortfolioContent> {
-  const settings = await supabase
-    .from("site_settings")
-    .select("*")
-    .eq("id", "main")
-    .limit(1)
-    .returns<SiteSettingsRow[]>();
-
-  const heroes = await supabase
-    .from("page_heroes")
-    .select("*")
-    .order("sort_order", { ascending: true })
-    .returns<PageHeroRow[]>();
-
-  const updates = await supabase
-    .from("home_updates")
-    .select("*")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .returns<HomeUpdateRow[]>();
-
-  const about = await supabase
-    .from("about_home")
-    .select("*")
-    .eq("id", "main")
-    .limit(1)
-    .returns<AboutHomeRow[]>();
-
-  const socials = await supabase
-    .from("social_links")
-    .select("*")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .returns<SocialLinkRow[]>();
-
-  const platforms = await supabase
-    .from("music_platform_links")
-    .select("*")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .returns<MusicPlatformRow[]>();
-
-  const tracks = await supabase
-    .from("soundcloud_tracks")
-    .select("*")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .returns<SoundcloudTrackRow[]>();
-
-  const gallery = await supabase
-    .from("bio_gallery_images")
-    .select("*")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .returns<BioGalleryImageRow[]>();
-
-  const galleryImages = await supabase
-    .from("gallery_images")
-    .select("*")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .returns<GalleryImageRow[]>();
-
-  // Optional until migration 0014 is applied; the public page keeps its
-  // established copy through fallback values during rollout.
-  const galleryPresentation = await supabase
-    .from("gallery_presentation")
-    .select("*")
-    .eq("id", "main")
-    .limit(1)
-    .returns<GalleryPresentationRow[]>();
-  const galleryPresentationAsset = await supabase
-    .from("media_assets")
-    .select("metadata")
-    .eq("id", "gallery-studio-settings")
-    .limit(1)
-    .returns<Array<{ metadata: Record<string, unknown> }>>();
-  const videoPresentationAsset = await supabase
-    .from("media_assets")
-    .select("metadata")
-    .eq("id", "showreel-studio-settings")
-    .limit(1)
-    .returns<Array<{ metadata: Record<string, unknown> }>>();
-  const homePresentationAsset = await supabase
-    .from("media_assets")
-    .select("metadata")
-    .eq("id", "home-studio-settings")
-    .limit(1)
-    .returns<Array<{ metadata: Record<string, unknown> }>>();
-
-  const bioProfile = await supabase
-    .from("bio_profile")
-    .select("*")
-    .eq("id", "main")
-    .limit(1)
-    .returns<BioProfileRow[]>();
-
-  const paragraphs = await supabase
-    .from("bio_paragraphs")
-    .select("*")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .returns<BioParagraphRow[]>();
-
-  const videos = await supabase
-    .from("videos")
-    .select("*")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .returns<VideoRow[]>();
-
-  const actorResume = await supabase
-    .from("actor_resume")
-    .select("*")
-    .eq("id", "main")
-    .limit(1)
-    .returns<ActorResumeRow[]>();
-
-  const actorCredits = await supabase
-    .from("actor_credits")
-    .select("*")
-    .eq("is_published", true)
-    .order("sort_order", { ascending: true })
-    .returns<ActorCreditRow[]>();
+  const [
+    settings,
+    heroes,
+    updates,
+    about,
+    socials,
+    platforms,
+    tracks,
+    gallery,
+    galleryImages,
+    galleryPresentation,
+    galleryPresentationAsset,
+    videoPresentationAsset,
+    homePresentationAsset,
+    bioProfile,
+    paragraphs,
+    videos,
+    actorResume,
+    actorCredits,
+  ] = await Promise.all([
+    supabase
+      .from("site_settings")
+      .select("*")
+      .eq("id", "main")
+      .limit(1)
+      .returns<SiteSettingsRow[]>(),
+    supabase
+      .from("page_heroes")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .returns<PageHeroRow[]>(),
+    supabase
+      .from("home_updates")
+      .select("*")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .returns<HomeUpdateRow[]>(),
+    supabase
+      .from("about_home")
+      .select("*")
+      .eq("id", "main")
+      .limit(1)
+      .returns<AboutHomeRow[]>(),
+    supabase
+      .from("social_links")
+      .select("*")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .returns<SocialLinkRow[]>(),
+    supabase
+      .from("music_platform_links")
+      .select("*")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .returns<MusicPlatformRow[]>(),
+    supabase
+      .from("soundcloud_tracks")
+      .select("*")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .returns<SoundcloudTrackRow[]>(),
+    supabase
+      .from("bio_gallery_images")
+      .select("*")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .returns<BioGalleryImageRow[]>(),
+    supabase
+      .from("gallery_images")
+      .select("*")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .returns<GalleryImageRow[]>(),
+    supabase
+      .from("gallery_presentation")
+      .select("*")
+      .eq("id", "main")
+      .limit(1)
+      .returns<GalleryPresentationRow[]>(),
+    supabase
+      .from("media_assets")
+      .select("metadata")
+      .eq("id", "gallery-studio-settings")
+      .limit(1)
+      .returns<Array<{ metadata: Record<string, unknown> }>>(),
+    supabase
+      .from("media_assets")
+      .select("metadata")
+      .eq("id", "showreel-studio-settings")
+      .limit(1)
+      .returns<Array<{ metadata: Record<string, unknown> }>>(),
+    supabase
+      .from("media_assets")
+      .select("metadata")
+      .eq("id", "home-studio-settings")
+      .limit(1)
+      .returns<Array<{ metadata: Record<string, unknown> }>>(),
+    supabase
+      .from("bio_profile")
+      .select("*")
+      .eq("id", "main")
+      .limit(1)
+      .returns<BioProfileRow[]>(),
+    supabase
+      .from("bio_paragraphs")
+      .select("*")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .returns<BioParagraphRow[]>(),
+    supabase
+      .from("videos")
+      .select("*")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .returns<VideoRow[]>(),
+    supabase
+      .from("actor_resume")
+      .select("*")
+      .eq("id", "main")
+      .limit(1)
+      .returns<ActorResumeRow[]>(),
+    supabase
+      .from("actor_credits")
+      .select("*")
+      .eq("is_published", true)
+      .order("sort_order", { ascending: true })
+      .returns<ActorCreditRow[]>(),
+  ]);
 
   const errors = [
     settings.error,
@@ -601,6 +633,9 @@ async function readSupabaseContent(
     tracks.error,
     gallery.error,
     galleryImages.error,
+    galleryPresentationAsset.error,
+    videoPresentationAsset.error,
+    homePresentationAsset.error,
     bioProfile.error,
     paragraphs.error,
     videos.error,
@@ -612,25 +647,43 @@ async function readSupabaseContent(
     throw new Error("Unable to load portfolio content from Supabase.");
   }
 
+  const settingsRow = settings.data?.[0];
+  const heroRows = heroes.data ?? [];
+
+  if (!allowFallback) {
+    const portfolioType = normalizePortfolioType(settingsRow?.portfolio_type);
+    const identityMissing =
+      !settingsRow?.artist_name.trim() ||
+      !heroRows.find((row) => row.page_slug === "home")?.title.trim();
+    const requiredProfileMissing =
+      !about.data?.[0] ||
+      !bioProfile.data?.[0] ||
+      (portfolioType === "actor" && !actorResume.data?.[0]);
+
+    if (identityMissing || requiredProfileMissing) {
+      throw new Error("Required published portfolio content is incomplete.");
+    }
+  }
+
   const bioProfileContent = mapBioProfile(bioProfile.data?.[0]);
 
   return {
-    settings: mapSettings(settings.data?.[0]),
-    heroes: mapHeroes(heroes.data ?? []),
-    homeUpdates: mapHomeUpdates(updates.data ?? []),
+    settings: mapSettings(settingsRow),
+    heroes: mapHeroes(heroRows),
+    homeUpdates: mapHomeUpdates(updates.data ?? [], allowFallback),
     homePresentation: mapHomePresentation(
       homePresentationAsset.data?.[0]?.metadata
     ),
     aboutHome: mapAboutHome(about.data?.[0]),
-    socialLinks: mapSocialLinks(socials.data ?? []),
-    musicPlatforms: mapMusicPlatforms(platforms.data ?? []),
-    soundcloudTracks: mapSoundcloudTracks(tracks.data ?? []),
+    socialLinks: mapSocialLinks(socials.data ?? [], allowFallback),
+    musicPlatforms: mapMusicPlatforms(platforms.data ?? [], allowFallback),
+    soundcloudTracks: mapSoundcloudTracks(tracks.data ?? [], allowFallback),
     bio: {
       ...bioProfileContent,
-      galleryImages: mapBioGalleryImages(gallery.data ?? []),
-      paragraphs: mapBioParagraphs(paragraphs.data ?? []),
+      galleryImages: mapBioGalleryImages(gallery.data ?? [], allowFallback),
+      paragraphs: mapBioParagraphs(paragraphs.data ?? [], allowFallback),
     },
-    galleryImages: mapGalleryImages(galleryImages.data ?? []),
+    galleryImages: mapGalleryImages(galleryImages.data ?? [], allowFallback),
     galleryPresentation: mapGalleryPresentation(
       galleryPresentation.data?.[0],
       galleryPresentationAsset.data?.[0]?.metadata
@@ -638,23 +691,63 @@ async function readSupabaseContent(
     videoPresentation: mapVideoPresentation(
       videoPresentationAsset.data?.[0]?.metadata
     ),
-    videos: mapVideos(videos.data ?? []),
+    videos: mapVideos(videos.data ?? [], allowFallback),
     actorResume: mapActorResume(actorResume.data?.[0]),
-    actorCredits: mapActorCredits(actorCredits.data ?? []),
+    actorCredits: mapActorCredits(actorCredits.data ?? [], allowFallback),
   };
+}
+
+function isLoopbackSiteUrl(value?: string) {
+  if (!value) return false;
+
+  try {
+    const url = new URL(
+      /^https?:\/\//i.test(value) ? value : `http://${value}`
+    );
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    return (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function canUseFallbackContent() {
+  if (process.env.NODE_ENV !== "production") return true;
+  if (process.env.VERCEL === "1" || process.env.VERCEL_ENV) return false;
+  if (process.env.ALLOW_FALLBACK_CONTENT !== "true") return false;
+
+  const configuredUrls = [
+    process.env.SITE_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+  ].filter((value): value is string => Boolean(value));
+
+  return (
+    configuredUrls.length > 0 && configuredUrls.every(isLoopbackSiteUrl)
+  );
 }
 
 export const getPortfolioContent = cache(async (): Promise<PortfolioContent> => {
   const supabase = createPublicContentClient();
+  const allowFallback = canUseFallbackContent();
 
   if (!supabase) {
-    return FALLBACK_CONTENT;
+    if (allowFallback) return FALLBACK_CONTENT;
+    throw new Error(
+      "Published portfolio content is unavailable because Supabase is not configured."
+    );
   }
 
   try {
-    return await readSupabaseContent(supabase);
-  } catch {
-    return FALLBACK_CONTENT;
+    return await readSupabaseContent(supabase, allowFallback);
+  } catch (error) {
+    if (allowFallback) return FALLBACK_CONTENT;
+    console.error("Unable to load published portfolio content.", error);
+    throw new Error("Published portfolio content is temporarily unavailable.");
   }
 });
 

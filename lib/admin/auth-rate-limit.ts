@@ -10,6 +10,7 @@ type AuthRateLimitKind = "login" | "password-reset" | "mfa";
 type AuthRateLimitResult = {
   allowed: boolean;
   configured: boolean;
+  firstDenied: boolean;
   retryAfterSeconds: number;
   auditMetadata: {
     accountKey: string;
@@ -46,30 +47,43 @@ export async function enforceAuthRateLimit(
     return {
       allowed: process.env.NODE_ENV !== "production",
       configured: false,
+      firstDenied: false,
       retryAfterSeconds: 60,
       auditMetadata,
     };
   }
 
   const limits = limitsFor(kind);
-  const [accountResult, ipResult] = await Promise.all([
-    consumeDatabaseRateLimit({
-      bucket: `admin-auth:${kind}:account`,
-      identifierHash: accountKey,
-      limit: limits.account,
-      windowSeconds: limits.windowSeconds,
-    }),
-    consumeDatabaseRateLimit({
-      bucket: `admin-auth:${kind}:ip`,
-      identifierHash: ipKey,
-      limit: limits.ip,
-      windowSeconds: limits.windowSeconds,
-    }),
-  ]);
+  const ipResult = await consumeDatabaseRateLimit({
+    bucket: `admin-auth:${kind}:ip`,
+    identifierHash: ipKey,
+    limit: limits.ip,
+    windowSeconds: limits.windowSeconds,
+  });
+
+  // The IP bucket is the admission gate. Do not create unbounded account rows
+  // for rotating email addresses after that source has already been denied.
+  if (!ipResult.allowed) {
+    return {
+      allowed: false,
+      configured: ipResult.configured,
+      firstDenied: ipResult.firstDenied,
+      retryAfterSeconds: ipResult.retryAfterSeconds,
+      auditMetadata,
+    };
+  }
+
+  const accountResult = await consumeDatabaseRateLimit({
+    bucket: `admin-auth:${kind}:account`,
+    identifierHash: accountKey,
+    limit: limits.account,
+    windowSeconds: limits.windowSeconds,
+  });
 
   return {
     allowed: accountResult.allowed && ipResult.allowed,
     configured: accountResult.configured && ipResult.configured,
+    firstDenied: accountResult.firstDenied,
     retryAfterSeconds: Math.max(
       accountResult.retryAfterSeconds,
       ipResult.retryAfterSeconds

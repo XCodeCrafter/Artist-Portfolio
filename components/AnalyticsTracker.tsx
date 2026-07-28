@@ -11,14 +11,31 @@ type AnalyticsPayload = {
   metadata?: Record<string, unknown>;
 };
 
+const TRACKABLE_PATHS = new Set([
+  "/",
+  "/bio",
+  "/booking",
+  "/gallery",
+  "/music",
+  "/privacy",
+  "/terms",
+  "/video",
+]);
+
 function isTrackablePath(path: string) {
-  return !path.startsWith("/admin") && !path.startsWith("/api");
+  const normalized =
+    path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+  return TRACKABLE_PATHS.has(normalized);
 }
 
 function sendAnalytics(payload: AnalyticsPayload) {
   if (!isTrackablePath(payload.pagePath)) return;
 
-  const body = JSON.stringify(payload);
+  const normalizedPath =
+    payload.pagePath.length > 1 && payload.pagePath.endsWith("/")
+      ? payload.pagePath.slice(0, -1)
+      : payload.pagePath;
+  const body = JSON.stringify({ ...payload, pagePath: normalizedPath });
 
   if (navigator.sendBeacon) {
     const blob = new Blob([body], { type: "application/json" });

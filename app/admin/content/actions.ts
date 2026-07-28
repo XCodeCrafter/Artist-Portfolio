@@ -49,38 +49,90 @@ const idValue = z
   .max(100)
   .regex(/^[a-z0-9][a-z0-9_-]*$/i);
 
+const INTERNAL_HREF_BASE = "https://portfolio.invalid";
+
+function isSafeHref(value: string) {
+  if (!value) return true;
+
+  try {
+    if (value.startsWith("#")) {
+      const url = new URL(value, INTERNAL_HREF_BASE);
+      return (
+        url.origin === INTERNAL_HREF_BASE &&
+        url.pathname === "/" &&
+        !url.search &&
+        Boolean(url.hash)
+      );
+    }
+
+    if (value.startsWith("//")) return false;
+
+    if (value.startsWith("/")) {
+      return new URL(value, INTERNAL_HREF_BASE).origin === INTERNAL_HREF_BASE;
+    }
+
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
 const safeHref = z
   .string()
   .trim()
   .max(1200)
-  .refine((value) => {
-    if (!value) return true;
+  .refine(isSafeHref);
 
-    const lower = value.toLowerCase();
-    if (lower.startsWith("javascript:") || lower.startsWith("data:")) {
-      return false;
+function isSafeMediaSrc(value: string) {
+  if (!value) return true;
+
+  try {
+    if (value.startsWith("//")) return false;
+    if (value.startsWith("/")) {
+      return new URL(value, INTERNAL_HREF_BASE).origin === INTERNAL_HREF_BASE;
     }
 
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+function isSafeImageSrc(value: string) {
+  if (!value) return true;
+  if (value.startsWith("/")) return isSafeMediaSrc(value);
+
+  const storageBase = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!storageBase) return false;
+
+  try {
+    const imageUrl = new URL(value);
+    const storageUrl = new URL(storageBase);
     return (
-      value.startsWith("/") ||
-      value.startsWith("#") ||
-      /^https?:\/\//i.test(value)
+      isSafeMediaSrc(value) &&
+      storageUrl.protocol === "https:" &&
+      imageUrl.origin === storageUrl.origin &&
+      imageUrl.pathname.startsWith("/storage/v1/object/public/")
     );
-  });
+  } catch {
+    return false;
+  }
+}
 
 const safeMediaSrc = z
   .string()
   .trim()
   .max(1200)
-  .refine((value) => {
-    if (!value) return true;
+  .refine(isSafeMediaSrc);
 
-    const lower = value.toLowerCase();
-    if (lower.startsWith("javascript:") || lower.startsWith("data:")) {
-      return false;
-    }
-
-    return value.startsWith("/") || /^https?:\/\//i.test(value);
+const safeImageSrc = z
+  .string()
+  .trim()
+  .max(1200)
+  .refine(isSafeImageSrc, {
+    message: "Choose a local image or one uploaded to this site's media library.",
   });
 
 const settingsSchema = z.object({
@@ -98,30 +150,41 @@ const settingsSchema = z.object({
   contactBlurb: mediumText,
 });
 
-const heroSchema = z.object({
-  pageSlug: z.enum(PAGE_SLUGS as [PageSlug, ...PageSlug[]]),
-  title: shortText.min(1),
-  subtitle: shortText,
-  ctaLabel: shortText,
-  ctaHref: safeHref,
-  backgroundSrc: safeMediaSrc.min(1),
-  posterSrc: safeMediaSrc,
-  mediaType: z.enum(["image", "video"]),
-  sortOrder,
-});
+const heroSchema = z
+  .object({
+    pageSlug: z.enum(PAGE_SLUGS as [PageSlug, ...PageSlug[]]),
+    title: shortText.min(1),
+    subtitle: shortText,
+    ctaLabel: shortText,
+    ctaHref: safeHref,
+    backgroundSrc: safeMediaSrc.min(1),
+    posterSrc: safeImageSrc,
+    mediaType: z.enum(["image", "video"]),
+    sortOrder,
+  })
+  .superRefine((hero, context) => {
+    if (hero.mediaType === "image" && !isSafeImageSrc(hero.backgroundSrc)) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Choose a local hero image or one uploaded to this site's media library.",
+        path: ["backgroundSrc"],
+      });
+    }
+  });
 
 const aboutHomeSchema = z.object({
   heading: shortText.min(1),
   body: longText.min(1),
   ctaLabel: shortText,
   ctaHref: safeHref,
-  imageSrc: safeMediaSrc,
+  imageSrc: safeImageSrc.min(1),
   imageAlt: shortText,
 });
 
 const homePresentationSchema = z.object({
   updatesHeading: shortText.min(1),
-  updatesImageSrc: safeMediaSrc,
+  updatesImageSrc: safeImageSrc,
   updatesImageAlt: shortText,
   updatesCtaLabel: shortText,
   updatesCtaHref: safeHref,
@@ -129,24 +192,24 @@ const homePresentationSchema = z.object({
   featureBody: mediumText,
   featureCtaLabel: shortText,
   featureCtaHref: safeHref,
-  featureImageSrc: safeMediaSrc,
+  featureImageSrc: safeImageSrc,
   featureImageAlt: shortText,
   featureVideoSrc: safeMediaSrc,
-  featurePosterSrc: safeMediaSrc,
+  featurePosterSrc: safeImageSrc,
   storyTitle: shortText.min(1),
   storyBody: mediumText,
   storyCtaLabel: shortText,
   storyCtaHref: safeHref,
-  storyImage1Src: safeMediaSrc,
+  storyImage1Src: safeImageSrc,
   storyImage1Title: shortText,
   storyImage1Body: mediumText,
-  storyImage2Src: safeMediaSrc,
+  storyImage2Src: safeImageSrc,
   storyImage2Title: shortText,
   storyImage2Body: mediumText,
-  storyImage3Src: safeMediaSrc,
+  storyImage3Src: safeImageSrc,
   storyImage3Title: shortText,
   storyImage3Body: mediumText,
-  storyImage4Src: safeMediaSrc,
+  storyImage4Src: safeImageSrc,
   storyImage4Title: shortText,
   storyImage4Body: mediumText,
 });
@@ -162,7 +225,7 @@ const homeUpdateSchema = z.object({
   text: mediumText.min(1),
   linkLabel: shortText,
   href: safeHref,
-  avatarSrc: safeMediaSrc,
+  avatarSrc: safeImageSrc,
   sortOrder,
   isPublished: z.boolean(),
 });
@@ -183,7 +246,7 @@ const musicPlatformSchema = z.object({
   label: shortText,
   href: safeHref.min(1),
   iconKey: shortText,
-  imageSrc: safeMediaSrc,
+  imageSrc: safeImageSrc,
   sortOrder,
   isPublished: z.boolean(),
 });
@@ -198,7 +261,7 @@ const soundcloudTrackSchema = z.object({
 
 const bioGalleryImageSchema = z.object({
   id: idValue,
-  src: safeMediaSrc.min(1),
+  src: safeImageSrc.min(1),
   alt: shortText,
   sortOrder,
   isPublished: z.boolean(),
@@ -207,7 +270,7 @@ const bioGalleryImageSchema = z.object({
 const galleryImageSchema = z.object({
   id: idValue,
   title: shortText.min(1),
-  src: safeMediaSrc.min(1),
+  src: safeImageSrc.min(1),
   alt: shortText,
   caption: mediumText,
   category: shortText,
@@ -238,7 +301,7 @@ const videoSchema = z.object({
   description: mediumText,
   embedUrl: safeHref.min(1),
   platform: shortText.min(1),
-  thumbnailSrc: safeMediaSrc,
+  thumbnailSrc: safeImageSrc,
   videoType: z.enum(VIDEO_TYPES),
   isFeatured: z.boolean(),
   sortOrder,
@@ -278,6 +341,20 @@ function formValue(formData: FormData, key: string) {
 
 function formChecked(formData: FormData, key: string) {
   return formData.get(key) === "on";
+}
+
+const CONTENT_RETURN_SECTIONS = new Set([
+  "home",
+  "bio",
+  "music-links",
+  "booking",
+  "settings",
+  "socials",
+]);
+
+function getReturnSection(formData: FormData, fallback: string) {
+  const value = formValue(formData, "returnSection");
+  return CONTENT_RETURN_SECTIONS.has(value) ? value : fallback;
 }
 
 function slugifyId(value: string, fallback: string) {
@@ -350,6 +427,7 @@ async function assertMutation(
 }
 
 export async function updateSiteSettings(formData: FormData) {
+  const returnSection = getReturnSection(formData, "settings");
   const parsed = settingsSchema.safeParse({
     portfolioType: formValue(formData, "portfolioType"),
     footerEffect: formValue(formData, "footerEffect"),
@@ -365,9 +443,9 @@ export async function updateSiteSettings(formData: FormData) {
     contactBlurb: formValue(formData, "contactBlurb"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid", "settings");
+  if (!parsed.success) redirectToStatus("invalid", returnSection);
 
-  const { admin, supabase } = await getWriteContext("settings");
+  const { admin, supabase } = await getWriteContext(returnSection);
   const result = await supabase.from("site_settings").upsert({
     id: "main",
     portfolio_type: parsed.data.portfolioType,
@@ -385,14 +463,14 @@ export async function updateSiteSettings(formData: FormData) {
   });
 
   if (isMissingTypographySchema(result.error)) {
-    redirectToStatus("typography-migration-required", "settings");
+    redirectToStatus("typography-migration-required", returnSection);
   }
 
   if (isMissingFooterEffectSchema(result.error)) {
-    redirectToStatus("footer-effect-migration-required", "settings");
+    redirectToStatus("footer-effect-migration-required", returnSection);
   }
 
-  await assertMutation(result, "settings");
+  await assertMutation(result, returnSection);
   await writeAuditLog({
     actorId: admin.id,
     action: "content_update",
@@ -402,10 +480,11 @@ export async function updateSiteSettings(formData: FormData) {
   });
 
   revalidatePortfolio();
-  redirectToStatus("saved-settings", "settings");
+  redirectToStatus("saved-settings", returnSection);
 }
 
 export async function updatePageHero(formData: FormData) {
+  const returnSection = getReturnSection(formData, "home");
   const parsed = heroSchema.safeParse({
     pageSlug: formValue(formData, "pageSlug"),
     title: formValue(formData, "title"),
@@ -418,9 +497,9 @@ export async function updatePageHero(formData: FormData) {
     sortOrder: formValue(formData, "sortOrder"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid", "heroes");
+  if (!parsed.success) redirectToStatus("invalid", returnSection);
 
-  const { admin, supabase } = await getWriteContext("heroes");
+  const { admin, supabase } = await getWriteContext(returnSection);
   const result = await supabase.from("page_heroes").upsert({
     page_slug: parsed.data.pageSlug,
     title: parsed.data.title,
@@ -433,7 +512,7 @@ export async function updatePageHero(formData: FormData) {
     sort_order: parsed.data.sortOrder,
   });
 
-  await assertMutation(result, "heroes");
+  await assertMutation(result, returnSection);
   await writeAuditLog({
     actorId: admin.id,
     action: "content_update",
@@ -443,14 +522,7 @@ export async function updatePageHero(formData: FormData) {
   });
 
   revalidatePortfolio();
-  redirectToStatus(
-    "saved-hero",
-    parsed.data.pageSlug === "bio"
-      ? "bio"
-      : parsed.data.pageSlug === "home"
-        ? "home"
-        : "settings"
-  );
+  redirectToStatus("saved-hero", returnSection);
 }
 
 export async function updateAboutHome(formData: FormData) {

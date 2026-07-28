@@ -111,7 +111,8 @@ export default function HeroCinematic({
       <div className="absolute inset-0">
         <Image
           src={backgroundSrc}
-          alt="Hero background"
+          alt=""
+          aria-hidden="true"
           fill
           priority
           sizes="100vw"
@@ -130,6 +131,7 @@ export default function HeroCinematic({
           <Image
             src={backgroundSrc}
             alt=""
+            aria-hidden="true"
             fill
             priority
             sizes="100vw"
@@ -197,6 +199,7 @@ export default function HeroCinematic({
                       </motion.span>
                     );
                   })}
+                  {wIdx < wordLetters.length - 1 ? " " : null}
                 </span>
               ))}
             </span>

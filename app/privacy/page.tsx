@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { getPortfolioContent } from "@/lib/content";
+import { createPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Privacy",
-  description: "Privacy information for this artist portfolio.",
-  alternates: { canonical: "/privacy" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getPortfolioContent();
+
+  return createPageMetadata(content, "privacy");
+}
 
 export default function PrivacyPage() {
   return (

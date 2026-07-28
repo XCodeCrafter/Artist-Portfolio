@@ -6,7 +6,7 @@ create table if not exists public.gallery_presentation (
   intro_eyebrow text not null default 'Artist gallery - selected frames',
   intro_title text not null default 'A visual archive with room to breathe.',
   interlude_label text not null default 'The Interlude',
-  interlude_meta text not null default 'Amsterdam / 2026 / In progress',
+  interlude_meta text not null default 'Portfolio / In progress',
   interlude_eyebrow text not null default 'A quiet study in motion',
   interlude_title text not null default 'Between the frames, the work keeps moving.',
   interlude_video_src text not null default '/media/hero-loop.mp4',

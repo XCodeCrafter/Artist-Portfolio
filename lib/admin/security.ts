@@ -33,6 +33,7 @@ export type SecurityCheck = {
   label: string;
   ok: boolean;
   detail: string;
+  verification?: "runtime" | "implemented";
 };
 
 export const SECURITY_EVENT_ACTIONS = [
@@ -53,6 +54,13 @@ export const SECURITY_EVENT_ACTIONS = [
   "security_admin_password_reset_rate_limited",
   "security_admin_mfa_rate_limited",
   "security_admin_media_upload_rejected",
+  "security_admin_mfa_session_revoke_failed",
+  "admin_login_failed",
+  "admin_login_denied",
+  "admin_mfa_verification_failed",
+  "admin_password_reset_request_failed",
+  "admin_password_update_failed",
+  "booking_email_failed",
 ] as const;
 
 export type SecurityEventAction = (typeof SECURITY_EVENT_ACTIONS)[number];
@@ -70,7 +78,19 @@ export type SecurityEventSummary = {
   contactBlocked7d: number;
   analyticsBlocked7d: number;
   adminBlocked7d: number;
+  authFailures7d: number;
+  operationsFailures7d: number;
   latestAt: string;
+  isCapped: boolean;
+  daily: Array<{
+    label: string;
+    contact: number;
+    analytics: number;
+    admin: number;
+    auth: number;
+    operations: number;
+    total: number;
+  }>;
   byAction: Record<SecurityEventAction, number>;
 };
 
@@ -94,6 +114,22 @@ type AuditLogRow = {
 };
 
 const SECURITY_EVENT_SET = new Set<string>(SECURITY_EVENT_ACTIONS);
+const ADMIN_AUTH_RATE_LIMIT_EVENT_SET = new Set<SecurityEventAction>([
+  "security_admin_login_rate_limited",
+  "security_admin_password_reset_rate_limited",
+  "security_admin_mfa_rate_limited",
+]);
+
+function getRecentDayLabels(days: number) {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date(today);
+    date.setUTCDate(today.getUTCDate() - (days - index - 1));
+    return date.toISOString().slice(0, 10);
+  });
+}
 
 function emptySecurityEventSummary(): SecurityEventSummary {
   return {
@@ -109,7 +145,19 @@ function emptySecurityEventSummary(): SecurityEventSummary {
     contactBlocked7d: 0,
     analyticsBlocked7d: 0,
     adminBlocked7d: 0,
+    authFailures7d: 0,
+    operationsFailures7d: 0,
     latestAt: "",
+    isCapped: false,
+    daily: getRecentDayLabels(7).map((label) => ({
+      label,
+      contact: 0,
+      analytics: 0,
+      admin: 0,
+      auth: 0,
+      operations: 0,
+      total: 0,
+    })),
     byAction: SECURITY_EVENT_ACTIONS.reduce(
       (counts, action) => ({ ...counts, [action]: 0 }),
       {} as Record<SecurityEventAction, number>
@@ -122,10 +170,15 @@ function isSecurityEventAction(action: string): action is SecurityEventAction {
 }
 
 function buildSecurityEventSummary(
-  securityLogs: AuditLogEntry[]
+  securityLogs: AuditLogEntry[],
+  isCapped = false
 ): SecurityEventSummary {
   const summary = emptySecurityEventSummary();
+  summary.isCapped = isCapped;
   const last24h = Date.now() - 24 * 60 * 60 * 1000;
+  const dailyMap = new Map(
+    summary.daily.map((day) => [day.label, day] as const)
+  );
 
   for (const log of securityLogs) {
     if (!isSecurityEventAction(log.action)) continue;
@@ -133,12 +186,39 @@ function buildSecurityEventSummary(
     summary.total7d += 1;
     summary.byAction[log.action] += 1;
 
-    if (log.action.startsWith("security_contact_")) {
+    let surface:
+      | "contact"
+      | "analytics"
+      | "admin"
+      | "auth"
+      | "operations"
+      | "" = "";
+
+    if (
+      log.action === "booking_email_failed" ||
+      log.action === "security_admin_mfa_session_revoke_failed"
+    ) {
+      summary.operationsFailures7d += 1;
+      surface = "operations";
+    } else if (ADMIN_AUTH_RATE_LIMIT_EVENT_SET.has(log.action)) {
+      summary.authFailures7d += 1;
+      surface = "auth";
+    } else if (log.action.startsWith("security_contact_")) {
       summary.contactBlocked7d += 1;
+      surface = "contact";
     } else if (log.action.startsWith("security_analytics_")) {
       summary.analyticsBlocked7d += 1;
+      surface = "analytics";
     } else if (log.action.startsWith("security_admin_")) {
       summary.adminBlocked7d += 1;
+      surface = "admin";
+    } else if (
+      log.action.startsWith("admin_login_") ||
+      log.action.startsWith("admin_mfa_") ||
+      log.action.startsWith("admin_password_")
+    ) {
+      summary.authFailures7d += 1;
+      surface = "auth";
     }
 
     const createdAt = new Date(log.createdAt).getTime();
@@ -148,6 +228,12 @@ function buildSecurityEventSummary(
 
     if (!summary.latestAt || log.createdAt > summary.latestAt) {
       summary.latestAt = log.createdAt;
+    }
+
+    const day = dailyMap.get(log.createdAt.slice(0, 10));
+    if (day) {
+      day.total += 1;
+      if (surface) day[surface] += 1;
     }
   }
 
@@ -264,12 +350,14 @@ function getSecurityChecks(
     {
       label: "Public API Guards",
       ok: true,
+      verification: "implemented",
       detail:
         "Contact and analytics APIs use payload limits, origin checks, bot filters, and audit logging.",
     },
     {
       label: "Admin Action Guard",
       ok: true,
+      verification: "implemented",
       detail:
         "Admin write actions verify same-origin requests before changing content or access.",
     },
@@ -278,10 +366,11 @@ function getSecurityChecks(
 
 async function getSecurityEventLogs(): Promise<{
   logs: AuditLogEntry[];
+  isCapped: boolean;
   error?: unknown;
 }> {
   const supabase = createAdminServiceClient();
-  if (!supabase) return { logs: [] };
+  if (!supabase) return { logs: [], isCapped: false };
 
   const sevenDaysAgo = new Date(
     Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -298,6 +387,7 @@ async function getSecurityEventLogs(): Promise<{
 
   return {
     logs: (data || []).map(mapAuditLog),
+    isCapped: (data?.length || 0) >= 1000,
     error,
   };
 }
@@ -314,10 +404,10 @@ export async function getSecurityEventData(): Promise<{
     };
   }
 
-  const { logs, error } = await getSecurityEventLogs();
+  const { logs, isCapped, error } = await getSecurityEventLogs();
 
   return {
-    summary: buildSecurityEventSummary(logs),
+    summary: buildSecurityEventSummary(logs, isCapped),
     isConfigured: true,
     loadError: error
       ? "Unable to load security event counters from Supabase."
@@ -385,7 +475,10 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
   return {
     profiles,
     auditLogs,
-    securitySummary: buildSecurityEventSummary(securityLogsResult.logs),
+    securitySummary: buildSecurityEventSummary(
+      securityLogsResult.logs,
+      securityLogsResult.isCapped
+    ),
     checks: getSecurityChecks(profiles, rateLimitResult),
     allowedEmails,
     isConfigured: true,

@@ -1,10 +1,19 @@
 // artist-portfolio/app/page.tsx
+import type { Metadata } from "next";
 import AboutHome from "@/components/AboutHome";
 import AdaptiveHero from "@/components/AdaptiveHero";
 import GalleryShowcase from "@/components/GalleryShowcase";
+import JsonLd from "@/components/JsonLd";
 import MusicPlatforms from "@/components/MusicPlatforms";
 import NewsletterBlock from "@/components/NewsletterBlock";
 import { getPortfolioContent, type GalleryImage } from "@/lib/content";
+import { createHomeJsonLd, createPageMetadata } from "@/lib/seo";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getPortfolioContent();
+
+  return createPageMetadata(content, "home");
+}
 
 export default async function HomePage() {
   const content = await getPortfolioContent();
@@ -79,30 +88,33 @@ export default async function HomePage() {
 
   return (
     <>
-      <AdaptiveHero {...hero} />
-      <AboutHome content={content.aboutHome} />
-      <GalleryShowcase
-        images={homeStoryImages}
-        interludeBody={homePresentation.featureBody}
-        interludeCtaHref={homePresentation.featureCtaHref || "/video"}
-        interludeCtaLabel={
-          homePresentation.featureCtaLabel || "WATCH SHOWREEL"
-        }
-        interludePosterSrc={interludePosterSrc}
-        interludeVideoSrc={interludeVideoSrc}
-        interludeTitle={homePresentation.featureTitle}
-        mode="narrative"
-        presentation={content.galleryPresentation}
-        storyBody={homePresentation.storyBody}
-        storyCtaHref={homePresentation.storyCtaHref || "/gallery"}
-        storyCtaLabel={
-          homePresentation.storyCtaLabel || "VIEW GALLERY"
-        }
-        storyTitle={homePresentation.storyTitle}
-      />
-      {profileType === "musician" ? (
-        <MusicPlatforms cards={content.musicPlatforms} />
-      ) : null}
+      <JsonLd data={createHomeJsonLd(content)} />
+      <main>
+        <AdaptiveHero {...hero} />
+        <AboutHome content={content.aboutHome} />
+        <GalleryShowcase
+          images={homeStoryImages}
+          interludeBody={homePresentation.featureBody}
+          interludeCtaHref={homePresentation.featureCtaHref || "/video"}
+          interludeCtaLabel={
+            homePresentation.featureCtaLabel || "WATCH SHOWREEL"
+          }
+          interludePosterSrc={interludePosterSrc}
+          interludeVideoSrc={interludeVideoSrc}
+          interludeTitle={homePresentation.featureTitle}
+          mode="narrative"
+          presentation={content.galleryPresentation}
+          storyBody={homePresentation.storyBody}
+          storyCtaHref={homePresentation.storyCtaHref || "/gallery"}
+          storyCtaLabel={
+            homePresentation.storyCtaLabel || "VIEW GALLERY"
+          }
+          storyTitle={homePresentation.storyTitle}
+        />
+        {profileType === "musician" ? (
+          <MusicPlatforms cards={content.musicPlatforms} />
+        ) : null}
+      </main>
       <NewsletterBlock
         artistName={content.settings.artistName}
         contactBlurb={content.settings.contactBlurb}
