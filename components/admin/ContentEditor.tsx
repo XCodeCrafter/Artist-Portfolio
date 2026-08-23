@@ -69,10 +69,12 @@ import {
   updateActorResume,
   updateAboutHome,
   updateBioProfile,
+  updateBrandSettings,
+  updateContactSettings,
   updateHomePresentation,
+  updateMusicSettings,
   updateNavigationSettings,
   updatePageHero,
-  updateSiteSettings,
 } from "@/app/admin/content/actions";
 
 type ContentEditorProps = {
@@ -86,7 +88,7 @@ type ContentEditorProps = {
 const statusCopy: Record<string, string> = {
   deleted: "Item deleted.",
   invalid:
-    "Some fields need attention. Links must use http(s), a local /path, or an #anchor.",
+    "Some fields need attention. Links must use https://, a local /path, or an #anchor.",
   "missing-service":
     "Server-side Supabase admin key is missing, so content cannot be saved.",
   "save-error": "Save failed. Check Supabase logs and environment variables.",
@@ -103,6 +105,9 @@ const statusCopy: Record<string, string> = {
   "saved-home-presentation": "Homepage section text and media saved.",
   "saved-music-link": "Music link saved.",
   "saved-navigation": "Navigation visibility saved.",
+  "saved-brand-settings": "Brand and typography saved.",
+  "saved-contact-settings": "Contact details saved.",
+  "saved-music-settings": "Spotify settings saved.",
   "saved-settings": "Site settings saved.",
   "saved-social": "Footer link saved.",
   "saved-track": "SoundCloud track saved.",
@@ -110,10 +115,18 @@ const statusCopy: Record<string, string> = {
   "saved-video": "Video saved.",
   "invalid-navigation":
     "Keep at least one page visible in the navbar.",
+  "invalid-brand-settings":
+    "Brand settings were not saved. Artist name is required and text must stay within the field limits.",
+  "invalid-contact-settings":
+    "Contact details were not saved. Short text supports 220 characters and the introduction supports 1,000.",
+  "invalid-music-settings":
+    "Spotify settings were not saved. Use a complete https:// URL or leave the field empty.",
   "navigation-migration-required":
     "Navbar visibility needs the 0021_navbar_visibility database migration before it can be saved.",
   "navigation-settings-required":
     "Save Brand & style once before saving navigation on a new database.",
+  "settings-required":
+    "Save Brand & style once before editing this section on a new database.",
   "footer-effect-migration-required":
     "Footer effects need the 0016_footer_effect database migration before they can be saved.",
   "typography-migration-required":
@@ -168,13 +181,19 @@ function TextInput({
   name,
   defaultValue,
   list,
+  maxLength,
+  pattern,
   required = false,
+  title,
   type = "text",
 }: {
   name: string;
   defaultValue?: string | number;
   list?: string;
+  maxLength?: number;
+  pattern?: string;
   required?: boolean;
+  title?: string;
   type?: "text" | "number" | "url";
 }) {
   return (
@@ -182,8 +201,11 @@ function TextInput({
       className={inputClass}
       defaultValue={defaultValue}
       list={list}
+      maxLength={maxLength}
       name={name}
+      pattern={pattern}
       required={required}
+      title={title}
       type={type}
     />
   );
@@ -811,11 +833,13 @@ function StudioWorkspace({
 function TextArea({
   name,
   defaultValue,
+  maxLength,
   rows = 5,
   required = false,
 }: {
   name: string;
   defaultValue?: string;
+  maxLength?: number;
   rows?: number;
   required?: boolean;
 }) {
@@ -823,6 +847,7 @@ function TextArea({
     <textarea
       className={textareaClass}
       defaultValue={defaultValue}
+      maxLength={maxLength}
       name={name}
       required={required}
       rows={rows}
@@ -1076,62 +1101,35 @@ function SiteSettingsForm({
   disabled: boolean;
   mode?: "brand" | "contact" | "music";
 }) {
-  const visibleFields =
-    mode === "brand"
-      ? new Set([
-          "portfolioType",
-          "footerEffect",
-          "artistName",
-          "displayFont",
-          "bodyFont",
-          "uiFont",
-          "tagline",
-          "description",
-        ])
-      : mode === "contact"
-        ? new Set(["location", "contactBlurb"])
-        : new Set(["spotifyArtistUrl", "spotifyEmbedUrl"]);
-  const hiddenSettings: Record<string, string> = {
-    portfolioType: content.settings.portfolioType,
-    footerEffect: content.settings.footerEffect,
-    artistName: content.settings.artistName,
-    displayFont: content.settings.displayFont,
-    bodyFont: content.settings.bodyFont,
-    uiFont: content.settings.uiFont,
-    tagline: content.settings.tagline,
-    description: content.settings.description,
-    location: content.settings.location,
-    spotifyArtistUrl: content.settings.spotifyArtistUrl,
-    spotifyEmbedUrl: content.settings.spotifyEmbedUrl,
-    contactBlurb: content.settings.contactBlurb,
-  };
+  const action = {
+    brand: updateBrandSettings,
+    contact: updateContactSettings,
+    music: updateMusicSettings,
+  }[mode];
   const copy = {
     brand: {
       kicker: "Global design",
       title: "Brand & typography",
       description:
         "Identity, portfolio mode, type system, and the visual behavior shared by every page.",
-      returnSection: "settings",
     },
     contact: {
       kicker: "Contact section",
       title: "Contact details",
       description:
         "Location and supporting copy shown around the public inquiry form.",
-      returnSection: "booking",
     },
     music: {
       kicker: "Music integrations",
       title: "Spotify profile",
       description:
         "Artist and embed links used by the music page and footer destinations.",
-      returnSection: "music-links",
     },
   }[mode];
 
   return (
     <form
-      action={updateSiteSettings}
+      action={action}
       className={sectionClass}
       id={mode === "brand" ? "settings" : `${mode}-settings`}
     >
@@ -1140,22 +1138,13 @@ function SiteSettingsForm({
         {copy.description}
       </p>
       <fieldset disabled={disabled}>
-        <input
-          name="returnSection"
-          type="hidden"
-          value={copy.returnSection}
-        />
-        {Object.entries(hiddenSettings)
-          .filter(([name]) => !visibleFields.has(name))
-          .map(([name, value]) => (
-            <input key={name} name={name} type="hidden" value={value} />
-          ))}
         <div className="grid gap-4 sm:grid-cols-2">
           {mode === "brand" ? (
             <>
               <Field label="Artist name">
                 <TextInput
                   defaultValue={content.settings.artistName}
+                  maxLength={220}
                   name="artistName"
                   required
                 />
@@ -1173,12 +1162,14 @@ function SiteSettingsForm({
               <Field label="Tagline / discipline" wide>
                 <TextInput
                   defaultValue={content.settings.tagline}
+                  maxLength={220}
                   name="tagline"
                 />
               </Field>
               <Field label="Site description" wide>
                 <TextArea
                   defaultValue={content.settings.description}
+                  maxLength={1000}
                   name="description"
                   rows={4}
                 />
@@ -1242,12 +1233,14 @@ function SiteSettingsForm({
               <Field label="Location">
                 <TextInput
                   defaultValue={content.settings.location}
+                  maxLength={220}
                   name="location"
                 />
               </Field>
               <Field label="Contact introduction" wide>
                 <TextArea
                   defaultValue={content.settings.contactBlurb}
+                  maxLength={1000}
                   name="contactBlurb"
                   rows={5}
                 />
@@ -1260,14 +1253,20 @@ function SiteSettingsForm({
               <Field label="Spotify artist URL" wide>
                 <TextInput
                   defaultValue={content.settings.spotifyArtistUrl}
+                  maxLength={1200}
                   name="spotifyArtistUrl"
+                  pattern="https://.*"
+                  title="Use a complete HTTPS URL, for example https://open.spotify.com/artist/..."
                   type="url"
                 />
               </Field>
               <Field label="Spotify embed URL" wide>
                 <TextInput
                   defaultValue={content.settings.spotifyEmbedUrl}
+                  maxLength={1200}
                   name="spotifyEmbedUrl"
+                  pattern="https://.*"
+                  title="Use the HTTPS URL from the Spotify embed code, not the whole iframe."
                   type="url"
                 />
               </Field>

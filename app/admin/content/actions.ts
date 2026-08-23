@@ -138,7 +138,7 @@ const safeImageSrc = z
     message: "Choose a local image or one uploaded to this site's media library.",
   });
 
-const settingsSchema = z.object({
+const brandSettingsSchema = z.object({
   portfolioType: z.enum(PORTFOLIO_TYPES as [PortfolioType, ...PortfolioType[]]),
   footerEffect: z.enum(FOOTER_EFFECTS),
   artistName: shortText.min(1),
@@ -147,10 +147,16 @@ const settingsSchema = z.object({
   uiFont: z.enum(UI_FONT_KEYS),
   tagline: shortText,
   description: mediumText,
+});
+
+const contactSettingsSchema = z.object({
   location: shortText,
+  contactBlurb: mediumText,
+});
+
+const musicSettingsSchema = z.object({
   spotifyArtistUrl: safeHref,
   spotifyEmbedUrl: safeHref,
-  contactBlurb: mediumText,
 });
 
 const navigationSettingsSchema = z.object({
@@ -447,9 +453,9 @@ async function assertMutation(
   }
 }
 
-export async function updateSiteSettings(formData: FormData) {
-  const returnSection = getReturnSection(formData, "settings");
-  const parsed = settingsSchema.safeParse({
+export async function updateBrandSettings(formData: FormData) {
+  const section = "settings";
+  const parsed = brandSettingsSchema.safeParse({
     portfolioType: formValue(formData, "portfolioType"),
     footerEffect: formValue(formData, "footerEffect"),
     artistName: formValue(formData, "artistName"),
@@ -458,50 +464,115 @@ export async function updateSiteSettings(formData: FormData) {
     uiFont: formValue(formData, "uiFont"),
     tagline: formValue(formData, "tagline"),
     description: formValue(formData, "description"),
-    location: formValue(formData, "location"),
-    spotifyArtistUrl: formValue(formData, "spotifyArtistUrl"),
-    spotifyEmbedUrl: formValue(formData, "spotifyEmbedUrl"),
-    contactBlurb: formValue(formData, "contactBlurb"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid", returnSection);
+  if (!parsed.success) redirectToStatus("invalid-brand-settings", section);
 
-  const { admin, supabase } = await getWriteContext(returnSection);
-  const result = await supabase.from("site_settings").upsert({
-    id: "main",
-    portfolio_type: parsed.data.portfolioType,
-    footer_effect: parsed.data.footerEffect,
-    artist_name: parsed.data.artistName,
-    display_font: parsed.data.displayFont,
-    body_font: parsed.data.bodyFont,
-    ui_font: parsed.data.uiFont,
-    tagline: parsed.data.tagline,
-    description: parsed.data.description,
-    location: parsed.data.location,
-    spotify_artist_url: parsed.data.spotifyArtistUrl,
-    spotify_embed_url: parsed.data.spotifyEmbedUrl,
-    contact_blurb: parsed.data.contactBlurb,
-  });
+  const { admin, supabase } = await getWriteContext(section);
+  const result = await supabase.from("site_settings").upsert(
+    {
+      id: "main",
+      portfolio_type: parsed.data.portfolioType,
+      footer_effect: parsed.data.footerEffect,
+      artist_name: parsed.data.artistName,
+      display_font: parsed.data.displayFont,
+      body_font: parsed.data.bodyFont,
+      ui_font: parsed.data.uiFont,
+      tagline: parsed.data.tagline,
+      description: parsed.data.description,
+    },
+    { onConflict: "id" }
+  );
 
   if (isMissingTypographySchema(result.error)) {
-    redirectToStatus("typography-migration-required", returnSection);
+    redirectToStatus("typography-migration-required", section);
   }
 
   if (isMissingFooterEffectSchema(result.error)) {
-    redirectToStatus("footer-effect-migration-required", returnSection);
+    redirectToStatus("footer-effect-migration-required", section);
   }
 
-  await assertMutation(result, returnSection);
+  await assertMutation(result, section);
   await writeAuditLog({
     actorId: admin.id,
     action: "content_update",
     tableName: "site_settings",
     recordId: "main",
-    metadata: { section: "settings" },
+    metadata: { section: "settings", settingsGroup: "brand" },
   });
 
   revalidatePortfolio();
-  redirectToStatus("saved-settings", returnSection);
+  redirectToStatus("saved-brand-settings", section);
+}
+
+export async function updateContactSettings(formData: FormData) {
+  const section = "booking";
+  const parsed = contactSettingsSchema.safeParse({
+    location: formValue(formData, "location"),
+    contactBlurb: formValue(formData, "contactBlurb"),
+  });
+
+  if (!parsed.success) redirectToStatus("invalid-contact-settings", section);
+
+  const { admin, supabase } = await getWriteContext(section);
+  const result = await supabase
+    .from("site_settings")
+    .update({
+      location: parsed.data.location,
+      contact_blurb: parsed.data.contactBlurb,
+    })
+    .eq("id", "main")
+    .select("id")
+    .maybeSingle();
+
+  await assertMutation(result, section);
+  if (!result.data) redirectToStatus("settings-required", section);
+
+  await writeAuditLog({
+    actorId: admin.id,
+    action: "content_update",
+    tableName: "site_settings",
+    recordId: "main",
+    metadata: { section: "settings", settingsGroup: "contact" },
+  });
+
+  revalidatePortfolio();
+  redirectToStatus("saved-contact-settings", section);
+}
+
+export async function updateMusicSettings(formData: FormData) {
+  const section = "music-links";
+  const parsed = musicSettingsSchema.safeParse({
+    spotifyArtistUrl: formValue(formData, "spotifyArtistUrl"),
+    spotifyEmbedUrl: formValue(formData, "spotifyEmbedUrl"),
+  });
+
+  if (!parsed.success) redirectToStatus("invalid-music-settings", section);
+
+  const { admin, supabase } = await getWriteContext(section);
+  const result = await supabase
+    .from("site_settings")
+    .update({
+      spotify_artist_url: parsed.data.spotifyArtistUrl,
+      spotify_embed_url: parsed.data.spotifyEmbedUrl,
+    })
+    .eq("id", "main")
+    .select("id")
+    .maybeSingle();
+
+  await assertMutation(result, section);
+  if (!result.data) redirectToStatus("settings-required", section);
+
+  await writeAuditLog({
+    actorId: admin.id,
+    action: "content_update",
+    tableName: "site_settings",
+    recordId: "main",
+    metadata: { section: "settings", settingsGroup: "music" },
+  });
+
+  revalidatePortfolio();
+  redirectToStatus("saved-music-settings", section);
 }
 
 export async function updateNavigationSettings(formData: FormData) {
