@@ -3,6 +3,7 @@ import type { PortfolioContent } from "./types";
 export const FALLBACK_CONTENT: PortfolioContent = {
   settings: {
     portfolioType: "musician",
+    hiddenNavPageSlugs: [],
     footerEffect: "soul",
     artistName: "Franky Fugazi",
     displayFont: "playfair-display",

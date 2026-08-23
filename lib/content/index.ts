@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { FALLBACK_CONTENT } from "./fallback";
-import { PAGE_SLUGS } from "./modules";
+import { PAGE_SLUGS, normalizeHiddenNavPageSlugs } from "./modules";
 import {
   normalizeBodyFont,
   normalizeDisplayFont,
@@ -41,6 +41,8 @@ import type {
 
 type SiteSettingsRow = {
   portfolio_type?: string | null;
+  hidden_nav_page_slugs_actor?: unknown;
+  hidden_nav_page_slugs_musician?: unknown;
   footer_effect?: string | null;
   artist_name: string;
   display_font?: string | null;
@@ -189,8 +191,15 @@ const PAGE_SLUG_SET = new Set<PageSlug>(PAGE_SLUGS);
 function mapSettings(row?: SiteSettingsRow): SiteSettings {
   if (!row) return FALLBACK_CONTENT.settings;
 
+  const portfolioType = normalizePortfolioType(row.portfolio_type);
+
   return {
-    portfolioType: normalizePortfolioType(row.portfolio_type),
+    portfolioType,
+    hiddenNavPageSlugs: normalizeHiddenNavPageSlugs(
+      portfolioType === "actor"
+        ? row.hidden_nav_page_slugs_actor
+        : row.hidden_nav_page_slugs_musician
+    ),
     footerEffect: normalizeFooterEffect(row.footer_effect),
     artistName: row.artist_name,
     displayFont: normalizeDisplayFont(row.display_font),

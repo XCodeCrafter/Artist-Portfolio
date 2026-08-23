@@ -8,6 +8,7 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
   FaExternalLinkAlt,
+  FaEyeSlash,
   FaImages,
   FaShieldAlt,
 } from "react-icons/fa";
@@ -21,7 +22,7 @@ import {
   type ProductionReadiness,
 } from "@/lib/admin/readiness";
 import { getPortfolioContent } from "@/lib/content";
-import { getPublicModules } from "@/lib/content/modules";
+import { getProfilePublicModules } from "@/lib/content/modules";
 import type { HeroContent } from "@/lib/content/types";
 
 export const metadata = {
@@ -117,6 +118,7 @@ function PageCard({
   editHref,
   hero,
   index,
+  isVisible,
   label,
   publicHref,
 }: {
@@ -124,6 +126,7 @@ function PageCard({
   editHref: string;
   hero?: HeroContent;
   index: number;
+  isVisible: boolean;
   label: string;
   publicHref: string;
 }) {
@@ -154,7 +157,16 @@ function PageCard({
                 {label}
               </h3>
             </div>
-            <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.55)]" />
+            <span
+              className={`inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-full border px-2 text-[9px] font-semibold ${
+                isVisible
+                  ? "border-emerald-300/16 bg-emerald-300/[0.08] text-emerald-100/72"
+                  : "border-amber-300/16 bg-amber-300/[0.08] text-amber-100/68"
+              }`}
+            >
+              {isVisible ? <FaCheckCircle /> : <FaEyeSlash />}
+              {isVisible ? "In navbar" : "Not in navbar"}
+            </span>
           </div>
         </div>
       </div>
@@ -320,7 +332,8 @@ export default async function AdminDashboardPage() {
     getProductionReadiness(),
   ]);
   const profileType = content.settings.portfolioType;
-  const publicModules = getPublicModules(profileType);
+  const publicModules = getProfilePublicModules(profileType);
+  const hiddenNavPageSlugs = new Set(content.settings.hiddenNavPageSlugs);
   const current = analyticsResult.summary.current7Days;
   const previous = analyticsResult.summary.previous7Days;
   const analyticsAvailable =
@@ -338,6 +351,7 @@ export default async function AdminDashboardPage() {
       active="dashboard"
       adminEmail={admin.email}
       description="Your portfolio, page by page — edit the public experience, understand visitors, and keep the site protected."
+      hiddenNavPageSlugs={content.settings.hiddenNavPageSlugs}
       portfolioType={profileType}
       title="Portfolio overview"
     >
@@ -350,17 +364,26 @@ export default async function AdminDashboardPage() {
                 Edit what your visitors see
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-white/42">
-                The page order below mirrors the live {profileType} portfolio.
-                Open any page and edit its sections in the same sequence.
+                Every {profileType} portfolio page stays editable here. Its
+                badge shows whether visitors currently see it in the navbar.
               </p>
             </div>
-            <Link
-              className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-white/9 bg-white/[0.04] px-3.5 text-xs font-semibold text-white/62 transition hover:bg-white hover:text-black"
-              href="/admin/content"
-            >
-              Open site editor
-              <FaArrowRight className="text-[9px]" />
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-[#ff6d55]/20 bg-[#ff3b1f]/10 px-3.5 text-xs font-semibold text-[#ffb5a9] transition hover:bg-[#ff3b1f] hover:text-white"
+                href="/admin/content#navigation"
+              >
+                Manage navbar
+                <FaArrowRight className="text-[9px]" />
+              </Link>
+              <Link
+                className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-white/9 bg-white/[0.04] px-3.5 text-xs font-semibold text-white/62 transition hover:bg-white hover:text-black"
+                href="/admin/content"
+              >
+                Open site editor
+                <FaArrowRight className="text-[9px]" />
+              </Link>
+            </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
             {publicModules.map((module, index) => (
@@ -373,6 +396,10 @@ export default async function AdminDashboardPage() {
                     : undefined
                 }
                 index={index}
+                isVisible={
+                  !module.pageSlug ||
+                  !hiddenNavPageSlugs.has(module.pageSlug)
+                }
                 key={`${module.key}-${module.href}`}
                 label={module.label}
                 publicHref={module.href}

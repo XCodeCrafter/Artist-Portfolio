@@ -65,6 +65,7 @@ export default async function RootLayout({
         <div className="pointer-events-none fixed inset-0 z-0 opacity-60 noise" />
         <TopNav
           artistName={content.settings.artistName}
+          hiddenNavPageSlugs={content.settings.hiddenNavPageSlugs}
           portfolioType={content.settings.portfolioType}
           socialLinks={content.socialLinks}
         />

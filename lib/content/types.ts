@@ -57,6 +57,7 @@ export type HeroContent = {
 
 export type SiteSettings = {
   portfolioType: PortfolioType;
+  hiddenNavPageSlugs: PageSlug[];
   footerEffect: FooterEffect;
   artistName: string;
   displayFont: DisplayFontKey;

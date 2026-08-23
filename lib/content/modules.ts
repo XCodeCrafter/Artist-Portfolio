@@ -33,6 +33,8 @@ export const PAGE_SLUGS: PageSlug[] = [
   "booking",
 ];
 
+const PAGE_SLUG_SET = new Set<PageSlug>(PAGE_SLUGS);
+
 export const MODULE_REGISTRY: PortfolioModule[] = [
   {
     key: "home",
@@ -144,8 +146,39 @@ export function getEnabledModules(type: PortfolioType) {
   return MODULE_REGISTRY.filter((module) => module.profiles.includes(type));
 }
 
-export function getPublicModules(type: PortfolioType) {
+/** All public pages supported by a portfolio profile, regardless of navbar visibility. */
+export function getProfilePublicModules(type: PortfolioType) {
   return getEnabledModules(type).filter((module) => module.publicNav);
+}
+
+/** Sanitizes the persisted value and keeps unknown/future slugs out of the UI. */
+export function normalizeHiddenNavPageSlugs(value: unknown): PageSlug[] {
+  if (!Array.isArray(value)) return [];
+
+  return [
+    ...new Set(
+      value.filter(
+        (slug): slug is PageSlug =>
+          typeof slug === "string" && PAGE_SLUG_SET.has(slug as PageSlug)
+      )
+    ),
+  ];
+}
+
+/** Public pages supported by the active profile, including navbar-hidden pages. */
+export function getPublicModules(type: PortfolioType) {
+  return getProfilePublicModules(type);
+}
+
+/** Public pages currently visible in the primary navbar. */
+export function getVisibleNavigationModules(
+  type: PortfolioType,
+  hiddenPageSlugs: readonly PageSlug[] = []
+) {
+  const hidden = new Set(hiddenPageSlugs);
+  return getProfilePublicModules(type).filter(
+    (module) => !module.pageSlug || !hidden.has(module.pageSlug)
+  );
 }
 
 export function getActivePageSlugs(type: PortfolioType): PageSlug[] {

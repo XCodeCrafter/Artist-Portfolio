@@ -66,9 +66,11 @@ Fallback seed content lives in `lib/content/fallback.ts`, so the site still buil
 
 The authenticated admin follows the same page order as the public portfolio:
 
-- `/admin` mirrors the live navigation with one-click page previews and editors.
+- `/admin` mirrors every portfolio page with one-click previews, editors, and
+  a visible/hidden navbar status.
 - `/admin/content` opens the page-first Site Editor for Home, Bio, Music,
-  Booking/Contact, global brand settings, and the shared footer.
+  Booking/Contact, primary navigation, global brand settings, and the shared
+  footer.
 - `/admin/media` provides the actor Gallery/Showreel studios or the musician
   Video Studio, plus upload and library tools.
 - `/admin/analytics` shows a complete 30-calendar-day traffic series, period
@@ -219,6 +221,12 @@ RPC with a one-shot denial marker. The app writes one audit signal for the first
 blocked request in each fixed window, so the Security Center receives live
 rate-limit data without writing an audit row for every attacker retry.
 
+Migration `0021_navbar_visibility.sql` adds independent Actor and Musician
+navbar preferences. The Site Editor can show or hide each profile-supported
+page in both desktop and mobile navigation. This setting affects only the menu:
+hidden pages remain editable, publicly reachable by direct URL, and available
+to the sitemap and discovery endpoints.
+
 ## Search and AI discovery
 
 - `/robots.txt` allows public search/discovery crawlers, blocks `/api`, and
@@ -239,7 +247,7 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. Apply all Supabase migrations through `0020_rate_limit_security_signals.sql`.
+1. Apply all Supabase migrations through `0021_navbar_visibility.sql`.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare

@@ -61,7 +61,9 @@ async function inspectSupabase() {
     ] = await Promise.all([
       supabase
         .from("site_settings")
-        .select("id, portfolio_type, display_font, body_font, ui_font")
+        .select(
+          "id, portfolio_type, display_font, body_font, ui_font, hidden_nav_page_slugs_actor, hidden_nav_page_slugs_musician"
+        )
         .limit(1),
       supabase
         .from("gallery_images")
@@ -182,7 +184,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       critical: true,
       detail: supabase.schemaOk
         ? "Required tables and columns are available."
-        : "Apply all Supabase migrations through 0018.",
+        : "Apply all Supabase migrations through 0021.",
       href: "/admin/security#health",
     },
     {

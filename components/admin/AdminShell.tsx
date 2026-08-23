@@ -6,6 +6,8 @@ import {
   FaExternalLinkAlt,
   FaFileAlt,
   FaHome,
+  FaEye,
+  FaEyeSlash,
   FaImages,
   FaMagic,
   FaShieldAlt,
@@ -13,8 +15,8 @@ import {
   FaUserCircle,
 } from "react-icons/fa";
 import LogoutButton from "@/components/admin/LogoutButton";
-import { getPublicModules } from "@/lib/content/modules";
-import type { PortfolioType } from "@/lib/content/types";
+import { getProfilePublicModules } from "@/lib/content/modules";
+import type { PageSlug, PortfolioType } from "@/lib/content/types";
 
 export type AdminSection =
   | "dashboard"
@@ -29,6 +31,7 @@ type AdminShellProps = {
   children: ReactNode;
   description: string;
   eyebrow?: string;
+  hiddenNavPageSlugs?: PageSlug[];
   portfolioType?: PortfolioType;
   title: string;
 };
@@ -145,13 +148,19 @@ function AdminNav({ active }: { active: AdminSection }) {
 }
 
 function PublicPageNav({
+  hiddenNavPageSlugs = [],
   portfolioType,
 }: {
+  hiddenNavPageSlugs?: PageSlug[];
   portfolioType?: PortfolioType;
 }) {
   if (!portfolioType) return null;
 
-  const pages = getPublicModules(portfolioType);
+  const pages = getProfilePublicModules(portfolioType);
+  const hiddenSet = new Set(hiddenNavPageSlugs);
+  const visibleCount = pages.filter(
+    (page) => !page.pageSlug || !hiddenSet.has(page.pageSlug)
+  ).length;
 
   return (
     <div className="mt-6">
@@ -160,28 +169,42 @@ function PublicPageNav({
           Your website
         </p>
         <span className="text-[10px] tabular-nums text-white/24">
-          {pages.length} pages
+          {visibleCount}/{pages.length} in navbar
         </span>
       </div>
       <nav aria-label="Portfolio pages" className="grid gap-0.5">
-        {pages.map((page, index) => (
-          <Link
-            className="group flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm text-white/46 transition hover:bg-white/[0.05] hover:text-white"
-            href={getPageEditorHref(page.key, page.pageSlug)}
-            key={`${page.key}-${page.href}`}
-          >
-            <span className="w-5 font-mono text-[10px] text-white/22">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-            <span className="min-w-0 flex-1 truncate">{page.label}</span>
-            <span
-              aria-hidden="true"
-              className="translate-x-1 text-white/20 opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100"
+        {pages.map((page, index) => {
+          const isVisible =
+            !page.pageSlug || !hiddenSet.has(page.pageSlug);
+
+          return (
+            <Link
+              className={cx(
+                "group flex min-h-10 items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition hover:bg-white/[0.05] hover:text-white",
+                "text-white/52"
+              )}
+              href={getPageEditorHref(page.key, page.pageSlug)}
+              key={`${page.key}-${page.href}`}
             >
-              →
-            </span>
-          </Link>
-        ))}
+              <span className="w-5 font-mono text-[10px] text-white/22">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{page.label}</span>
+              <span
+                title={isVisible ? "Shown in navbar" : "Hidden from navbar"}
+                className={cx(
+                  "inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-1 text-[9px] font-semibold uppercase tracking-[0.08em]",
+                  isVisible
+                    ? "border-emerald-300/12 bg-emerald-300/[0.055] text-emerald-100/68"
+                    : "border-amber-300/14 bg-amber-300/[0.065] text-amber-100/72"
+                )}
+              >
+                {isVisible ? <FaEye /> : <FaEyeSlash />}
+                {isVisible ? "Menu" : "Hidden"}
+              </span>
+            </Link>
+          );
+        })}
       </nav>
     </div>
   );
@@ -223,6 +246,7 @@ export default function AdminShell({
   children,
   description,
   eyebrow = "Portfolio admin",
+  hiddenNavPageSlugs = [],
   portfolioType,
   title,
 }: AdminShellProps) {
@@ -256,7 +280,10 @@ export default function AdminShell({
 
             <div className="mt-4 flex-1 overflow-y-auto pr-0.5">
               <AdminNav active={active} />
-              <PublicPageNav portfolioType={portfolioType} />
+              <PublicPageNav
+                hiddenNavPageSlugs={hiddenNavPageSlugs}
+                portfolioType={portfolioType}
+              />
             </div>
 
             <div className="mt-3 grid gap-2">
@@ -297,7 +324,10 @@ export default function AdminShell({
             </summary>
             <div className="mt-3 border-t border-white/8 pt-3">
               <AdminNav active={active} />
-              <PublicPageNav portfolioType={portfolioType} />
+              <PublicPageNav
+                hiddenNavPageSlugs={hiddenNavPageSlugs}
+                portfolioType={portfolioType}
+              />
               <div className="mt-3">
                 <AccountMenu
                   adminEmail={adminEmail}

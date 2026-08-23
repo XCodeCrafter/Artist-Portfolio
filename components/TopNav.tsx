@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
 import { getProfileNav } from "@/lib/content/profile";
-import type { PortfolioType, SocialLink } from "@/lib/content";
+import type { PageSlug, PortfolioType, SocialLink } from "@/lib/content";
 
 const DEFAULT_SOCIAL_LINKS: SocialLink[] = [
   {
@@ -51,16 +51,18 @@ function isActivePath(pathname: string, href: string) {
 
 export default function TopNav({
   artistName = "Artist Portfolio",
+  hiddenNavPageSlugs = [],
   portfolioType = "musician",
   socialLinks = DEFAULT_SOCIAL_LINKS,
 }: {
   artistName?: string;
+  hiddenNavPageSlugs?: PageSlug[];
   portfolioType?: PortfolioType;
   socialLinks?: SocialLink[];
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname() || "/";
-  const navItems = getProfileNav(portfolioType);
+  const navItems = getProfileNav(portfolioType, hiddenNavPageSlugs);
   const activeSocialLinks = socialLinks.filter((link) => link.href.trim());
 
   const close = () => setOpen(false);

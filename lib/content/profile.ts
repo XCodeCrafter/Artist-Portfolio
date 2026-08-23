@@ -1,5 +1,5 @@
-import type { PortfolioType } from "./types";
-import { getPublicModules } from "./modules";
+import type { PageSlug, PortfolioType } from "./types";
+import { getVisibleNavigationModules } from "./modules";
 
 export const PORTFOLIO_TYPES: PortfolioType[] = ["musician", "actor"];
 
@@ -7,8 +7,11 @@ export function normalizePortfolioType(value?: string | null): PortfolioType {
   return value === "actor" ? "actor" : "musician";
 }
 
-export function getProfileNav(type: PortfolioType) {
-  return getPublicModules(type).map((module) => ({
+export function getProfileNav(
+  type: PortfolioType,
+  hiddenNavPageSlugs: readonly PageSlug[] = []
+) {
+  return getVisibleNavigationModules(type, hiddenNavPageSlugs).map((module) => ({
     label: module.label,
     href: module.href,
   }));

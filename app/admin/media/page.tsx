@@ -44,6 +44,7 @@ export default async function AdminMediaPage({
           ? "Upload and organize photos and video, then shape the public Gallery or Showreel in a dedicated visual studio."
           : "Upload and organize artwork and video, then shape the public Video page in a dedicated visual studio."
       }
+      hiddenNavPageSlugs={contentResult.content.settings.hiddenNavPageSlugs}
       portfolioType={portfolioType}
       title="Media library"
     >

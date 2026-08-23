@@ -8,7 +8,10 @@ import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { requireAdmin } from "@/lib/admin/auth";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { createAdminServiceClient } from "@/lib/admin/service";
-import { PAGE_SLUGS } from "@/lib/content/modules";
+import {
+  PAGE_SLUGS,
+  getProfilePublicModules,
+} from "@/lib/content/modules";
 import {
   BODY_FONT_KEYS,
   DISPLAY_FONT_KEYS,
@@ -148,6 +151,17 @@ const settingsSchema = z.object({
   spotifyArtistUrl: safeHref,
   spotifyEmbedUrl: safeHref,
   contactBlurb: mediumText,
+});
+
+const navigationSettingsSchema = z.object({
+  portfolioType: z.enum(
+    PORTFOLIO_TYPES as [PortfolioType, ...PortfolioType[]]
+  ),
+  visibleNavPageSlugs: z.array(
+    z.enum(PAGE_SLUGS as [PageSlug, ...PageSlug[]])
+  )
+    .max(PAGE_SLUGS.length)
+    .transform((slugs) => [...new Set(slugs)]),
 });
 
 const heroSchema = z
@@ -348,6 +362,7 @@ const CONTENT_RETURN_SECTIONS = new Set([
   "bio",
   "music-links",
   "booking",
+  "navigation",
   "settings",
   "socials",
 ]);
@@ -399,6 +414,12 @@ function isMissingTypographySchema(error: { message?: string } | null) {
 
 function isMissingFooterEffectSchema(error: { message?: string } | null) {
   return (error?.message?.toLowerCase() || "").includes("footer_effect");
+}
+
+function isMissingNavigationSchema(error: { message?: string } | null) {
+  return (error?.message?.toLowerCase() || "").includes(
+    "hidden_nav_page_slugs"
+  );
 }
 
 async function getWriteContext(section: string) {
@@ -481,6 +502,77 @@ export async function updateSiteSettings(formData: FormData) {
 
   revalidatePortfolio();
   redirectToStatus("saved-settings", returnSection);
+}
+
+export async function updateNavigationSettings(formData: FormData) {
+  const section = "navigation";
+  const parsed = navigationSettingsSchema.safeParse({
+    portfolioType: formValue(formData, "portfolioType"),
+    visibleNavPageSlugs: formData
+      .getAll("visibleNavPageSlugs")
+      .map((value) => String(value)),
+  });
+
+  if (!parsed.success) redirectToStatus("invalid-navigation", section);
+
+  const supportedPageSlugs = getProfilePublicModules(
+    parsed.data.portfolioType
+  )
+    .map((module) => module.pageSlug)
+    .filter((slug): slug is PageSlug => Boolean(slug));
+  const supportedSet = new Set(supportedPageSlugs);
+  if (
+    parsed.data.visibleNavPageSlugs.some((slug) => !supportedSet.has(slug))
+  ) {
+    redirectToStatus("invalid-navigation", section);
+  }
+
+  const visibleSet = new Set(
+    parsed.data.visibleNavPageSlugs
+  );
+
+  if (!visibleSet.size) {
+    redirectToStatus("invalid-navigation", section);
+  }
+
+  const hiddenNavPageSlugs = supportedPageSlugs.filter(
+    (slug) => !visibleSet.has(slug)
+  );
+  const visibilityColumn =
+    parsed.data.portfolioType === "actor"
+      ? "hidden_nav_page_slugs_actor"
+      : "hidden_nav_page_slugs_musician";
+
+  const { admin, supabase } = await getWriteContext(section);
+  const result = await supabase
+    .from("site_settings")
+    .update({ [visibilityColumn]: hiddenNavPageSlugs })
+    .eq("id", "main")
+    .select("id")
+    .single();
+
+  if (isMissingNavigationSchema(result.error)) {
+    redirectToStatus("navigation-migration-required", section);
+  }
+
+  if (result.error?.code === "PGRST116") {
+    redirectToStatus("navigation-settings-required", section);
+  }
+
+  await assertMutation(result, section);
+  await writeAuditLog({
+    actorId: admin.id,
+    action: "content_navigation_update",
+    tableName: "site_settings",
+    recordId: "main",
+    metadata: {
+      hiddenNavPageSlugs,
+      portfolioType: parsed.data.portfolioType,
+    },
+  });
+
+  revalidatePortfolio();
+  redirectToStatus("saved-navigation", section);
 }
 
 export async function updatePageHero(formData: FormData) {

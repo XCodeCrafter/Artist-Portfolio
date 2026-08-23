@@ -6,6 +6,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   FaArrowDown,
   FaArrowUp,
+  FaBars,
+  FaCheck,
+  FaEye,
+  FaEyeSlash,
+  FaExclamationTriangle,
   FaExternalLinkAlt,
   FaGlobe,
   FaImages,
@@ -19,7 +24,8 @@ import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
 import {
-  getPublicModules,
+  getProfilePublicModules,
+  getVisibleNavigationModules,
   isModuleEnabled,
 } from "@/lib/content/modules";
 import {
@@ -64,6 +70,7 @@ import {
   updateAboutHome,
   updateBioProfile,
   updateHomePresentation,
+  updateNavigationSettings,
   updatePageHero,
   updateSiteSettings,
 } from "@/app/admin/content/actions";
@@ -95,11 +102,18 @@ const statusCopy: Record<string, string> = {
   "saved-home": "Homepage about block saved.",
   "saved-home-presentation": "Homepage section text and media saved.",
   "saved-music-link": "Music link saved.",
+  "saved-navigation": "Navigation visibility saved.",
   "saved-settings": "Site settings saved.",
   "saved-social": "Footer link saved.",
   "saved-track": "SoundCloud track saved.",
   "saved-update": "Homepage update saved.",
   "saved-video": "Video saved.",
+  "invalid-navigation":
+    "Keep at least one page visible in the navbar.",
+  "navigation-migration-required":
+    "Navbar visibility needs the 0021_navbar_visibility database migration before it can be saved.",
+  "navigation-settings-required":
+    "Save Brand & style once before saving navigation on a new database.",
   "footer-effect-migration-required":
     "Footer effects need the 0016_footer_effect database migration before they can be saved.",
   "typography-migration-required":
@@ -379,6 +393,293 @@ function BookingSnapshot({ content }: { content: EditablePortfolioContent }) {
   );
 }
 
+function NavigationSnapshot({
+  artistName,
+  modules,
+  visiblePageSlugs,
+}: {
+  artistName: string;
+  modules: ReturnType<typeof getProfilePublicModules>;
+  visiblePageSlugs: readonly PageSlug[];
+}) {
+  const visibleSet = new Set(visiblePageSlugs);
+  const visibleModules = modules.filter(
+    (module) => module.pageSlug && visibleSet.has(module.pageSlug)
+  );
+
+  return (
+    <section className={sectionClass}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className={labelClass}>Live navigation preview</p>
+          <p className="mt-1 text-xs text-white/38">
+            Updates while you click. Save when the lineup feels right.
+          </p>
+        </div>
+        <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/[0.06] px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-100/68">
+          <FaEye />
+          {visibleModules.length} visible
+        </span>
+      </div>
+      <div className="mt-4 overflow-hidden rounded-[18px] border border-white/10 bg-[#070708] shadow-[0_18px_55px_rgba(0,0,0,0.34)]">
+        <div className="flex min-h-16 items-center justify-between gap-4 border-b border-white/8 px-4 py-3">
+          <span className="truncate text-[10px] font-semibold uppercase tracking-[0.3em] text-white/78">
+            {artistName}
+          </span>
+          <FaBars className="shrink-0 text-xs text-white/48 sm:hidden" />
+          <div className="hidden flex-wrap justify-end gap-x-4 gap-y-2 sm:flex">
+            {visibleModules.map((module) => (
+              <span
+                className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/62"
+                key={`${module.key}-${module.href}`}
+              >
+                {module.label}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="bg-[radial-gradient(circle_at_78%_18%,rgba(255,59,31,0.18),transparent_34%)] p-5 sm:p-6">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[#ff715b]">
+            Primary navigation
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {visibleModules.map((module) => (
+              <span
+                className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[10px] font-semibold tracking-[0.12em] text-white/68"
+                key={`${module.key}-${module.href}`}
+              >
+                {module.label}
+              </span>
+            ))}
+          </div>
+          <p className="mt-5 text-xs leading-5 text-white/38">
+            The artist name always links home, even when HOME is hidden from
+            the text menu.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function NavigationSettingsForm({
+  content,
+  disabled,
+  modules,
+  setVisiblePageSlugs,
+  visiblePageSlugs,
+}: {
+  content: EditablePortfolioContent;
+  disabled: boolean;
+  modules: ReturnType<typeof getProfilePublicModules>;
+  setVisiblePageSlugs: (
+    value: PageSlug[] | ((current: PageSlug[]) => PageSlug[])
+  ) => void;
+  visiblePageSlugs: PageSlug[];
+}) {
+  const visibleSet = new Set(visiblePageSlugs);
+  const publishedVideoCount = content.videos.filter(
+    (video) => video.isPublished
+  ).length;
+  const noVisiblePages = visiblePageSlugs.length === 0;
+
+  return (
+    <form
+      action={updateNavigationSettings}
+      className={sectionClass}
+      id="navigation"
+    >
+      <SectionHeader
+        count={visiblePageSlugs.length}
+        countLabel="visible"
+        kicker="Site-wide"
+        title="Main navigation"
+      />
+      <p className="-mt-2 max-w-2xl text-sm leading-6 text-white/48">
+        Choose which pages appear in the desktop and mobile navbar. Hidden
+        pages stay editable and still work through their direct URL.
+      </p>
+      <div className="mt-4 flex items-start gap-3 rounded-[18px] border border-white/9 bg-black/22 p-3.5 text-xs leading-5 text-white/48">
+        <FaBars className="mt-1 shrink-0 text-white/32" />
+        <p>
+          This controls the menu only — it does not delete content or
+          unpublish a page. Much less drama, significantly fewer regrets.
+        </p>
+      </div>
+      <fieldset className="mt-5" disabled={disabled}>
+        <legend className="sr-only">
+          Pages shown in the primary navigation
+        </legend>
+        <input
+          name="portfolioType"
+          type="hidden"
+          value={content.settings.portfolioType}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {modules.map((module) => {
+            if (!module.pageSlug) return null;
+
+            const pageSlug = module.pageSlug;
+            const isVisible = visibleSet.has(pageSlug);
+            const isVideoPage =
+              module.key === "video" || module.key === "showreel";
+
+            return (
+              <div
+                className={`overflow-hidden rounded-[20px] border transition duration-200 ${
+                  isVisible
+                    ? "border-emerald-300/20 bg-emerald-300/[0.055]"
+                    : "border-white/9 bg-black/22"
+                }`}
+                key={`${module.key}-${module.href}`}
+              >
+                <label className="flex min-h-20 cursor-pointer items-center gap-3 p-4">
+                  <input
+                    aria-describedby={`nav-status-${pageSlug}`}
+                    aria-label={`Show ${module.label} in navbar`}
+                    checked={isVisible}
+                    className="peer sr-only"
+                    name="visibleNavPageSlugs"
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setVisiblePageSlugs((current) =>
+                        checked
+                          ? [
+                              ...current.filter((slug) => slug !== pageSlug),
+                              pageSlug,
+                            ]
+                          : current.filter((slug) => slug !== pageSlug)
+                      );
+                    }}
+                    type="checkbox"
+                    value={pageSlug}
+                  />
+                  <span
+                    aria-hidden="true"
+                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border text-sm transition peer-focus-visible:ring-2 peer-focus-visible:ring-white/70 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-[#111] ${
+                      isVisible
+                        ? "border-emerald-300/24 bg-emerald-300/12 text-emerald-100"
+                        : "border-white/10 bg-white/[0.035] text-white/28"
+                    }`}
+                  >
+                    {isVisible ? <FaCheck /> : <FaEyeSlash />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-white">
+                      {module.label}
+                    </span>
+                    <span
+                      id={`nav-status-${pageSlug}`}
+                      className={`mt-1 flex items-center gap-1.5 text-[11px] ${
+                        isVisible ? "text-emerald-100/58" : "text-white/34"
+                      }`}
+                    >
+                      {isVisible ? <FaEye /> : <FaEyeSlash />}
+                      {isVisible ? "Shown in navbar" : "Hidden from navbar"}
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition ${
+                      isVisible
+                        ? "border-emerald-300/25 bg-emerald-300/18"
+                        : "border-white/10 bg-black/35"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full transition ${
+                        isVisible
+                          ? "left-[22px] bg-emerald-200"
+                          : "left-1 bg-white/30"
+                      }`}
+                    />
+                  </span>
+                </label>
+                {isVideoPage && isVisible && publishedVideoCount === 0 ? (
+                  <div className="flex items-start justify-between gap-3 border-t border-amber-300/12 bg-amber-400/[0.045] px-4 py-3">
+                    <p className="flex min-w-0 items-start gap-2 text-[11px] leading-5 text-amber-100/62">
+                      <FaExclamationTriangle className="mt-1 shrink-0" />
+                      No published videos yet. You can hide this link until
+                      Spielberg finally calls.
+                    </p>
+                    <Link
+                      className="shrink-0 text-[10px] font-semibold text-amber-100/72 underline decoration-amber-200/25 underline-offset-4 hover:text-amber-50"
+                      href="/admin/media?view=showreel"
+                    >
+                      Add video
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+        {noVisiblePages ? (
+          <p
+            className="mt-4 flex items-center gap-2 rounded-2xl border border-red-300/18 bg-red-400/[0.07] px-4 py-3 text-xs text-red-100/72"
+            role="alert"
+          >
+            <FaExclamationTriangle />
+            Keep at least one page in the navbar so the mobile menu is not an
+            impressively empty hamburger.
+          </p>
+        ) : null}
+        <SaveRow
+          disabled={disabled || noVisiblePages}
+          label="Save navigation"
+          pendingLabel="Saving navigation..."
+        />
+      </fieldset>
+    </form>
+  );
+}
+
+function NavigationWorkspace({
+  content,
+  disabled,
+}: {
+  content: EditablePortfolioContent;
+  disabled: boolean;
+}) {
+  const modules = useMemo(
+    () => getProfilePublicModules(content.settings.portfolioType),
+    [content.settings.portfolioType]
+  );
+  const [visiblePageSlugs, setVisiblePageSlugs] = useState<PageSlug[]>(() => {
+    const hidden = new Set(content.settings.hiddenNavPageSlugs);
+    return modules
+      .map((module) => module.pageSlug)
+      .filter(
+        (pageSlug): pageSlug is PageSlug =>
+          Boolean(pageSlug) && !hidden.has(pageSlug as PageSlug)
+      );
+  });
+
+  return (
+    <StudioWorkspace
+      description="The same primary menu your visitors see"
+      editor={
+        <NavigationSettingsForm
+          content={content}
+          disabled={disabled}
+          modules={modules}
+          setVisiblePageSlugs={setVisiblePageSlugs}
+          visiblePageSlugs={visiblePageSlugs}
+        />
+      }
+      label="Main navigation"
+      preview={
+        <NavigationSnapshot
+          artistName={content.settings.artistName}
+          modules={modules}
+          visiblePageSlugs={visiblePageSlugs}
+        />
+      }
+      publicHref="/"
+    />
+  );
+}
+
 function BrandSnapshot({ content }: { content: EditablePortfolioContent }) {
   return (
     <section className={sectionClass}>
@@ -558,10 +859,12 @@ function SectionHeader({
   kicker,
   title,
   count,
+  countLabel = "items",
 }: {
   kicker: string;
   title: string;
   count?: number;
+  countLabel?: string;
 }) {
   return (
     <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -570,21 +873,31 @@ function SectionHeader({
         <h2 className="heading-ui mt-2 text-2xl text-white">{title}</h2>
       </div>
       {typeof count === "number" ? (
-        <span className="text-sm text-white/45">{count} items</span>
+        <span className="text-sm text-white/45">
+          {count} {countLabel}
+        </span>
       ) : null}
     </div>
   );
 }
 
-function SaveRow({ disabled }: { disabled: boolean }) {
+function SaveRow({
+  disabled,
+  label = "Save",
+  pendingLabel = "Saving...",
+}: {
+  disabled: boolean;
+  label?: string;
+  pendingLabel?: string;
+}) {
   return (
     <div className="mt-5 flex justify-end">
       <ActionButton
         className={buttonClass}
         disabled={disabled}
-        pendingLabel="Saving..."
+        pendingLabel={pendingLabel}
       >
-        Save
+        {label}
       </ActionButton>
     </div>
   );
@@ -2089,6 +2402,7 @@ type ContentWorkspaceSection = {
   kicker: string;
   description: string;
   count?: number;
+  countLabel?: string;
   node: ReactNode;
 };
 
@@ -2260,6 +2574,27 @@ export default function ContentEditor({
         ),
       },
       {
+        id: "navigation",
+        label: "Navigation",
+        kicker: "Site-wide",
+        description:
+          "Choose which portfolio pages appear in the desktop and mobile navbar.",
+        count: getVisibleNavigationModules(
+          portfolioType,
+          content.settings.hiddenNavPageSlugs
+        ).length,
+        countLabel: "visible",
+        node: (
+          <NavigationWorkspace
+            content={content}
+            disabled={disabled}
+            key={`${portfolioType}-${content.settings.hiddenNavPageSlugs.join(
+              "-"
+            )}`}
+          />
+        ),
+      },
+      {
         id: "settings",
         label: "Brand & style",
         kicker: "Site-wide",
@@ -2367,7 +2702,8 @@ export default function ContentEditor({
       ?.scrollIntoView({ block: "start" });
   }
 
-  const publicPageItems = getPublicModules(portfolioType).map((page) => {
+  const hiddenNavPageSlugs = new Set(content.settings.hiddenNavPageSlugs);
+  const publicPageItems = getProfilePublicModules(portfolioType).map((page) => {
     const sectionId =
       page.key === "home"
         ? "home"
@@ -2398,10 +2734,12 @@ export default function ContentEditor({
       sectionId,
       editorHref,
       icon,
+      isVisible:
+        !page.pageSlug || !hiddenNavPageSlugs.has(page.pageSlug),
     };
   });
   const sharedSections = sections.filter((section) =>
-    ["settings", "socials"].includes(section.id)
+    ["navigation", "settings", "socials"].includes(section.id)
   );
 
   return (
@@ -2438,7 +2776,8 @@ export default function ContentEditor({
               Edit by page
             </h2>
             <p className="mt-2 text-xs leading-5 text-white/38">
-              Matches the order of your public navigation.
+              Every portfolio page stays here, even when its navbar link is
+              hidden.
             </p>
           </div>
 
@@ -2466,8 +2805,17 @@ export default function ContentEditor({
                       </span>
                       <span className="truncate">{page.label}</span>
                     </span>
-                    <span className="mt-0.5 block truncate text-[10px] text-white/32">
-                      {page.description}
+                    <span
+                      className={`mt-0.5 flex items-center gap-1.5 truncate text-[10px] ${
+                        page.isVisible
+                          ? "text-emerald-100/42"
+                          : "text-amber-100/42"
+                      }`}
+                    >
+                      {page.isVisible ? <FaEye /> : <FaEyeSlash />}
+                      {page.isVisible
+                        ? "Shown in navbar"
+                        : "Hidden from navbar"}
                     </span>
                   </span>
                   {page.editorHref ? (
@@ -2511,7 +2859,13 @@ export default function ContentEditor({
             {sharedSections.map((section) => {
               const active = section.id === activeSection?.id;
               const icon =
-                section.id === "settings" ? <FaPalette /> : <FaGlobe />;
+                section.id === "navigation" ? (
+                  <FaBars />
+                ) : section.id === "settings" ? (
+                  <FaPalette />
+                ) : (
+                  <FaGlobe />
+                );
 
               return (
                 <button
@@ -2555,7 +2909,7 @@ export default function ContentEditor({
               ) : null}
               {typeof activeSection?.count === "number" ? (
                 <span className="inline-flex min-h-8 items-center rounded-full border border-white/9 px-3 text-xs tabular-nums text-white/45">
-                  {activeSection.count} items
+                  {activeSection.count} {activeSection.countLabel || "items"}
                 </span>
               ) : null}
             </div>
