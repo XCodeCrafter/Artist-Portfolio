@@ -62,7 +62,7 @@ async function inspectSupabase() {
       supabase
         .from("site_settings")
         .select(
-          "id, portfolio_type, display_font, body_font, ui_font, hidden_nav_page_slugs_actor, hidden_nav_page_slugs_musician"
+          "id, portfolio_type, footer_effect, display_font, body_font, ui_font, hidden_nav_page_slugs_actor, hidden_nav_page_slugs_musician"
         )
         .limit(1),
       supabase

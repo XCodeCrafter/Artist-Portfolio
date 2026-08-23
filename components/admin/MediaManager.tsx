@@ -33,6 +33,7 @@ import {
 } from "react-icons/fa";
 import CopyButton from "@/components/admin/CopyButton";
 import ActionButton from "@/components/admin/ActionButton";
+import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import {
@@ -691,20 +692,17 @@ function UploadPanel({
   }
 
   return (
-    <section className={`${sectionClass} scroll-mt-6`} id="upload">
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className={labelClass}>Storage</p>
-          <h2 className="heading-ui mt-2 text-2xl font-semibold tracking-tight text-white">
-            Upload Media in Batches
-          </h2>
-        </div>
-        <span className="text-sm text-white/45">
-          Up to {MAX_BATCH_FILES} files · images {formatBytes(MAX_IMAGE_BYTES)} · videos{" "}
-          {formatBytes(MAX_VIDEO_BYTES)} each
+    <AdminDisclosure
+      badge={
+        <span className="text-[10px] text-white/40">
+          {MAX_BATCH_FILES} files max
         </span>
-      </div>
-
+      }
+      description={`Batch upload · images ${formatBytes(MAX_IMAGE_BYTES)} · videos ${formatBytes(MAX_VIDEO_BYTES)} each.`}
+      eyebrow="Storage"
+      id="upload"
+      title="Add media"
+    >
       <form onSubmit={handleUpload} ref={formRef}>
         <fieldset disabled={disabled || pending}>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -854,7 +852,7 @@ function UploadPanel({
           ) : null}
         </fieldset>
       </form>
-    </section>
+    </AdminDisclosure>
   );
 }
 
@@ -1226,7 +1224,14 @@ function AssetCard({
         )}
       </div>
 
-      <form action={updateMediaAsset} className="mt-5">
+      <AdminDisclosure
+        className="mt-5"
+        description="Label, alt text, visibility, placement, and storage actions."
+        id={`asset-settings-${asset.id}`}
+        title="Edit details & placement"
+        variant="advanced"
+      >
+      <form action={updateMediaAsset}>
         <fieldset disabled={disabled}>
           <input name="id" type="hidden" value={asset.id} />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1285,6 +1290,7 @@ function AssetCard({
           </ActionButton>
         </form>
       </div>
+      </AdminDisclosure>
     </article>
   );
 }
@@ -1307,7 +1313,13 @@ function GalleryImageForm({
   );
 
   return (
-    <article className={cardClass}>
+    <AdminDisclosure
+      description={mode === "new" ? "Choose an image and add it to the public mosaic." : item.category || "Gallery item"}
+      id={mode === "new" ? "studio-frame-new" : `gallery-item-${item.id}`}
+      title={mode === "new" ? "+ Add gallery frame" : item.title}
+      variant="item"
+    >
+    <article>
       {previewSrc ? (
         <div className="relative aspect-video overflow-hidden rounded-[20px] border border-white/10 bg-black/40">
           <ImagePreview
@@ -1431,6 +1443,7 @@ function GalleryImageForm({
         </form>
       ) : null}
     </article>
+    </AdminDisclosure>
   );
 }
 
@@ -1540,7 +1553,15 @@ function StudioImageEditor({
   item: EditableGalleryImage;
 }) {
   return (
-    <article className="scroll-mt-6 overflow-hidden rounded-lg border border-white/10 bg-black/35" id={`studio-frame-${item.id}`}>
+    <AdminDisclosure
+      badge={<span className="text-[10px] text-white/40">{item.isPublished ? "Published" : "Hidden"}</span>}
+      description={[item.category, `Frame ${String(index + 1).padStart(2, "0")}`].filter(Boolean).join(" · ")}
+      icon={<FaImage />}
+      id={`studio-frame-${item.id}`}
+      title={item.title}
+      variant="item"
+    >
+    <article>
       <form action={saveMediaGalleryImage} className="p-4">
         <fieldset disabled={disabled}>
           <input name="id" type="hidden" value={item.id} />
@@ -1582,6 +1603,7 @@ function StudioImageEditor({
         </div>
       </div>
     </article>
+    </AdminDisclosure>
   );
 }
 
@@ -1664,7 +1686,15 @@ function ShowreelVideoEditor({
   );
 
   return (
-    <article className="overflow-hidden rounded-lg border border-white/10 bg-black/30">
+    <AdminDisclosure
+      badge={<span className="text-[10px] text-white/40">{item.isPublished || mode === "new" ? "Published" : "Hidden"}</span>}
+      description={mode === "new" ? "Upload a file or connect a YouTube, Vimeo, or direct video URL." : `${item.videoType} · ${item.platform}`}
+      icon={<FaVideo />}
+      id={mode === "new" ? "showreel-video-new" : `showreel-video-${item.id}`}
+      title={mode === "new" ? "+ Add video" : item.title}
+      variant="item"
+    >
+    <article>
       {item.embedUrl ? (
         <div className="relative aspect-video bg-black">
           {initialSource === "upload" || initialSource === "direct" ? (
@@ -1755,6 +1785,7 @@ function ShowreelVideoEditor({
       </form>
       {mode === "edit" ? <form action={deleteShowreelVideo} className="flex justify-end border-t border-white/10 p-4" onSubmit={(event) => { if (!window.confirm(`Delete "${item.title}"?`)) event.preventDefault(); }}><input name="id" type="hidden" value={item.id} /><ActionButton className={dangerButtonClass} disabled={disabled} pendingLabel="Deleting..."><FaTrash /> Delete</ActionButton></form> : null}
     </article>
+    </AdminDisclosure>
   );
 }
 
@@ -1782,8 +1813,21 @@ function ShowreelStudio({
         </nav>
         <Link className={secondaryButtonClass} href="/video" rel="noreferrer" target="_blank"><FaExternalLinkAlt /> Open public {pageLabel}</Link>
       </div>
-      <ShowreelHeroEditor assets={assets} content={content} disabled={disabled} portfolioType={portfolioType} />
-      <section className={`${sectionClass} scroll-mt-6`} id="showreel-copy">
+      <AdminDisclosure
+        defaultOpen
+        description="Opening title, action, and background media."
+        eyebrow="01 · Page opening"
+        id="showreel-hero-panel"
+        title={`${pageLabel} hero`}
+      >
+        <ShowreelHeroEditor assets={assets} content={content} disabled={disabled} portfolioType={portfolioType} />
+      </AdminDisclosure>
+      <AdminDisclosure
+        description="Section labels, supporting copy, and empty states."
+        eyebrow="02 · Page text"
+        id="showreel-copy"
+        title="Page introduction"
+      >
         <p className={labelClass}>02 / Page introduction</p>
         <div className="mt-4 rounded-lg border border-white/10 bg-black/30 p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/45">{copy.sectionEyebrow}</p>
@@ -1805,14 +1849,20 @@ function ShowreelStudio({
             <div className="mt-5 flex justify-end"><ActionButton className={buttonClass} disabled={disabled} pendingLabel="Saving...">Save page text</ActionButton></div>
           </fieldset>
         </form>
-      </section>
-      <section className={`${sectionClass} scroll-mt-6`} id="showreel-videos">
+      </AdminDisclosure>
+      <AdminDisclosure
+        badge={<span className="text-xs text-white/42">{videos.length} items</span>}
+        description="Featured reel, scenes, and supporting clips."
+        eyebrow="03 · Video sequence"
+        id="showreel-videos"
+        title="Videos"
+      >
         <div className="flex items-end justify-between gap-4"><div><p className={labelClass}>03 / Video sequence</p><h2 className="heading-ui mt-2 text-2xl font-semibold text-white">Featured reel, scenes, and clips</h2></div><span className="text-sm text-white/45">{videos.length} items</span></div>
-        <div className="mt-6 grid gap-4 xl:grid-cols-2">
+        <div className="mt-6 grid gap-3">
           {videos.map((item) => <ShowreelVideoEditor assets={assets} disabled={disabled} item={item} key={item.id} portfolioType={portfolioType} />)}
           <ShowreelVideoEditor assets={assets} disabled={disabled} item={{ id: "", title: "", description: "", embedUrl: "", platform: "upload", thumbnailSrc: "", videoType: portfolioType === "actor" ? "showreel" : "music_video", isFeatured: videos.length === 0, sortOrder: nextSort(videos), isPublished: true }} mode="new" portfolioType={portfolioType} />
         </div>
-      </section>
+      </AdminDisclosure>
     </div>
   );
 }
@@ -1845,9 +1895,23 @@ function GalleryStudio({
         <Link className={secondaryButtonClass} href="/gallery" rel="noreferrer" target="_blank"><FaExternalLinkAlt /> Open public Gallery</Link>
       </div>
 
-      <StudioHero assets={assets} content={content} disabled={disabled} />
+      <AdminDisclosure
+        defaultOpen
+        description="Opening title, action, and gallery background media."
+        eyebrow="01 · Page opening"
+        id="studio-hero-panel"
+        title="Gallery hero"
+      >
+        <StudioHero assets={assets} content={content} disabled={disabled} />
+      </AdminDisclosure>
 
-      <section className={`${sectionClass} scroll-mt-6`} id="studio-mosaic">
+      <AdminDisclosure
+        badge={<span className="text-xs text-white/42">{mosaic.length} frames</span>}
+        description="Archive introduction and the ordered public image composition."
+        eyebrow="02 · Gallery content"
+        id="studio-mosaic"
+        title="Public mosaic"
+      >
         <p className={labelClass}>02 / Archive introduction</p>
         <form action={saveGalleryPresentation} className="mt-4">
           <fieldset disabled={disabled}>
@@ -1891,7 +1955,7 @@ function GalleryStudio({
             mode="new"
           />
         </div>
-      </section>
+      </AdminDisclosure>
 
       <section className={sectionClass}>
         <p className={labelClass}>Home narrative sections</p>

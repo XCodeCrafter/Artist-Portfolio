@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import {
   FaArrowDown,
   FaArrowUp,
@@ -20,6 +20,7 @@ import {
   FaTrash,
 } from "react-icons/fa";
 import ActionButton from "@/components/admin/ActionButton";
+import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
@@ -69,12 +70,14 @@ import {
   updateActorResume,
   updateAboutHome,
   updateBioProfile,
-  updateBrandSettings,
+  updateBrandIdentitySettings,
   updateContactSettings,
+  updateFooterEffectSettings,
   updateHomePresentation,
   updateMusicSettings,
   updateNavigationSettings,
   updatePageHero,
+  updateTypographySettings,
 } from "@/app/admin/content/actions";
 
 type ContentEditorProps = {
@@ -105,9 +108,11 @@ const statusCopy: Record<string, string> = {
   "saved-home-presentation": "Homepage section text and media saved.",
   "saved-music-link": "Music link saved.",
   "saved-navigation": "Navigation visibility saved.",
-  "saved-brand-settings": "Brand and typography saved.",
+  "saved-brand-settings": "Brand identity and text saved.",
   "saved-contact-settings": "Contact details saved.",
+  "saved-footer-effect-settings": "Footer interaction saved.",
   "saved-music-settings": "Spotify settings saved.",
+  "saved-typography-settings": "Typography saved.",
   "saved-settings": "Site settings saved.",
   "saved-social": "Footer link saved.",
   "saved-track": "SoundCloud track saved.",
@@ -128,7 +133,7 @@ const statusCopy: Record<string, string> = {
   "settings-required":
     "Save Brand & style once before editing this section on a new database.",
   "footer-effect-migration-required":
-    "Footer effects need the 0016_footer_effect database migration before they can be saved.",
+    "Identity and text can still be saved. Footer interaction needs the safe 0022_repair_footer_effect database migration.",
   "typography-migration-required":
     "Typography fields need the 0012_typography_settings database migration before they can be saved.",
 };
@@ -785,6 +790,9 @@ function StudioWorkspace({
   preview: ReactNode;
   publicHref: string;
 }) {
+  const previewId = useId();
+  const [previewOpen, setPreviewOpen] = useState(false);
+
   return (
     <div className="grid items-start gap-5 2xl:grid-cols-[minmax(390px,0.82fr)_minmax(0,1.18fr)]">
       <aside className="min-w-0 2xl:sticky 2xl:top-4">
@@ -801,18 +809,33 @@ function StudioWorkspace({
                 {description}
               </p>
             </div>
-            <Link
-              aria-label={`Open ${label} on the public site`}
-              className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[11px] font-semibold text-white/60 transition hover:bg-white hover:text-black"
-              href={publicHref}
-              rel="noreferrer"
-              target="_blank"
-            >
-              View
-              <FaExternalLinkAlt className="text-[9px]" />
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                aria-controls={previewId}
+                aria-expanded={previewOpen}
+                className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[11px] font-semibold text-white/60 transition hover:bg-white hover:text-black 2xl:hidden"
+                onClick={() => setPreviewOpen((open) => !open)}
+                type="button"
+              >
+                {previewOpen ? <FaEyeSlash /> : <FaEye />}
+                {previewOpen ? "Hide mirror" : "Show mirror"}
+              </button>
+              <Link
+                aria-label={`Open ${label} on the public site`}
+                className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[11px] font-semibold text-white/60 transition hover:bg-white hover:text-black"
+                href={publicHref}
+                rel="noreferrer"
+                target="_blank"
+              >
+                View
+                <FaExternalLinkAlt className="text-[9px]" />
+              </Link>
+            </div>
           </div>
-          <div className="max-h-[calc(100vh-9.5rem)] overflow-y-auto rounded-[18px] bg-black/35 p-2">
+          <div
+            className={`${previewOpen ? "block" : "hidden"} max-h-[calc(100vh-9.5rem)] overflow-y-auto rounded-[18px] bg-black/35 p-2 2xl:block`}
+            id={previewId}
+          >
             {preview}
           </div>
         </div>
@@ -1101,134 +1124,158 @@ function SiteSettingsForm({
   disabled: boolean;
   mode?: "brand" | "contact" | "music";
 }) {
-  const action = {
-    brand: updateBrandSettings,
-    contact: updateContactSettings,
-    music: updateMusicSettings,
-  }[mode];
-  const copy = {
-    brand: {
-      kicker: "Global design",
-      title: "Brand & typography",
-      description:
-        "Identity, portfolio mode, type system, and the visual behavior shared by every page.",
-    },
-    contact: {
-      kicker: "Contact section",
-      title: "Contact details",
-      description:
-        "Location and supporting copy shown around the public inquiry form.",
-    },
-    music: {
-      kicker: "Music integrations",
-      title: "Spotify profile",
-      description:
-        "Artist and embed links used by the music page and footer destinations.",
-    },
-  }[mode];
-
-  return (
-    <form
-      action={action}
-      className={sectionClass}
-      id={mode === "brand" ? "settings" : `${mode}-settings`}
-    >
-      <SectionHeader kicker={copy.kicker} title={copy.title} />
-      <p className="-mt-2 mb-5 max-w-2xl text-sm leading-6 text-white/48">
-        {copy.description}
-      </p>
-      <fieldset disabled={disabled}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {mode === "brand" ? (
-            <>
-              <Field label="Artist name">
-                <TextInput
-                  defaultValue={content.settings.artistName}
-                  maxLength={220}
-                  name="artistName"
-                  required
-                />
-              </Field>
-              <Field label="Portfolio mode">
-                <select
-                  className={inputClass}
-                  defaultValue={content.settings.portfolioType}
-                  name="portfolioType"
-                >
-                  <option value="musician">Musician</option>
-                  <option value="actor">Actor</option>
-                </select>
-              </Field>
-              <Field label="Tagline / discipline" wide>
-                <TextInput
-                  defaultValue={content.settings.tagline}
-                  maxLength={220}
-                  name="tagline"
-                />
-              </Field>
-              <Field label="Site description" wide>
-                <TextArea
-                  defaultValue={content.settings.description}
-                  maxLength={1000}
-                  name="description"
-                  rows={4}
-                />
-              </Field>
-              <div className="sm:col-span-2 mt-3 border-t border-white/10 pt-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/52">
-                  Typography
-                </p>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/48">
-                  Display type shapes the portfolio headlines. Body and UI
-                  fonts keep stories and controls readable.
-                </p>
+  if (mode === "brand") {
+    return (
+      <div className="grid gap-3" id="settings">
+        <AdminDisclosure
+          defaultOpen
+          description="Artist name, portfolio mode, tagline, and public site description."
+          eyebrow="01 · Identity"
+          id="settings-identity"
+          title="Brand identity & text"
+        >
+          <form action={updateBrandIdentitySettings}>
+            <fieldset disabled={disabled}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Artist name">
+                  <TextInput
+                    defaultValue={content.settings.artistName}
+                    maxLength={220}
+                    name="artistName"
+                    required
+                  />
+                </Field>
+                <Field label="Portfolio mode">
+                  <select
+                    className={inputClass}
+                    defaultValue={content.settings.portfolioType}
+                    name="portfolioType"
+                  >
+                    <option value="musician">Musician</option>
+                    <option value="actor">Actor</option>
+                  </select>
+                </Field>
+                <Field label="Tagline / discipline" wide>
+                  <TextInput
+                    defaultValue={content.settings.tagline}
+                    maxLength={220}
+                    name="tagline"
+                  />
+                </Field>
+                <Field label="Site description" wide>
+                  <TextArea
+                    defaultValue={content.settings.description}
+                    maxLength={1000}
+                    name="description"
+                    rows={4}
+                  />
+                </Field>
               </div>
-              <Field label="Display / headings">
-                <select
-                  className={inputClass}
-                  defaultValue={content.settings.displayFont}
-                  name="displayFont"
-                >
-                  {DISPLAY_FONT_OPTIONS.map((font) => (
-                    <option key={font.key} value={font.key}>
-                      {font.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Body / paragraphs">
-                <select
-                  className={inputClass}
-                  defaultValue={content.settings.bodyFont}
-                  name="bodyFont"
-                >
-                  {BODY_FONT_OPTIONS.map((font) => (
-                    <option key={font.key} value={font.key}>
-                      {font.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="UI / navigation and buttons" wide>
-                <select
-                  className={inputClass}
-                  defaultValue={content.settings.uiFont}
-                  name="uiFont"
-                >
-                  {UI_FONT_OPTIONS.map((font) => (
-                    <option key={font.key} value={font.key}>
-                      {font.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              <SaveRow disabled={disabled} label="Save identity" />
+            </fieldset>
+          </form>
+        </AdminDisclosure>
+
+        <AdminDisclosure
+          description="Display, paragraph, and interface font families."
+          eyebrow="02 · Type system"
+          id="settings-typography"
+          title="Typography"
+        >
+          <form action={updateTypographySettings}>
+            <fieldset disabled={disabled}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Display / headings">
+                  <select
+                    className={inputClass}
+                    defaultValue={content.settings.displayFont}
+                    name="displayFont"
+                  >
+                    {DISPLAY_FONT_OPTIONS.map((font) => (
+                      <option key={font.key} value={font.key}>
+                        {font.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Body / paragraphs">
+                  <select
+                    className={inputClass}
+                    defaultValue={content.settings.bodyFont}
+                    name="bodyFont"
+                  >
+                    {BODY_FONT_OPTIONS.map((font) => (
+                      <option key={font.key} value={font.key}>
+                        {font.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="UI / navigation and buttons" wide>
+                  <select
+                    className={inputClass}
+                    defaultValue={content.settings.uiFont}
+                    name="uiFont"
+                  >
+                    {UI_FONT_OPTIONS.map((font) => (
+                      <option key={font.key} value={font.key}>
+                        {font.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <SaveRow disabled={disabled} label="Save typography" />
+            </fieldset>
+          </form>
+        </AdminDisclosure>
+
+        <AdminDisclosure
+          description="Pointer effect used in the public footer on desktop."
+          eyebrow="03 · Interaction"
+          id="settings-footer-effect"
+          title="Footer interaction"
+        >
+          <form action={updateFooterEffectSettings}>
+            <fieldset disabled={disabled}>
               <FooterEffectPicker
                 defaultValue={content.settings.footerEffect}
               />
-            </>
-          ) : null}
+              <SaveRow disabled={disabled} label="Save interaction" />
+            </fieldset>
+          </form>
+        </AdminDisclosure>
+      </div>
+    );
+  }
 
-          {mode === "contact" ? (
+  const isContact = mode === "contact";
+  const action = isContact ? updateContactSettings : updateMusicSettings;
+  const copy = isContact
+    ? {
+        eyebrow: "02 · Contact copy",
+        title: "Contact details",
+        description:
+          "Location and supporting copy shown around the public inquiry form.",
+      }
+    : {
+        eyebrow: "02 · Integrations",
+        title: "Spotify profile",
+        description:
+          "Artist and embed links used by the music page and footer destinations.",
+      };
+
+  return (
+    <AdminDisclosure
+      description={copy.description}
+      eyebrow={copy.eyebrow}
+      id={`${mode}-settings`}
+      title={copy.title}
+    >
+      <form action={action}>
+        <fieldset disabled={disabled}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {isContact ? (
             <>
               <Field label="Location">
                 <TextInput
@@ -1246,9 +1293,7 @@ function SiteSettingsForm({
                 />
               </Field>
             </>
-          ) : null}
-
-          {mode === "music" ? (
+            ) : (
             <>
               <Field label="Spotify artist URL" wide>
                 <TextInput
@@ -1271,11 +1316,12 @@ function SiteSettingsForm({
                 />
               </Field>
             </>
-          ) : null}
-        </div>
-        <SaveRow disabled={disabled} />
-      </fieldset>
-    </form>
+            )}
+          </div>
+          <SaveRow disabled={disabled} />
+        </fieldset>
+      </form>
+    </AdminDisclosure>
   );
 }
 
@@ -1297,12 +1343,18 @@ function HeroForms({
   );
 
   return (
-    <section className={sectionClass} id={`${returnSection}-hero`}>
-      <SectionHeader
-        count={heroes.length}
-        kicker="Page headers"
-        title="Hero Blocks"
-      />
+    <AdminDisclosure
+      badge={
+        <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-white/45">
+          {heroes[0]?.mediaType || "media"}
+        </span>
+      }
+      defaultOpen
+      description="Opening title, supporting text, action, and background media."
+      eyebrow="01 · Page opening"
+      id={`${returnSection}-hero`}
+      title="Hero"
+    >
       <div className="grid gap-4">
         {heroes.map((hero) => (
           <form action={updatePageHero} className={itemClass} key={hero.pageSlug}>
@@ -1369,7 +1421,7 @@ function HeroForms({
           </form>
         ))}
       </div>
-    </section>
+    </AdminDisclosure>
   );
 }
 
@@ -1504,24 +1556,15 @@ function HomePresentationForm({
     { bodyName: "storyImage4Body", bodyValue: item.storyImage4Body, name: "storyImage4Src", titleName: "storyImage4Title", titleValue: item.storyImage4Title, value: item.storyImage4Src },
   ];
   return (
-    <section className={sectionClass} id="home">
-      <SectionHeader kicker="Homepage sequence" title="Public sections in page order" />
-
-      <nav aria-label="Homepage section editors" className="mt-5 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-black/20 p-2">
-        {[
-          ["home-about", "01 About"],
-          ["home-interlude", "02 The Interlude"],
-          ["home-freelancer-life", "03 Freelancer Life"],
-        ].map(([href, label]) => (
-          <a className="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white/58 transition hover:border-white/25 hover:bg-white/[0.07] hover:text-white" href={`#${href}`} key={href}>
-            {label}
-          </a>
-        ))}
-      </nav>
-
-      <form action={updateAboutHome} className={`${itemClass} mt-6 scroll-mt-28`} id="home-about">
-        <fieldset disabled={disabled}>
-          <p className={labelClass}>01 / About</p>
+    <div className="grid gap-3" id="home">
+      <AdminDisclosure
+        description="Heading, portrait, introduction, and optional call to action."
+        eyebrow="02 · About"
+        id="home-about"
+        title={content.aboutHome.heading || "About"}
+      >
+        <form action={updateAboutHome}>
+          <fieldset disabled={disabled}>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field label="Heading"><TextInput defaultValue={content.aboutHome.heading} name="heading" required /></Field>
             <Field label="Image alt"><TextInput defaultValue={content.aboutHome.imageAlt} name="imageAlt" /></Field>
@@ -1531,12 +1574,18 @@ function HomePresentationForm({
             <MediaAssetPicker assets={assets} className="sm:col-span-2" defaultValue={content.aboutHome.imageSrc} kind="image" label="Section image" name="imageSrc" />
           </div>
           <SaveRow disabled={disabled} />
-        </fieldset>
-      </form>
+          </fieldset>
+        </form>
+      </AdminDisclosure>
 
-      <form action={updateHomePresentation} className={`${itemClass} mt-6 scroll-mt-28`} id="home-interlude">
-        <fieldset disabled={disabled}>
-          <p className={labelClass}>02 / The Interlude</p>
+      <AdminDisclosure
+        description="Full-width video transition between the opening story and gallery."
+        eyebrow="03 · Feature"
+        id="home-interlude"
+        title={item.featureTitle || "The Interlude"}
+      >
+        <form action={updateHomePresentation}>
+          <fieldset disabled={disabled}>
           <p className="mt-2 text-sm leading-6 text-white/48">Text, link, video, and poster for the full-width section directly below About.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field label="Heading" wide><TextInput defaultValue={item.featureTitle} name="featureTitle" required /></Field>
@@ -1548,12 +1597,21 @@ function HomePresentationForm({
           </div>
           <HomePresentationHiddenFields except="interlude" item={item} />
           <SaveRow disabled={disabled} />
-        </fieldset>
-      </form>
+          </fieldset>
+        </form>
+      </AdminDisclosure>
 
-      <form action={updateHomePresentation} className={`${itemClass} mt-6 scroll-mt-28`} id="home-freelancer-life">
-        <fieldset disabled={disabled}>
-          <p className={labelClass}>03 / Artist Freelancer Life</p>
+      <AdminDisclosure
+        badge={
+          <span className="text-xs tabular-nums text-white/42">4 scenes</span>
+        }
+        description="Scroll-driven image and text sequence leading into the gallery."
+        eyebrow="04 · Story sequence"
+        id="home-freelancer-life"
+        title="Artist Freelancer Life"
+      >
+        <form action={updateHomePresentation}>
+          <fieldset disabled={disabled}>
           <p className="mt-2 text-sm leading-6 text-white/48">Each scene has its own image, heading, and paragraph. Public text changes together with the active image while the visitor scrolls.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <input name="storyTitle" type="hidden" value={item.storyTitle} />
@@ -1571,9 +1629,10 @@ function HomePresentationForm({
           </div>
           <HomePresentationHiddenFields except="story" item={item} />
           <SaveRow disabled={disabled} />
-        </fieldset>
-      </form>
-    </section>
+          </fieldset>
+        </form>
+      </AdminDisclosure>
+    </div>
   );
 }
 
@@ -1589,11 +1648,16 @@ function BioForms({
   isActor: boolean;
 }) {
   return (
-    <section className={sectionClass} id="bio">
-      <SectionHeader kicker="Biography" title="Bio Content" />
-      <form action={updateBioProfile} className={itemClass}>
-        <fieldset disabled={disabled}>
-          <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-3" id="bio">
+      <AdminDisclosure
+        description="The opening biography label, caption, and introduction."
+        eyebrow="02 · Biography"
+        id="bio-intro"
+        title="Bio introduction"
+      >
+        <form action={updateBioProfile}>
+          <fieldset disabled={disabled}>
+            <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Top label">
               <TextInput defaultValue={content.bio.topLabel} name="topLabel" />
             </Field>
@@ -1607,36 +1671,48 @@ function BioForms({
                 rows={5}
               />
             </Field>
-          </div>
-          <SaveRow disabled={disabled} />
-        </fieldset>
-      </form>
+            </div>
+            <SaveRow disabled={disabled} />
+          </fieldset>
+        </form>
+      </AdminDisclosure>
 
-      <div className="mt-5 grid gap-4">
-        <SectionHeader
-          count={content.bio.galleryImages.length}
-          kicker="Biography"
-          title={isActor ? "Bio Portraits" : "Gallery Images"}
-        />
-        {content.bio.galleryImages.map((item) => (
-          <BioGalleryForm assets={assets} disabled={disabled} item={item} key={item.id} />
-        ))}
-        <BioGalleryForm
-          assets={assets}
-          disabled={disabled}
-          item={{
-            id: "",
-            src: "",
-            alt: "",
-            sortOrder: nextSort(content.bio.galleryImages),
-            isPublished: true,
-          }}
-          mode="new"
-        />
-      </div>
+      <AdminDisclosure
+        badge={<span className="text-xs text-white/42">{content.bio.galleryImages.length} items</span>}
+        description="Portraits shown alongside the biography. Open only the image you want to edit."
+        eyebrow="03 · Visual story"
+        id="bio-gallery"
+        title={isActor ? "Bio portraits" : "Gallery images"}
+      >
+        <div className="grid gap-3">
+          {content.bio.galleryImages.map((item) => (
+            <BioGalleryForm assets={assets} disabled={disabled} item={item} key={item.id} />
+          ))}
+          <BioGalleryForm
+            assets={assets}
+            disabled={disabled}
+            item={{
+              id: "",
+              src: "",
+              alt: "",
+              sortOrder: nextSort(content.bio.galleryImages),
+              isPublished: true,
+            }}
+            mode="new"
+          />
+        </div>
+      </AdminDisclosure>
 
-      <BioParagraphsEditor disabled={disabled} items={content.bio.paragraphs} />
-    </section>
+      <AdminDisclosure
+        badge={<span className="text-xs text-white/42">{content.bio.paragraphs.length} paragraphs</span>}
+        description="Long-form biography paragraphs and their reveal order."
+        eyebrow="04 · Story"
+        id="bio-paragraphs-panel"
+        title="Biography paragraphs"
+      >
+        <BioParagraphsEditor disabled={disabled} items={content.bio.paragraphs} />
+      </AdminDisclosure>
+    </div>
   );
 }
 
@@ -1648,9 +1724,13 @@ function ActorResumeSection({
   disabled: boolean;
 }) {
   return (
-    <section className={sectionClass} id="actor-resume">
-      <SectionHeader kicker="Actor portfolio" title="Resume Profile" />
-      <form action={updateActorResume} className={itemClass}>
+    <AdminDisclosure
+      description="Playing profile, representation, languages, skills, and resume link."
+      eyebrow="05 · Actor profile"
+      id="actor-resume"
+      title="Resume profile"
+    >
+      <form action={updateActorResume}>
         <fieldset disabled={disabled}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Headline">
@@ -1720,7 +1800,7 @@ function ActorResumeSection({
           <SaveRow disabled={disabled} />
         </fieldset>
       </form>
-    </section>
+    </AdminDisclosure>
   );
 }
 
@@ -1732,13 +1812,14 @@ function ActorCreditsSection({
   disabled: boolean;
 }) {
   return (
-    <section className={sectionClass} id="actor-credits">
-      <SectionHeader
-        count={items.length}
-        kicker="Actor portfolio"
-        title="Credits"
-      />
-      <div className="grid gap-4">
+    <AdminDisclosure
+      badge={<span className="text-xs text-white/42">{items.length} credits</span>}
+      description="Film, television, theatre, training, and other selected work."
+      eyebrow="06 · Experience"
+      id="actor-credits"
+      title="Credits"
+    >
+      <div className="grid gap-3">
         {items.map((item) => (
           <ActorCreditForm disabled={disabled} item={item} key={item.id} />
         ))}
@@ -1759,7 +1840,7 @@ function ActorCreditsSection({
           mode="new"
         />
       </div>
-    </section>
+    </AdminDisclosure>
   );
 }
 
@@ -1772,18 +1853,30 @@ function ActorCreditForm({
   disabled: boolean;
   mode?: "edit" | "new";
 }) {
+  const visible = item.isPublished || mode === "new";
   return (
-    <div className={itemClass}>
+    <AdminDisclosure
+      badge={
+        <span className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${visible ? "border-emerald-300/15 text-emerald-100/65" : "border-white/10 text-white/35"}`}>
+          {visible ? "Published" : "Hidden"}
+        </span>
+      }
+      description={
+        mode === "new"
+          ? "Create another film, television, theatre, or training credit."
+          : [actorCreditTypeLabels[item.creditType], item.role, item.year]
+              .filter(Boolean)
+              .join(" · ")
+      }
+      id={mode === "new" ? "actor-credit-new" : `actor-credit-${item.id}`}
+      title={mode === "new" ? "+ Add credit" : item.title}
+      variant="item"
+    >
       <form action={saveActorCredit}>
         <fieldset disabled={disabled}>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold text-white">
-              {mode === "new" ? "New credit" : item.title}
-            </h3>
-            {mode === "edit" ? (
-              <input name="id" type="hidden" value={item.id} />
-            ) : null}
-          </div>
+          {mode === "edit" ? (
+            <input name="id" type="hidden" value={item.id} />
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             {mode === "new" ? (
               <Field label="ID">
@@ -1834,7 +1927,7 @@ function ActorCreditForm({
       {mode === "edit" ? (
         <DeleteForm action={deleteActorCredit} disabled={disabled} id={item.id} />
       ) : null}
-    </div>
+    </AdminDisclosure>
   );
 }
 
@@ -1849,18 +1942,24 @@ function BioGalleryForm({
   disabled: boolean;
   mode?: "edit" | "new";
 }) {
+  const visible = item.isPublished || mode === "new";
   return (
-    <div className={itemClass}>
+    <AdminDisclosure
+      badge={
+        <span className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${visible ? "border-emerald-300/15 text-emerald-100/65" : "border-white/10 text-white/35"}`}>
+          {visible ? "Published" : "Hidden"}
+        </span>
+      }
+      description={mode === "new" ? "Choose a portrait from the media library." : item.alt || "Biography image"}
+      id={mode === "new" ? "bio-image-new" : `bio-image-${item.id}`}
+      title={mode === "new" ? "+ Add portrait" : item.id}
+      variant="item"
+    >
       <form action={saveBioGalleryImage}>
         <fieldset disabled={disabled}>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold text-white">
-              {mode === "new" ? "New image" : item.id}
-            </h3>
-            {mode === "edit" ? (
-              <input name="id" type="hidden" value={item.id} />
-            ) : null}
-          </div>
+          {mode === "edit" ? (
+            <input name="id" type="hidden" value={item.id} />
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             {mode === "new" ? (
               <Field label="ID">
@@ -1896,7 +1995,7 @@ function BioGalleryForm({
           id={item.id}
         />
       ) : null}
-    </div>
+    </AdminDisclosure>
   );
 }
 
@@ -1961,16 +2060,11 @@ function BioParagraphsEditor({
   }));
 
   return (
-    <section className="mt-8 overflow-hidden rounded-[24px] border border-white/10 bg-black/24" id="bio-paragraphs">
-      <div className="flex flex-col gap-3 border-b border-white/10 p-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className={labelClass}>Biography text editor</p>
-          <h3 className="heading-ui mt-2 text-2xl font-semibold text-white">Paragraphs</h3>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/48">
-            Each row is one public paragraph. Reorder the reading flow, adjust its reveal delay, then save the complete text once.
-          </p>
-        </div>
-        <span className="text-sm text-white/45">{paragraphs.length} paragraphs</span>
+    <div className="overflow-hidden rounded-[18px] border border-white/9 bg-black/24" id="bio-paragraphs">
+      <div className="border-b border-white/10 px-5 py-4">
+        <p className="text-sm leading-6 text-white/48">
+          Reorder the reading flow, adjust reveal timing, then save the complete biography once.
+        </p>
       </div>
 
       <form action={saveBioParagraphs}>
@@ -2007,7 +2101,7 @@ function BioParagraphsEditor({
           </div>
         </fieldset>
       </form>
-    </section>
+    </div>
   );
 }
 
@@ -2021,9 +2115,15 @@ function SocialLinksSection({
   portfolioType: PortfolioType;
 }) {
   return (
-    <section className={sectionClass} id="socials">
-      <SectionHeader count={items.length} kicker="Public presence" title="Footer Links" />
-      <div className="mb-5 grid gap-3 rounded-[22px] border border-white/10 bg-gradient-to-br from-white/[0.075] to-transparent p-4 sm:grid-cols-[auto_1fr] sm:items-center sm:p-5">
+    <AdminDisclosure
+      badge={<span className="text-xs text-white/42">{items.length} links</span>}
+      defaultOpen
+      description="Social destinations shared by the public footer and navigation."
+      eyebrow="Public presence"
+      id="socials"
+      title="Footer links"
+    >
+      <div className="mb-4 grid gap-3 rounded-[18px] border border-white/10 bg-gradient-to-br from-white/[0.075] to-transparent p-4 sm:grid-cols-[auto_1fr] sm:items-center">
         <div className="flex -space-x-2">
           {(portfolioType === "actor"
             ? ["vimeo", "youtube", "imdb", "instagram"]
@@ -2046,7 +2146,7 @@ function SocialLinksSection({
           </p>
         </div>
       </div>
-      <div className="grid gap-4">
+      <div className="grid gap-3">
         {items.map((item) => (
           <SocialLinkForm
             disabled={disabled}
@@ -2070,7 +2170,7 @@ function SocialLinksSection({
           portfolioType={portfolioType}
         />
       </div>
-    </section>
+    </AdminDisclosure>
   );
 }
 
@@ -2116,39 +2216,30 @@ function SocialLinkForm({
   }
 
   return (
-    <div className={itemClass}>
+    <AdminDisclosure
+      badge={
+        <span className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${item.isPublished || mode === "new" ? "border-emerald-300/15 text-emerald-100/65" : "border-white/10 text-white/35"}`}>
+          {item.isPublished || mode === "new" ? "Visible" : "Hidden"}
+        </span>
+      }
+      description={`${platformDefinition.label} · automatic logo`}
+      icon={
+        <SocialPlatformIcon
+          className="grid h-8 w-8 place-items-center rounded-lg bg-white text-sm text-black"
+          href={item.href}
+          label={label}
+          platform={platform}
+        />
+      }
+      id={mode === "new" ? "social-link-new" : `social-link-${item.id}`}
+      title={mode === "new" ? "+ Add footer link" : label}
+      variant="item"
+    >
       <form action={saveSocialLink}>
         <fieldset disabled={disabled}>
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <SocialPlatformIcon
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/12 bg-white text-lg text-black"
-                href={item.href}
-                label={label}
-                platform={platform}
-              />
-              <div className="min-w-0">
-                <h3 className="truncate text-lg font-semibold text-white">
-                  {mode === "new" ? "Add footer link" : label}
-                </h3>
-                <p className="mt-0.5 text-xs text-white/38">
-                  {platformDefinition.label} · automatic logo
-                </p>
-              </div>
-            </div>
-            <span
-              className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                item.isPublished || mode === "new"
-                  ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200"
-                  : "border-white/10 bg-white/5 text-white/38"
-              }`}
-            >
-              {item.isPublished || mode === "new" ? "Visible" : "Hidden"}
-            </span>
-            {mode === "edit" ? (
-              <input name="id" type="hidden" value={item.id} />
-            ) : null}
-          </div>
+          {mode === "edit" ? (
+            <input name="id" type="hidden" value={item.id} />
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Platform">
               <select
@@ -2201,7 +2292,7 @@ function SocialLinkForm({
       {mode === "edit" ? (
         <DeleteForm action={deleteSocialLink} disabled={disabled} id={item.id} />
       ) : null}
-    </div>
+    </AdminDisclosure>
   );
 }
 
@@ -2215,9 +2306,14 @@ function MusicLinksSection({
   disabled: boolean;
 }) {
   return (
-    <section className={sectionClass} id="music-links">
-      <SectionHeader count={items.length} kicker="Music" title="Platform Links" />
-      <div className="grid gap-4">
+    <AdminDisclosure
+      badge={<span className="text-xs text-white/42">{items.length} links</span>}
+      description="Streaming destinations and release cards."
+      eyebrow="03 · Destinations"
+      id="music-platforms"
+      title="Platform links"
+    >
+      <div className="grid gap-3">
         {items.map((item) => (
           <MusicPlatformForm assets={assets} disabled={disabled} item={item} key={item.id} />
         ))}
@@ -2237,7 +2333,7 @@ function MusicLinksSection({
           mode="new"
         />
       </div>
-    </section>
+    </AdminDisclosure>
   );
 }
 
@@ -2253,17 +2349,18 @@ function MusicPlatformForm({
   mode?: "edit" | "new";
 }) {
   return (
-    <div className={itemClass}>
+    <AdminDisclosure
+      badge={<span className="text-[10px] text-white/40">{item.isPublished || mode === "new" ? "Published" : "Hidden"}</span>}
+      description={mode === "new" ? "Create a new streaming or release destination." : item.label || item.href}
+      id={mode === "new" ? "music-platform-new" : `music-platform-${item.id}`}
+      title={mode === "new" ? "+ Add music link" : item.title}
+      variant="item"
+    >
       <form action={saveMusicPlatformLink}>
         <fieldset disabled={disabled}>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold text-white">
-              {mode === "new" ? "New music link" : item.title}
-            </h3>
-            {mode === "edit" ? (
-              <input name="id" type="hidden" value={item.id} />
-            ) : null}
-          </div>
+          {mode === "edit" ? (
+            <input name="id" type="hidden" value={item.id} />
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             {mode === "new" ? (
               <Field label="ID">
@@ -2307,7 +2404,7 @@ function MusicPlatformForm({
           id={item.id}
         />
       ) : null}
-    </div>
+    </AdminDisclosure>
   );
 }
 
@@ -2319,9 +2416,14 @@ function TracksSection({
   disabled: boolean;
 }) {
   return (
-    <section className={sectionClass} id="tracks">
-      <SectionHeader count={items.length} kicker="Music" title="SoundCloud Tracks" />
-      <div className="grid gap-4">
+    <AdminDisclosure
+      badge={<span className="text-xs text-white/42">{items.length} tracks</span>}
+      description="SoundCloud embeds and their public order."
+      eyebrow="04 · Listening"
+      id="tracks"
+      title="SoundCloud tracks"
+    >
+      <div className="grid gap-3">
         {items.map((item) => (
           <TrackForm disabled={disabled} item={item} key={item.id} />
         ))}
@@ -2337,7 +2439,7 @@ function TracksSection({
           mode="new"
         />
       </div>
-    </section>
+    </AdminDisclosure>
   );
 }
 
@@ -2351,17 +2453,18 @@ function TrackForm({
   mode?: "edit" | "new";
 }) {
   return (
-    <div className={itemClass}>
+    <AdminDisclosure
+      badge={<span className="text-[10px] text-white/40">{item.isPublished || mode === "new" ? "Published" : "Hidden"}</span>}
+      description={mode === "new" ? "Add another SoundCloud embed." : item.embedUrl}
+      id={mode === "new" ? "track-new" : `track-${item.id}`}
+      title={mode === "new" ? "+ Add track" : item.title || item.id}
+      variant="item"
+    >
       <form action={saveSoundcloudTrack}>
         <fieldset disabled={disabled}>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold text-white">
-              {mode === "new" ? "New track" : item.id}
-            </h3>
-            {mode === "edit" ? (
-              <input name="id" type="hidden" value={item.id} />
-            ) : null}
-          </div>
+          {mode === "edit" ? (
+            <input name="id" type="hidden" value={item.id} />
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             {mode === "new" ? (
               <Field label="ID">
@@ -2391,7 +2494,7 @@ function TrackForm({
           id={item.id}
         />
       ) : null}
-    </div>
+    </AdminDisclosure>
   );
 }
 
@@ -2672,14 +2775,20 @@ export default function ContentEditor({
     "home-interlude": "home",
     "home-freelancer-life": "home",
     "bio-hero": "bio",
+    "bio-intro": "bio",
     "actor-resume": "bio",
     "actor-credits": "bio",
     "bio-gallery": "bio",
     "bio-paragraphs": "bio",
+    "bio-paragraphs-panel": "bio",
     "music-links-hero": "music-links",
     "music-settings": "music-links",
+    "music-platforms": "music-links",
     "booking-hero": "booking",
     "contact-settings": "booking",
+    "settings-identity": "settings",
+    "settings-typography": "settings",
+    "settings-footer-effect": "settings",
     updates: "home",
     tracks: "music-links",
   };
@@ -2768,7 +2877,19 @@ export default function ContentEditor({
       />
 
       <div className="grid items-start gap-4 xl:grid-cols-[250px_minmax(0,1fr)]">
-        <aside className="rounded-[22px] border border-white/9 bg-[#0d0d0f]/88 p-3 shadow-[0_18px_65px_rgba(0,0,0,0.24)] xl:sticky xl:top-4">
+        <aside className="xl:sticky xl:top-4">
+          <AdminDisclosure
+            badge={
+              <span className="rounded-full border border-white/10 px-2 py-1 text-[9px] uppercase tracking-[0.1em] text-white/40">
+                Change
+              </span>
+            }
+            description="Open the portfolio map to switch pages or global settings."
+            eyebrow="Portfolio map"
+            id="portfolio-map"
+            title={`Editing: ${activeSection?.label || "Home"}`}
+            variant="advanced"
+          >
           <div className="px-2 pb-2 pt-1">
             <p className={labelClass}>Portfolio map</p>
             <h2 className="heading-ui mt-2 text-lg font-semibold text-white">
@@ -2886,6 +3007,7 @@ export default function ContentEditor({
               );
             })}
           </div>
+          </AdminDisclosure>
         </aside>
 
         <div className="min-w-0">

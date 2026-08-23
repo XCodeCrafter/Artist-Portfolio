@@ -138,15 +138,21 @@ const safeImageSrc = z
     message: "Choose a local image or one uploaded to this site's media library.",
   });
 
-const brandSettingsSchema = z.object({
+const brandIdentitySchema = z.object({
   portfolioType: z.enum(PORTFOLIO_TYPES as [PortfolioType, ...PortfolioType[]]),
-  footerEffect: z.enum(FOOTER_EFFECTS),
   artistName: shortText.min(1),
+  tagline: shortText,
+  description: mediumText,
+});
+
+const typographySettingsSchema = z.object({
   displayFont: z.enum(DISPLAY_FONT_KEYS),
   bodyFont: z.enum(BODY_FONT_KEYS),
   uiFont: z.enum(UI_FONT_KEYS),
-  tagline: shortText,
-  description: mediumText,
+});
+
+const footerEffectSettingsSchema = z.object({
+  footerEffect: z.enum(FOOTER_EFFECTS),
 });
 
 const contactSettingsSchema = z.object({
@@ -453,15 +459,11 @@ async function assertMutation(
   }
 }
 
-export async function updateBrandSettings(formData: FormData) {
+export async function updateBrandIdentitySettings(formData: FormData) {
   const section = "settings";
-  const parsed = brandSettingsSchema.safeParse({
+  const parsed = brandIdentitySchema.safeParse({
     portfolioType: formValue(formData, "portfolioType"),
-    footerEffect: formValue(formData, "footerEffect"),
     artistName: formValue(formData, "artistName"),
-    displayFont: formValue(formData, "displayFont"),
-    bodyFont: formValue(formData, "bodyFont"),
-    uiFont: formValue(formData, "uiFont"),
     tagline: formValue(formData, "tagline"),
     description: formValue(formData, "description"),
   });
@@ -473,24 +475,12 @@ export async function updateBrandSettings(formData: FormData) {
     {
       id: "main",
       portfolio_type: parsed.data.portfolioType,
-      footer_effect: parsed.data.footerEffect,
       artist_name: parsed.data.artistName,
-      display_font: parsed.data.displayFont,
-      body_font: parsed.data.bodyFont,
-      ui_font: parsed.data.uiFont,
       tagline: parsed.data.tagline,
       description: parsed.data.description,
     },
     { onConflict: "id" }
   );
-
-  if (isMissingTypographySchema(result.error)) {
-    redirectToStatus("typography-migration-required", section);
-  }
-
-  if (isMissingFooterEffectSchema(result.error)) {
-    redirectToStatus("footer-effect-migration-required", section);
-  }
 
   await assertMutation(result, section);
   await writeAuditLog({
@@ -498,11 +488,87 @@ export async function updateBrandSettings(formData: FormData) {
     action: "content_update",
     tableName: "site_settings",
     recordId: "main",
-    metadata: { section: "settings", settingsGroup: "brand" },
+    metadata: { section: "settings", settingsGroup: "identity" },
   });
 
   revalidatePortfolio();
   redirectToStatus("saved-brand-settings", section);
+}
+
+export async function updateTypographySettings(formData: FormData) {
+  const section = "settings";
+  const parsed = typographySettingsSchema.safeParse({
+    displayFont: formValue(formData, "displayFont"),
+    bodyFont: formValue(formData, "bodyFont"),
+    uiFont: formValue(formData, "uiFont"),
+  });
+
+  if (!parsed.success) redirectToStatus("invalid-brand-settings", section);
+
+  const { admin, supabase } = await getWriteContext(section);
+  const result = await supabase
+    .from("site_settings")
+    .update({
+      display_font: parsed.data.displayFont,
+      body_font: parsed.data.bodyFont,
+      ui_font: parsed.data.uiFont,
+    })
+    .eq("id", "main")
+    .select("id")
+    .maybeSingle();
+
+  if (isMissingTypographySchema(result.error)) {
+    redirectToStatus("typography-migration-required", section);
+  }
+
+  await assertMutation(result, section);
+  if (!result.data) redirectToStatus("settings-required", section);
+
+  await writeAuditLog({
+    actorId: admin.id,
+    action: "content_update",
+    tableName: "site_settings",
+    recordId: "main",
+    metadata: { section: "settings", settingsGroup: "typography" },
+  });
+
+  revalidatePortfolio();
+  redirectToStatus("saved-typography-settings", section);
+}
+
+export async function updateFooterEffectSettings(formData: FormData) {
+  const section = "settings";
+  const parsed = footerEffectSettingsSchema.safeParse({
+    footerEffect: formValue(formData, "footerEffect"),
+  });
+
+  if (!parsed.success) redirectToStatus("invalid-brand-settings", section);
+
+  const { admin, supabase } = await getWriteContext(section);
+  const result = await supabase
+    .from("site_settings")
+    .update({ footer_effect: parsed.data.footerEffect })
+    .eq("id", "main")
+    .select("id")
+    .maybeSingle();
+
+  if (isMissingFooterEffectSchema(result.error)) {
+    redirectToStatus("footer-effect-migration-required", section);
+  }
+
+  await assertMutation(result, section);
+  if (!result.data) redirectToStatus("settings-required", section);
+
+  await writeAuditLog({
+    actorId: admin.id,
+    action: "content_update",
+    tableName: "site_settings",
+    recordId: "main",
+    metadata: { section: "settings", settingsGroup: "footer-effect" },
+  });
+
+  revalidatePortfolio();
+  redirectToStatus("saved-footer-effect-settings", section);
 }
 
 export async function updateContactSettings(formData: FormData) {

@@ -1,6 +1,7 @@
 "use client";
 
 import ActionButton from "@/components/admin/ActionButton";
+import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 
 import { useEffect, useState, type ReactNode } from "react";
@@ -148,40 +149,62 @@ function StatusNotice({
   );
 }
 
+function SecurityCheckCard({ check }: { check: SecurityCheck }) {
+  return (
+    <div className={itemClass}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold text-white">{check.label}</h3>
+        <span
+          className={`rounded-md border px-2 py-1 text-xs ${
+            check.verification === "implemented"
+              ? "border-sky-300/20 bg-sky-400/[0.07] text-sky-100/72"
+              : check.ok
+                ? "border-emerald-300/25 bg-emerald-500/10 text-emerald-100"
+                : "border-red-300/25 bg-red-500/10 text-red-100"
+          }`}
+        >
+          {check.verification === "implemented"
+            ? "Implemented"
+            : check.ok
+              ? "Verified"
+              : "Needs attention"}
+        </span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-white/55">{check.detail}</p>
+    </div>
+  );
+}
+
 function CheckGrid({ checks }: { checks: SecurityCheck[] }) {
+  const attentionChecks = checks.filter((check) => !check.ok);
+  const passingChecks = checks.filter((check) => check.ok);
+
   return (
     <section className={sectionClass}>
       <div className="mb-5">
         <p className={labelClass}>Configuration</p>
         <h2 className="heading-ui mt-2 text-2xl text-white">Security Health</h2>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {checks.map((check) => (
-          <div className={itemClass} key={check.label}>
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-semibold text-white">{check.label}</h3>
-              <span
-                className={`rounded-md border px-2 py-1 text-xs ${
-                  check.verification === "implemented"
-                    ? "border-sky-300/20 bg-sky-400/[0.07] text-sky-100/72"
-                    : check.ok
-                    ? "border-emerald-300/25 bg-emerald-500/10 text-emerald-100"
-                    : "border-red-300/25 bg-red-500/10 text-red-100"
-                }`}
-              >
-                {check.verification === "implemented"
-                  ? "Implemented"
-                  : check.ok
-                    ? "Verified"
-                    : "Needs attention"}
-              </span>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-white/55">
-              {check.detail}
-            </p>
-          </div>
-        ))}
-      </div>
+      {attentionChecks.length ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {attentionChecks.map((check) => (
+            <SecurityCheckCard check={check} key={check.label} />
+          ))}
+        </div>
+      ) : null}
+      <AdminDisclosure
+        className={attentionChecks.length ? "mt-4" : ""}
+        description="Verified and implemented controls are grouped here to keep the health view calm."
+        id="passing-security-checks"
+        title={`${passingChecks.length} checks passing`}
+        variant="advanced"
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          {passingChecks.map((check) => (
+            <SecurityCheckCard check={check} key={check.label} />
+          ))}
+        </div>
+      </AdminDisclosure>
     </section>
   );
 }
@@ -456,31 +479,21 @@ function AdminProfileForm({
   const disabled = !canManageAdmins;
 
   return (
-    <div className={itemClass}>
+    <AdminDisclosure
+      badge={
+        profile ? (
+          <span className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.1em] ${profile.isActive ? "border-emerald-300/15 text-emerald-100/65" : "border-white/10 text-white/35"}`}>
+            {profile.isActive ? "Active" : "Inactive"}
+          </span>
+        ) : null
+      }
+      description={mode === "new" ? "Grant access to another Supabase user." : `${profile?.role}${isCurrentAdmin ? " · Current session" : ""}`}
+      id={mode === "new" ? "admin-profile-new" : `admin-profile-${profile?.userId}`}
+      title={mode === "new" ? "+ Add admin" : profile?.email || "Admin profile"}
+      variant="item"
+    >
       <form action={saveAdminProfile}>
         <fieldset disabled={disabled}>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h3 className="font-semibold text-white">
-                {mode === "new" ? "New admin profile" : profile?.email}
-              </h3>
-              {isCurrentAdmin ? (
-                <p className="mt-1 text-xs text-white/45">Current session</p>
-              ) : null}
-            </div>
-            {profile ? (
-              <span
-                className={`rounded-md border px-2 py-1 text-xs ${
-                  profile.isActive
-                    ? "border-emerald-300/25 bg-emerald-500/10 text-emerald-100"
-                    : "border-white/10 bg-white/5 text-white/45"
-                }`}
-              >
-                {profile.isActive ? "Active" : "Inactive"}
-              </span>
-            ) : null}
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Supabase user ID" wide>
               <TextInput
@@ -572,7 +585,7 @@ function AdminProfileForm({
           </form>
         </div>
       ) : null}
-    </div>
+    </AdminDisclosure>
   );
 }
 

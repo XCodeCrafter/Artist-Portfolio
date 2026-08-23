@@ -280,10 +280,12 @@ export default function AdminShell({
 
             <div className="mt-4 flex-1 overflow-y-auto pr-0.5">
               <AdminNav active={active} />
-              <PublicPageNav
-                hiddenNavPageSlugs={hiddenNavPageSlugs}
-                portfolioType={portfolioType}
-              />
+              {active !== "content" ? (
+                <PublicPageNav
+                  hiddenNavPageSlugs={hiddenNavPageSlugs}
+                  portfolioType={portfolioType}
+                />
+              ) : null}
             </div>
 
             <div className="mt-3 grid gap-2">
@@ -324,10 +326,12 @@ export default function AdminShell({
             </summary>
             <div className="mt-3 border-t border-white/8 pt-3">
               <AdminNav active={active} />
-              <PublicPageNav
-                hiddenNavPageSlugs={hiddenNavPageSlugs}
-                portfolioType={portfolioType}
-              />
+              {active !== "content" ? (
+                <PublicPageNav
+                  hiddenNavPageSlugs={hiddenNavPageSlugs}
+                  portfolioType={portfolioType}
+                />
+              ) : null}
               <div className="mt-3">
                 <AccountMenu
                   adminEmail={adminEmail}

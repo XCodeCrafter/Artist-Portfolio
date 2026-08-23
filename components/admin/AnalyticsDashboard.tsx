@@ -10,6 +10,7 @@ import {
   FaMousePointer,
 } from "react-icons/fa";
 import ActionButton from "@/components/admin/ActionButton";
+import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import { deleteInquiry, updateInquiry } from "@/app/admin/analytics/actions";
 import type { AnalyticsSummary } from "@/lib/admin/analytics";
@@ -41,8 +42,6 @@ const statusCopy: Record<string, string> = {
 
 const sectionClass =
   "scroll-mt-28 rounded-[22px] border border-white/9 bg-[#0f0f11]/92 p-4 shadow-[0_18px_65px_rgba(0,0,0,0.24)] sm:p-5";
-const itemClass =
-  "rounded-[18px] border border-white/9 bg-black/24 p-4 transition hover:border-white/15";
 const labelClass =
   "text-[11px] font-semibold uppercase tracking-[0.16em] text-white/46";
 const inputClass =
@@ -519,9 +518,11 @@ function InquiryStatusBadge({ status }: { status: InquiryStatus }) {
 }
 
 function InquiryCard({
+  defaultOpen,
   inquiry,
   disabled,
 }: {
+  defaultOpen?: boolean;
   inquiry: BookingInquiry;
   disabled: boolean;
 }) {
@@ -531,17 +532,17 @@ function InquiryCard({
       : "Booking";
 
   return (
-    <article className={itemClass}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-base font-semibold text-white">
-              {inquiry.name}
-            </h3>
-            <InquiryStatusBadge status={inquiry.status} />
-          </div>
+    <AdminDisclosure
+      badge={<InquiryStatusBadge status={inquiry.status} />}
+      defaultOpen={defaultOpen}
+      description={`${inquiry.email} · ${typeLabel} · ${formatDate(inquiry.createdAt)}`}
+      id={`inquiry-${inquiry.id}`}
+      title={inquiry.name}
+      variant="item"
+    >
+      <article>
           <a
-            className="mt-1 block truncate text-sm text-white/52 underline-offset-4 hover:text-white hover:underline"
+            className="block truncate text-sm text-white/52 underline-offset-4 hover:text-white hover:underline"
             href={`mailto:${inquiry.email}`}
           >
             {inquiry.email}
@@ -551,12 +552,6 @@ function InquiryCard({
             <span>·</span>
             <span>{typeLabel}</span>
           </div>
-        </div>
-        <span className="text-[10px] text-white/28">
-          {formatDate(inquiry.createdAt)}
-        </span>
-      </div>
-
       <p className="mt-4 whitespace-pre-wrap rounded-xl border border-white/8 bg-black/24 p-4 text-sm leading-6 text-white/68">
         {inquiry.message}
       </p>
@@ -621,7 +616,8 @@ function InquiryCard({
           Delete inquiry
         </ActionButton>
       </form>
-    </article>
+      </article>
+    </AdminDisclosure>
   );
 }
 
@@ -661,8 +657,9 @@ function InquiriesSection({
 
       <div className="mt-5 grid gap-3">
         {inquiries.length ? (
-          inquiries.map((inquiry) => (
+          inquiries.map((inquiry, index) => (
             <InquiryCard
+              defaultOpen={index === 0 && inquiry.status === "new"}
               disabled={disabled}
               inquiry={inquiry}
               key={inquiry.id}
