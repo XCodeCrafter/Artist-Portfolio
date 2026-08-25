@@ -658,56 +658,89 @@ export async function deleteMediaAsset(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-metadata", "library");
 
   const { admin, supabase } = await getWriteContext();
-  const { data: asset, error: readError } = await supabase
-    .from("media_assets")
-    .select("id, storage_bucket, storage_path")
-    .eq("id", parsed.data)
-    .limit(1)
-    .maybeSingle<{
-      id: string;
-      storage_bucket: string | null;
-      storage_path: string | null;
-    }>();
-
-  if (readError) {
-    console.error(readError);
-    redirectToStatus("delete-error", "library");
-  }
-
-  if (asset?.storage_bucket && asset.storage_path) {
-    const removeResult = await supabase.storage
-      .from(asset.storage_bucket)
-      .remove([asset.storage_path]);
-
-    if (removeResult.error) {
-      console.error(removeResult.error);
-      redirectToStatus("delete-error", "library");
-    }
-  }
-
-  const deleteResult = await supabase
-    .from("media_assets")
-    .delete()
-    .eq("id", parsed.data);
+  const deleteResult = await supabase.rpc("trash_media_asset", {
+    p_asset_id: parsed.data,
+    p_actor_id: admin.id,
+  });
 
   if (deleteResult.error) {
     console.error(deleteResult.error);
+    if (deleteResult.error.message.includes("trash_media_asset")) {
+      redirectToStatus("trash-migration-required", "library");
+    }
     redirectToStatus("delete-error", "library");
+  }
+
+  const outcome = (deleteResult.data as Array<{
+    outcome: "already_trashed" | "in_use" | "missing" | "trashed";
+    reference_total: number | string;
+    storage_bucket: string;
+    storage_path: string;
+  }> | null)?.[0];
+
+  if (!outcome || outcome.outcome === "missing") {
+    redirectToStatus("delete-error", "library");
+  }
+  if (outcome.outcome === "in_use") {
+    redirectToStatus("media-in-use", "library");
+  }
+  if (outcome.outcome === "already_trashed") {
+    redirectToStatus("deleted", "library");
   }
 
   await writeAuditLog({
     actorId: admin.id,
-    action: "media_delete",
+    action: "media_trash",
     tableName: "media_assets",
     recordId: parsed.data,
     metadata: {
-      storageBucket: asset?.storage_bucket,
-      storagePath: asset?.storage_path,
+      storageBucket: outcome.storage_bucket,
+      storagePath: outcome.storage_path,
     },
   });
 
   revalidateMediaSurfaces();
   redirectToStatus("deleted", "library");
+}
+
+export async function restoreMediaAsset(formData: FormData) {
+  const parsed = idValue.safeParse(formValue(formData, "id"));
+  if (!parsed.success) redirectToStatus("invalid-metadata", "library");
+
+  const { admin, supabase } = await getWriteContext();
+  const restoreResult = await supabase
+    .from("media_assets")
+    .update({
+      deleted_at: null,
+      deleted_by: null,
+    })
+    .eq("id", parsed.data)
+    .not("deleted_at", "is", null)
+    .select("id")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
+  if (restoreResult.error) {
+    console.error(restoreResult.error);
+    if (restoreResult.error.message.includes("deleted_at")) {
+      redirectToStatus("trash-migration-required", "library");
+    }
+    redirectToStatus("restore-error", "library");
+  }
+
+  if (!restoreResult.data) {
+    redirectToStatus("restore-error", "library");
+  }
+
+  await writeAuditLog({
+    actorId: admin.id,
+    action: "media_restore",
+    tableName: "media_assets",
+    recordId: parsed.data,
+  });
+
+  revalidateMediaSurfaces();
+  redirectToStatus("restored", "library");
 }
 
 export async function saveMediaGalleryImage(formData: FormData) {

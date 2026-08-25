@@ -4,12 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
+  type KeyboardEvent,
   type ReactNode,
 } from "react";
 import {
@@ -20,13 +22,13 @@ import {
   FaEyeSlash,
   FaExclamationTriangle,
   FaImage,
-  FaImages,
   FaLayerGroup,
   FaPhotoVideo,
   FaPlus,
   FaSearch,
   FaSpinner,
   FaTrash,
+  FaUndo,
   FaUpload,
   FaVideo,
   FaExternalLinkAlt,
@@ -43,6 +45,7 @@ import {
   finalizeMediaUpload,
   moveGalleryImage,
   prepareMediaUpload,
+  restoreMediaAsset,
   saveGalleryHero,
   saveGalleryPresentation,
   saveShowreelHero,
@@ -72,7 +75,17 @@ type MediaManagerProps = {
   initialMode?: MediaMode;
 };
 
-type MediaFilter = "all" | "image" | "video" | "published" | "hidden";
+type MediaFilter =
+  | "all"
+  | "image"
+  | "video"
+  | "published"
+  | "hidden"
+  | "unused"
+  | "missing_alt"
+  | "oversized"
+  | "recent"
+  | "trash";
 export type MediaMode = "studio" | "showreel" | "library";
 type MediaSort = "order" | "newest" | "label" | "largest";
 
@@ -93,8 +106,14 @@ const ACCEPTED_MEDIA_TYPES = new Set([
 
 const statusCopy: Record<string, string> = {
   "bucket-error": "Storage bucket could not be prepared.",
-  deleted: "Media deleted.",
+  deleted: "Media moved to Trash. Its storage file is still recoverable.",
   "delete-error": "Delete failed.",
+  "media-in-use":
+    "This asset is still used on the public portfolio. Remove or replace it in the listed sections before moving it to Trash.",
+  "trash-migration-required":
+    "Media Trash needs Supabase migration 0023_admin_operations_hardening.sql.",
+  restored: "Media restored from Trash.",
+  "restore-error": "Media could not be restored.",
   "delete-gallery-error": "Gallery image could not be deleted.",
   "deleted-gallery-image": "Gallery image deleted.",
   "file-too-large": "File is too large.",
@@ -185,6 +204,11 @@ const filterOptions: Array<{
   { key: "video", label: "Videos", icon: <FaVideo /> },
   { key: "published", label: "Active", icon: <FaEye /> },
   { key: "hidden", label: "Hidden", icon: <FaEyeSlash /> },
+  { key: "unused", label: "Unused", icon: <FaLayerGroup /> },
+  { key: "missing_alt", label: "Missing alt", icon: <FaExclamationTriangle /> },
+  { key: "oversized", label: "Oversized", icon: <FaPhotoVideo /> },
+  { key: "recent", label: "Recent", icon: <FaCheckCircle /> },
+  { key: "trash", label: "Trash", icon: <FaTrash /> },
 ];
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -208,7 +232,8 @@ function formatBytes(bytes: number) {
     unitIndex += 1;
   }
 
-  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${
+  const precision = Number.isInteger(value) || value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(precision)} ${
     units[unitIndex]
   }`;
 }
@@ -435,9 +460,11 @@ function ImagePreview({
 
 function UploadPanel({
   disabled,
+  onSaved,
   sortOrder,
 }: {
   disabled: boolean;
+  onSaved: (form: HTMLFormElement) => void;
   sortOrder: number;
 }) {
   const router = useRouter();
@@ -689,6 +716,7 @@ function UploadPanel({
       kind: "success",
       message: `${completedCount} ${completedCount === 1 ? "file" : "files"} uploaded successfully.`,
     });
+    onSaved(form);
   }
 
   return (
@@ -798,6 +826,7 @@ function UploadPanel({
                     <button
                       aria-label={`Remove ${item.file.name}`}
                       className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/45 transition hover:border-red-300/25 hover:bg-red-500/10 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      data-editor-dirty-action
                       disabled={pending}
                       onClick={() => removeUploadItem(item.key)}
                       type="button"
@@ -880,25 +909,25 @@ function StatCard({
 
 function MediaOverview({
   assets,
-  galleryImages,
 }: {
   assets: MediaAsset[];
-  galleryImages: EditableGalleryImage[];
 }) {
-  const imageCount = assets.filter((asset) => asset.mediaType === "image").length;
-  const videoCount = assets.filter((asset) => asset.mediaType === "video").length;
+  const availableAssets = assets.filter((asset) => !asset.deletedAt);
+  const imageCount = availableAssets.filter((asset) => asset.mediaType === "image").length;
+  const videoCount = availableAssets.filter((asset) => asset.mediaType === "video").length;
+  const missingAltCount = availableAssets.filter(
+    (asset) => asset.mediaType === "image" && !asset.alt.trim()
+  ).length;
+  const trashCount = assets.length - availableAssets.length;
   const totalSize = assets.reduce((sum, asset) => sum + asset.fileSize, 0);
 
   return (
-    <section className="grid gap-3 grid-cols-2 xl:grid-cols-5">
-      <StatCard icon={<FaPhotoVideo />} label="Assets" value={assets.length} />
+    <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
+      <StatCard icon={<FaPhotoVideo />} label="Available" value={availableAssets.length} />
       <StatCard icon={<FaImage />} label="Images" value={imageCount} />
       <StatCard icon={<FaVideo />} label="Videos" value={videoCount} />
-      <StatCard
-        icon={<FaImages />}
-        label="Gallery"
-        value={galleryImages.length}
-      />
+      <StatCard icon={<FaExclamationTriangle />} label="Missing alt" value={missingAltCount} />
+      <StatCard icon={<FaTrash />} label="Trash" value={trashCount} />
       <StatCard icon={<FaLayerGroup />} label="Storage" value={formatBytes(totalSize)} />
     </section>
   );
@@ -912,7 +941,7 @@ function ModeTabs({
 }: {
   hasUnsavedChanges: boolean;
   mode: MediaMode;
-  onChange: (mode: MediaMode) => void;
+  onChange: (mode: MediaMode) => boolean;
   portfolioType: PortfolioType;
 }) {
   const items: Array<{ key: MediaMode; label: string; detail: string }> = [
@@ -955,25 +984,63 @@ function ModeTabs({
       ) : null}
       <nav
         aria-label="Media workspaces"
-        className="grid gap-1 sm:grid-cols-3"
+        className="admin-scrollbar-none flex gap-1 overflow-x-auto"
+        role="tablist"
       >
-      {items.map((item) => {
+      {items.map((item, index) => {
         const active = item.key === mode;
 
         return (
           <button
-            aria-pressed={active}
+            aria-controls={`media-${item.key}-panel`}
+            aria-selected={active}
             className={cx(
-              "min-h-14 rounded-xl border px-3 py-2.5 text-left transition",
+              "min-h-14 min-w-[170px] flex-1 rounded-xl border px-3 py-2.5 text-left transition",
               active
                 ? "border-white/14 bg-white/[0.09] text-white"
                 : "border-transparent text-white/50 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"
             )}
+            id={`media-${item.key}-tab`}
             key={item.key}
-            onClick={() => onChange(item.key)}
+            data-media-mode={item.key}
+            onKeyDown={(event) => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+                return;
+              }
+              const tabs = Array.from(
+                event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                  '[role="tab"]'
+                ) || []
+              );
+              const currentIndex = tabs.indexOf(event.currentTarget);
+              const nextIndex =
+                event.key === "Home"
+                  ? 0
+                  : event.key === "End"
+                    ? tabs.length - 1
+                    : event.key === "ArrowRight"
+                      ? (currentIndex + 1) % tabs.length
+                      : (currentIndex - 1 + tabs.length) % tabs.length;
+              const nextTab = tabs[nextIndex];
+              const nextMode = nextTab?.dataset.mediaMode as MediaMode | undefined;
+              if (!nextTab || !nextMode) return;
+              event.preventDefault();
+              if (onChange(nextMode)) nextTab.focus();
+            }}
+            onClick={() => {
+              if (onChange(item.key)) return;
+              window.requestAnimationFrame(() => {
+                document.getElementById(`media-${mode}-tab`)?.focus();
+              });
+            }}
+            role="tab"
+            tabIndex={active ? 0 : -1}
             type="button"
           >
-            <span className="block text-xs font-semibold">{item.label}</span>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-white/38">
+              {String(index).padStart(2, "0")}
+            </span>
+            <span className="mt-1 block text-xs font-semibold">{item.label}</span>
             <span className="mt-1 block truncate text-[10px] text-white/32">
               {item.detail}
             </span>
@@ -1061,7 +1128,7 @@ function LibraryToolbar({
 function AssetBadge({ asset }: { asset: MediaAsset }) {
   return (
     <span className="rounded-2xl border border-white/10 px-3 py-1 text-sm text-white/55">
-      {asset.isPublished ? "Active" : "Hidden"}
+      {asset.deletedAt ? "Trash" : asset.isPublished ? "Active" : "Hidden"}
     </span>
   );
 }
@@ -1091,6 +1158,28 @@ function getAssetDestinations(
   if (interludeSrc === src) destinations.add("Gallery: The Interlude");
 
   if (content.aboutHome.imageSrc === src) destinations.add("Home: about");
+
+  for (const update of content.homeUpdates) {
+    if (update.avatarSrc === src) destinations.add("Home: updates");
+  }
+
+  const homePresentationSources = [
+    content.homePresentation.updatesImageSrc,
+    content.homePresentation.featureImageSrc,
+    content.homePresentation.featureVideoSrc,
+    content.homePresentation.featurePosterSrc,
+    content.homePresentation.storyImage1Src,
+    content.homePresentation.storyImage2Src,
+    content.homePresentation.storyImage3Src,
+    content.homePresentation.storyImage4Src,
+  ];
+  if (homePresentationSources.includes(src)) {
+    destinations.add("Home: presentation");
+  }
+
+  for (const platform of content.musicPlatforms) {
+    if (platform.imageSrc === src) destinations.add(`Music: ${platform.title}`);
+  }
 
   for (const image of content.bio.galleryImages) {
     if (image.src === src) destinations.add("Bio gallery");
@@ -1231,6 +1320,27 @@ function AssetCard({
         title="Edit details & placement"
         variant="advanced"
       >
+      {asset.deletedAt ? (
+        <div className="flex flex-col gap-4 rounded-2xl border border-amber-300/15 bg-amber-300/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-50">Stored safely in Trash</p>
+            <p className="mt-1 text-xs leading-5 text-white/45">
+              The storage object is intact. Restore it to make the asset available in editors again.
+            </p>
+          </div>
+          <form action={restoreMediaAsset}>
+            <input name="id" type="hidden" value={asset.id} />
+            <ActionButton
+              className={secondaryButtonClass}
+              disabled={disabled}
+              pendingLabel="Restoring..."
+            >
+              <FaUndo /> Restore
+            </ActionButton>
+          </form>
+        </div>
+      ) : (
+      <>
       <form action={updateMediaAsset}>
         <fieldset disabled={disabled}>
           <input name="id" type="hidden" value={asset.id} />
@@ -1274,7 +1384,7 @@ function AssetCard({
         <form
           action={deleteMediaAsset}
           onSubmit={(event) => {
-            if (!window.confirm(`Delete "${asset.label}" from storage?`)) {
+            if (!window.confirm(`Move "${asset.label}" to Trash?`)) {
               event.preventDefault();
             }
           }}
@@ -1282,14 +1392,16 @@ function AssetCard({
           <input name="id" type="hidden" value={asset.id} />
           <ActionButton
             className={dangerButtonClass}
-            disabled={disabled}
-            pendingLabel="Deleting..."
+            disabled={disabled || usage.length > 0}
+            pendingLabel="Moving..."
           >
             <FaTrash />
-            Delete
+            {usage.length ? "Remove usage first" : "Move to Trash"}
           </ActionButton>
         </form>
       </div>
+      </>
+      )}
       </AdminDisclosure>
     </article>
   );
@@ -1730,6 +1842,7 @@ function ShowreelVideoEditor({
                       ? "border-white bg-white text-black"
                       : "border-white/10 text-white/60 hover:border-white/30 hover:text-white"
                   )}
+                  data-editor-dirty-action
                   key={value}
                   onClick={() => setSourceMode(value)}
                   type="button"
@@ -1791,11 +1904,13 @@ function ShowreelVideoEditor({
 
 function ShowreelStudio({
   assets,
+  confirmDiscard,
   content,
   disabled,
   portfolioType,
 }: {
   assets: MediaAsset[];
+  confirmDiscard: () => boolean;
   content: EditablePortfolioContent;
   disabled: boolean;
   portfolioType: PortfolioType;
@@ -1803,31 +1918,118 @@ function ShowreelStudio({
   const videos = [...content.videos].sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured) || a.sortOrder - b.sortOrder);
   const copy = content.videoPresentation;
   const pageLabel = portfolioType === "actor" ? "Showreel" : "Video";
+  const [activePanel, setActivePanel] = useState<"hero" | "copy" | "videos">("hero");
+  const panels = [
+    { id: "hero" as const, label: "01 Hero", target: "showreel-hero" },
+    { id: "copy" as const, label: "02 Page text", target: "showreel-copy" },
+    { id: "videos" as const, label: `03 Videos · ${videos.length}`, target: "showreel-videos" },
+  ];
+
+  function openPanel(id: (typeof panels)[number]["id"]) {
+    if (id === activePanel) return true;
+    if (!confirmDiscard()) return false;
+    setActivePanel(id);
+    return true;
+  }
+
+  function handlePanelKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? panels.length - 1
+          : event.key === "ArrowRight"
+            ? (index + 1) % panels.length
+            : (index - 1 + panels.length) % panels.length;
+    const nextPanel = panels[nextIndex];
+    if (!openPanel(nextPanel.id)) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(`showreel-${nextPanel.id}-tab`)?.focus();
+    });
+  }
+
   return (
     <div className="grid gap-6">
       <div className="sticky top-4 z-30 flex flex-col gap-3 rounded-2xl border border-emerald-300/15 bg-[#101312]/95 p-4 shadow-2xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-        <nav aria-label={`${pageLabel} Studio sections`} className="flex flex-wrap gap-2">
-          {[["showreel-hero", "01 Hero"], ["showreel-copy", "02 Page text"], ["showreel-videos", "03 Videos"]].map(([href, label]) => (
-            <a className="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-white/65 transition hover:bg-white hover:text-black" href={`#${href}`} key={href}>{label}</a>
+        <nav aria-label={`${pageLabel} Studio sections`} className="admin-scrollbar-none flex gap-2 overflow-x-auto" role="tablist">
+          {panels.map((panel, index) => (
+            <button
+              aria-controls={panel.target}
+              aria-selected={activePanel === panel.id}
+              className={cx(
+                "shrink-0 rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                activePanel === panel.id
+                  ? "border-white bg-white text-black"
+                  : "border-white/10 text-white/60 hover:border-white/30 hover:text-white"
+              )}
+              id={`showreel-${panel.id}-tab`}
+              key={panel.id}
+              onClick={() => {
+                if (openPanel(panel.id)) return;
+                window.requestAnimationFrame(() => {
+                  document.getElementById(`showreel-${activePanel}-tab`)?.focus();
+                });
+              }}
+              onKeyDown={(event) => handlePanelKeyDown(event, index)}
+              role="tab"
+              tabIndex={activePanel === panel.id ? 0 : -1}
+              type="button"
+            >
+              {panel.label}
+            </button>
           ))}
         </nav>
         <Link className={secondaryButtonClass} href="/video" rel="noreferrer" target="_blank"><FaExternalLinkAlt /> Open public {pageLabel}</Link>
       </div>
-      <AdminDisclosure
-        defaultOpen
-        description="Opening title, action, and background media."
-        eyebrow="01 · Page opening"
-        id="showreel-hero-panel"
-        title={`${pageLabel} hero`}
-      >
-        <ShowreelHeroEditor assets={assets} content={content} disabled={disabled} portfolioType={portfolioType} />
-      </AdminDisclosure>
-      <AdminDisclosure
-        description="Section labels, supporting copy, and empty states."
-        eyebrow="02 · Page text"
-        id="showreel-copy"
-        title="Page introduction"
-      >
+      {panels
+        .filter((panel) => panel.id !== activePanel)
+        .map((panel) => (
+          <div
+            aria-labelledby={`showreel-${panel.id}-tab`}
+            hidden
+            id={panel.target}
+            key={panel.id}
+            role="tabpanel"
+          />
+        ))}
+      {activePanel === "hero" ? (
+        <div
+          aria-labelledby="showreel-hero-tab"
+          id="showreel-hero"
+          role="tabpanel"
+        >
+          <AdminDisclosure
+            collapsible={false}
+            description="Opening title, action, and background media."
+            eyebrow="01 · Page opening"
+            id="showreel-hero-panel"
+            title={`${pageLabel} hero`}
+          >
+            <ShowreelHeroEditor assets={assets} content={content} disabled={disabled} portfolioType={portfolioType} />
+          </AdminDisclosure>
+        </div>
+      ) : null}
+      {activePanel === "copy" ? (
+        <div
+          aria-labelledby="showreel-copy-tab"
+          id="showreel-copy"
+          role="tabpanel"
+        >
+        <AdminDisclosure
+          collapsible={false}
+          description="Section labels, supporting copy, and empty states."
+          eyebrow="02 · Page text"
+          id="showreel-copy-editor"
+          title="Page introduction"
+        >
         <p className={labelClass}>02 / Page introduction</p>
         <div className="mt-4 rounded-lg border border-white/10 bg-black/30 p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/45">{copy.sectionEyebrow}</p>
@@ -1849,20 +2051,31 @@ function ShowreelStudio({
             <div className="mt-5 flex justify-end"><ActionButton className={buttonClass} disabled={disabled} pendingLabel="Saving...">Save page text</ActionButton></div>
           </fieldset>
         </form>
-      </AdminDisclosure>
-      <AdminDisclosure
-        badge={<span className="text-xs text-white/42">{videos.length} items</span>}
-        description="Featured reel, scenes, and supporting clips."
-        eyebrow="03 · Video sequence"
-        id="showreel-videos"
-        title="Videos"
-      >
+        </AdminDisclosure>
+        </div>
+      ) : null}
+      {activePanel === "videos" ? (
+        <div
+          aria-labelledby="showreel-videos-tab"
+          id="showreel-videos"
+          role="tabpanel"
+        >
+        <AdminDisclosure
+          collapsible={false}
+          badge={<span className="text-xs text-white/42">{videos.length} items</span>}
+          description="Featured reel, scenes, and supporting clips."
+          eyebrow="03 · Video sequence"
+          id="showreel-videos-editor"
+          title="Videos"
+        >
         <div className="flex items-end justify-between gap-4"><div><p className={labelClass}>03 / Video sequence</p><h2 className="heading-ui mt-2 text-2xl font-semibold text-white">Featured reel, scenes, and clips</h2></div><span className="text-sm text-white/45">{videos.length} items</span></div>
         <div className="mt-6 grid gap-3">
           {videos.map((item) => <ShowreelVideoEditor assets={assets} disabled={disabled} item={item} key={item.id} portfolioType={portfolioType} />)}
           <ShowreelVideoEditor assets={assets} disabled={disabled} item={{ id: "", title: "", description: "", embedUrl: "", platform: "upload", thumbnailSrc: "", videoType: portfolioType === "actor" ? "showreel" : "music_video", isFeatured: videos.length === 0, sortOrder: nextSort(videos), isPublished: true }} mode="new" portfolioType={portfolioType} />
         </div>
-      </AdminDisclosure>
+        </AdminDisclosure>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1870,12 +2083,14 @@ function ShowreelStudio({
 function GalleryStudio({
   assetListId,
   assets,
+  confirmDiscard,
   content,
   disabled,
   portfolioType,
 }: {
   assetListId: string;
   assets: MediaAsset[];
+  confirmDiscard: () => boolean;
   content: EditablePortfolioContent;
   disabled: boolean;
   portfolioType: PortfolioType;
@@ -1883,35 +2098,125 @@ function GalleryStudio({
   const presentation = content.galleryPresentation;
   const mosaic = [...content.galleryImages].filter((item) => item.isMosaic).sort((a, b) => a.sortOrder - b.sortOrder);
   const nextOrder = nextSort(content.galleryImages);
+  const [activePanel, setActivePanel] = useState<"hero" | "mosaic">("hero");
+  const panels = [
+    { id: "hero" as const, label: "01 Hero", target: "studio-hero-panel" },
+    {
+      id: "mosaic" as const,
+      label: `02 Mosaic · ${mosaic.length}`,
+      target: "studio-mosaic",
+    },
+  ];
+
+  function openPanel(id: (typeof panels)[number]["id"]) {
+    if (id === activePanel) return true;
+    if (!confirmDiscard()) return false;
+    setActivePanel(id);
+    return true;
+  }
+
+  function handlePanelKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? panels.length - 1
+          : event.key === "ArrowRight"
+            ? (index + 1) % panels.length
+            : (index - 1 + panels.length) % panels.length;
+    const nextPanel = panels[nextIndex];
+    if (!openPanel(nextPanel.id)) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(`studio-${nextPanel.id}-tab`)?.focus();
+    });
+  }
 
   return (
     <div className="grid gap-6">
       <div className="sticky top-4 z-30 flex flex-col gap-3 rounded-2xl border border-emerald-300/15 bg-[#101312]/95 p-4 shadow-2xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-        <nav aria-label="Gallery Studio sections" className="flex flex-wrap gap-2">
-          {[['studio-hero','01 Hero'],['studio-mosaic','02 Mosaic']].map(([href,label]) => (
-            <a className="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-white/65 transition hover:bg-white hover:text-black" href={`#${href}`} key={href}>{label}</a>
+        <nav aria-label="Gallery Studio sections" className="flex gap-2" role="tablist">
+          {panels.map((panel, index) => (
+            <button
+              aria-controls={panel.target}
+              aria-selected={activePanel === panel.id}
+              className={cx(
+                "rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                activePanel === panel.id
+                  ? "border-white bg-white text-black"
+                  : "border-white/10 text-white/60 hover:border-white/30 hover:text-white"
+              )}
+              id={`studio-${panel.id}-tab`}
+              key={panel.id}
+              onClick={() => {
+                if (openPanel(panel.id)) return;
+                window.requestAnimationFrame(() => {
+                  document.getElementById(`studio-${activePanel}-tab`)?.focus();
+                });
+              }}
+              onKeyDown={(event) => handlePanelKeyDown(event, index)}
+              role="tab"
+              tabIndex={activePanel === panel.id ? 0 : -1}
+              type="button"
+            >
+              {panel.label}
+            </button>
           ))}
         </nav>
         <Link className={secondaryButtonClass} href="/gallery" rel="noreferrer" target="_blank"><FaExternalLinkAlt /> Open public Gallery</Link>
       </div>
 
-      <AdminDisclosure
-        defaultOpen
-        description="Opening title, action, and gallery background media."
-        eyebrow="01 · Page opening"
-        id="studio-hero-panel"
-        title="Gallery hero"
-      >
-        <StudioHero assets={assets} content={content} disabled={disabled} />
-      </AdminDisclosure>
+      {panels
+        .filter((panel) => panel.id !== activePanel)
+        .map((panel) => (
+          <div
+            aria-labelledby={`studio-${panel.id}-tab`}
+            hidden
+            id={panel.target}
+            key={panel.id}
+            role="tabpanel"
+          />
+        ))}
 
-      <AdminDisclosure
-        badge={<span className="text-xs text-white/42">{mosaic.length} frames</span>}
-        description="Archive introduction and the ordered public image composition."
-        eyebrow="02 · Gallery content"
-        id="studio-mosaic"
-        title="Public mosaic"
-      >
+      {activePanel === "hero" ? (
+        <div
+          aria-labelledby="studio-hero-tab"
+          id="studio-hero-panel"
+          role="tabpanel"
+        >
+          <AdminDisclosure
+            collapsible={false}
+            description="Opening title, action, and gallery background media."
+            eyebrow="01 · Page opening"
+            id="studio-hero-editor"
+            title="Gallery hero"
+          >
+            <StudioHero assets={assets} content={content} disabled={disabled} />
+          </AdminDisclosure>
+        </div>
+      ) : null}
+
+      {activePanel === "mosaic" ? (
+        <div
+          aria-labelledby="studio-mosaic-tab"
+          id="studio-mosaic"
+          role="tabpanel"
+        >
+        <AdminDisclosure
+          collapsible={false}
+          badge={<span className="text-xs text-white/42">{mosaic.length} frames</span>}
+          description="Archive introduction and the ordered public image composition."
+          eyebrow="02 · Gallery content"
+          id="studio-mosaic-editor"
+          title="Public mosaic"
+        >
         <p className={labelClass}>02 / Archive introduction</p>
         <form action={saveGalleryPresentation} className="mt-4">
           <fieldset disabled={disabled}>
@@ -1955,28 +2260,17 @@ function GalleryStudio({
             mode="new"
           />
         </div>
-      </AdminDisclosure>
+        </AdminDisclosure>
+        </div>
+      ) : null}
 
-      <section className={sectionClass}>
-        <p className={labelClass}>Home narrative sections</p>
-        <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
-          Interlude and Freelancer Life moved to Home Studio
-        </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-white/50">
-          Their headings, paragraphs, links, video, poster, and story images now
-          live with the rest of the Homepage content. Gallery Studio only edits
-          the public Gallery page.
-        </p>
-        <Link className={`${secondaryButtonClass} mt-5`} href="/admin/content#home-interlude">
-          Open Interlude & Freelancer editors
-        </Link>
-      </section>
     </div>
   );
 }
 
 function filterAssets(
   assets: MediaAsset[],
+  assetUsage: Map<string, string[]>,
   filter: MediaFilter,
   search: string,
   sort: MediaSort
@@ -1985,10 +2279,34 @@ function filterAssets(
 
   return assets
     .filter((asset) => {
+      if (filter !== "trash" && asset.deletedAt) return false;
+      if (filter === "trash" && !asset.deletedAt) return false;
       if (filter === "image" && asset.mediaType !== "image") return false;
       if (filter === "video" && asset.mediaType !== "video") return false;
       if (filter === "published" && !asset.isPublished) return false;
       if (filter === "hidden" && asset.isPublished) return false;
+      if (filter === "unused" && (assetUsage.get(asset.id)?.length || 0) > 0) {
+        return false;
+      }
+      if (
+        filter === "missing_alt" &&
+        (asset.mediaType !== "image" || asset.alt.trim())
+      ) {
+        return false;
+      }
+      if (
+        filter === "oversized" &&
+        asset.fileSize <=
+          (asset.mediaType === "video" ? 50 * 1024 * 1024 : 5 * 1024 * 1024)
+      ) {
+        return false;
+      }
+      if (
+        filter === "recent" &&
+        Date.now() - new Date(asset.createdAt).getTime() > 30 * 24 * 60 * 60 * 1000
+      ) {
+        return false;
+      }
 
       if (!needle) return true;
 
@@ -2054,9 +2372,14 @@ export default function MediaManager({
     hasUnsavedChanges,
     markDirty,
   } = useUnsavedChangesGuard();
+  const dirtyFormsRef = useRef<Set<HTMLFormElement>>(new Set());
   const previousInitialModeRef = useRef(initialMode);
   const expectedRestoredModeRef = useRef<MediaMode | null>(null);
   const assetListId = "media-asset-url-options";
+  const availableAssets = useMemo(
+    () => assets.filter((asset) => !asset.deletedAt),
+    [assets]
+  );
   const gallerySrcSet = useMemo(
     () =>
       new Set(
@@ -2078,10 +2401,52 @@ export default function MediaManager({
     [assets, content]
   );
   const filteredAssets = useMemo(
-    () => filterAssets(assets, filter, search, sort),
-    [assets, filter, search, sort]
+    () => filterAssets(assets, assetUsage, filter, search, sort),
+    [assetUsage, assets, filter, search, sort]
   );
   const nextGallerySort = nextSort(galleryImages);
+
+  const confirmAndDiscardDrafts = useCallback(() => {
+    if (!confirmDiscard()) return false;
+    dirtyFormsRef.current.clear();
+    return true;
+  }, [confirmDiscard]);
+
+  function rememberDirtyForm(target: EventTarget | null) {
+    if (!(target instanceof Element)) return;
+    const form = target.closest<HTMLFormElement>("form");
+    if (!form) return;
+
+    dirtyFormsRef.current.add(form);
+    markDirty();
+  }
+
+  function submitNavigatingForm(form: HTMLFormElement) {
+    const otherDraftForms = [...dirtyFormsRef.current].filter(
+      (dirtyForm) => dirtyForm !== form && dirtyForm.isConnected
+    );
+
+    if (
+      otherDraftForms.length > 0 &&
+      !window.confirm(
+        "You also have unsaved changes in another media form. Continuing reloads this workspace and discards those drafts. Continue?"
+      )
+    ) {
+      return false;
+    }
+
+    dirtyFormsRef.current.clear();
+    clearDirty();
+    return true;
+  }
+
+  function finishFormWithoutNavigation(form: HTMLFormElement) {
+    const remainingDraftForms = [...dirtyFormsRef.current].filter(
+      (dirtyForm) => dirtyForm !== form && dirtyForm.isConnected
+    );
+    dirtyFormsRef.current = new Set(remainingDraftForms);
+    if (remainingDraftForms.length === 0) clearDirty();
+  }
 
   useEffect(() => {
     if (initialMode === previousInitialModeRef.current) return;
@@ -2094,7 +2459,7 @@ export default function MediaManager({
 
     previousInitialModeRef.current = initialMode;
 
-    if (!confirmDiscard()) {
+    if (!confirmAndDiscardDrafts()) {
       expectedRestoredModeRef.current = mode;
       replaceMediaModeInUrl(mode);
       return;
@@ -2104,13 +2469,15 @@ export default function MediaManager({
     const nextMode = initialMode;
     const timeoutId = window.setTimeout(() => setMode(nextMode), 0);
     return () => window.clearTimeout(timeoutId);
-  }, [confirmDiscard, initialMode, mode]);
+  }, [confirmAndDiscardDrafts, initialMode, mode]);
 
   function changeMode(nextMode: MediaMode) {
-    if (nextMode === mode || !confirmDiscard()) return;
+    if (nextMode === mode) return true;
+    if (!confirmAndDiscardDrafts()) return false;
 
     setMode(nextMode);
     replaceMediaModeInUrl(nextMode);
+    return true;
   }
 
   return (
@@ -2118,7 +2485,15 @@ export default function MediaManager({
       className="grid gap-6"
       onChangeCapture={(event) => {
         const target = event.target;
-        if (target instanceof Element && target.closest("form")) markDirty();
+        if (
+          (target instanceof HTMLInputElement ||
+            target instanceof HTMLSelectElement ||
+            target instanceof HTMLTextAreaElement) &&
+          target.name &&
+          target.closest("form")
+        ) {
+          rememberDirtyForm(target);
+        }
       }}
       onClickCapture={(event) => {
         const target = event.target;
@@ -2127,13 +2502,23 @@ export default function MediaManager({
         if (
           button instanceof HTMLButtonElement &&
           button.type === "button" &&
-          button.closest("form")
+          button.closest("form") &&
+          (button.hasAttribute("data-editor-dirty-action") ||
+            (button.getAttribute("aria-label")?.startsWith("Use ") &&
+              button.getAttribute("aria-pressed") !== "true"))
         ) {
-          markDirty();
+          rememberDirtyForm(button);
         }
       }}
       onSubmit={(event) => {
-        if (!event.defaultPrevented) clearDirty();
+        if (event.defaultPrevented) return;
+        const form = event.target;
+        if (
+          form instanceof HTMLFormElement &&
+          !submitNavigatingForm(form)
+        ) {
+          event.preventDefault();
+        }
       }}
     >
       <StatusNotice
@@ -2150,33 +2535,64 @@ export default function MediaManager({
         onChange={changeMode}
         portfolioType={portfolioType}
       />
-      <MediaOverview assets={assets} galleryImages={galleryImages} />
-      <UploadPanel disabled={mediaDisabled} sortOrder={nextSort(assets)} />
-
       <datalist id={assetListId}>
-        {assets
+        {availableAssets
           .filter((asset) => asset.mediaType === "image")
           .map((asset) => (
             <option key={asset.id} label={asset.label} value={asset.src} />
           ))}
       </datalist>
 
+      {(["studio", "showreel", "library"] as const)
+        .filter(
+          (panelMode) =>
+            panelMode !== mode &&
+            (portfolioType === "actor" || panelMode !== "studio")
+        )
+        .map((panelMode) => (
+          <div
+            aria-labelledby={`media-${panelMode}-tab`}
+            hidden
+            id={`media-${panelMode}-panel`}
+            key={panelMode}
+            role="tabpanel"
+          />
+        ))}
+
       {mode === "studio" ? (
-        <GalleryStudio
-          assetListId={assetListId}
-          assets={assets}
-          content={content}
-          disabled={contentDisabled}
-          portfolioType={portfolioType}
-        />
+        <div aria-labelledby="media-studio-tab" id="media-studio-panel" role="tabpanel">
+          <GalleryStudio
+            assetListId={assetListId}
+            assets={availableAssets}
+            confirmDiscard={confirmAndDiscardDrafts}
+            content={content}
+            disabled={contentDisabled}
+            portfolioType={portfolioType}
+          />
+        </div>
       ) : mode === "showreel" ? (
-        <ShowreelStudio
-          assets={assets}
-          content={content}
-          disabled={contentDisabled}
-          portfolioType={portfolioType}
-        />
+        <div aria-labelledby="media-showreel-tab" id="media-showreel-panel" role="tabpanel">
+          <ShowreelStudio
+            assets={availableAssets}
+            confirmDiscard={confirmAndDiscardDrafts}
+            content={content}
+            disabled={contentDisabled}
+            portfolioType={portfolioType}
+          />
+        </div>
       ) : mode === "library" ? (
+        <div
+          aria-labelledby="media-library-tab"
+          className="grid gap-4"
+          id="media-library-panel"
+          role="tabpanel"
+        >
+        <MediaOverview assets={assets} />
+        <UploadPanel
+          disabled={mediaDisabled}
+          onSaved={finishFormWithoutNavigation}
+          sortOrder={nextSort(availableAssets)}
+        />
         <section className={sectionClass}>
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -2220,6 +2636,7 @@ export default function MediaManager({
             </div>
           )}
         </section>
+        </div>
       ) : null}
     </div>
   );

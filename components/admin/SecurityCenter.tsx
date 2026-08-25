@@ -4,10 +4,18 @@ import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import {
   deleteAdminProfile,
   resetAdminMfa,
+  revokeAdminSessions,
   saveAdminProfile,
 } from "@/app/admin/security/actions";
 import type {
@@ -31,17 +39,31 @@ type SecurityCenterProps = {
 };
 
 const statusCopy: Record<string, string> = {
+  "admin-not-found": "That admin profile no longer exists. Refresh this view.",
   deleted: "Admin profile deleted.",
+  "deleted-audit-warning":
+    "Admin profile deleted, but the audit event could not be recorded. Review the server log and Audit Read Path status.",
   "delete-error": "Admin profile could not be deleted.",
   invalid: "Admin profile input is invalid.",
+  "last-owner-required":
+    "At least one active owner must remain. Promote another admin before changing this owner.",
   "missing-service": "Server-side Supabase admin key is missing.",
   "auth-user-mismatch": "The email must exactly match the Supabase Auth user.",
   "mfa-reset": "Authenticator factors removed. The admin must enroll MFA again.",
   "mfa-reset-error": "Authenticator factors could not be reset.",
   "owner-required": "Only owner admins can manage admin profiles.",
+  "profile-check-error":
+    "The admin profile could not be verified before changing access.",
   saved: "Admin profile saved.",
+  "saved-audit-warning":
+    "Admin profile saved, but the audit event could not be recorded. Review the server log and Audit Read Path status.",
   "save-error": "Admin profile could not be saved.",
   "security-error": "Request origin was blocked. Refresh admin and try again.",
+  "session-revoke-error":
+    "Sessions could not be revoked. An inactive profile is still blocked by admin authorization, but existing Auth sessions must be revoked after repairing the database RPC.",
+  "sessions-revoked": "All sessions for this admin were revoked.",
+  "sessions-revoked-audit-warning":
+    "Sessions were revoked, but the audit event could not be recorded. Review the server log and Audit Read Path status.",
   "self-protected": "Your own owner profile cannot be removed or demoted here.",
 };
 
@@ -124,6 +146,19 @@ function StatusNotice({
   loadError?: string;
 }) {
   const message = status ? statusCopy[status] : "";
+  const statusIsError = Boolean(
+    status &&
+      (status.includes("error") ||
+        status === "invalid" ||
+        status === "admin-not-found" ||
+        status === "auth-user-mismatch")
+  );
+  const statusIsWarning = Boolean(
+    status &&
+      (status.includes("warning") ||
+        status === "last-owner-required" ||
+        status === "self-protected")
+  );
 
   if (!message && isConfigured && !loadError) return null;
 
@@ -141,7 +176,15 @@ function StatusNotice({
         </div>
       ) : null}
       {message ? (
-        <div className="rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-sm leading-6 text-white/80">
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm leading-6 ${
+            statusIsError
+              ? "border-red-300/25 bg-red-500/10 text-red-100"
+              : statusIsWarning
+                ? "border-amber-300/25 bg-amber-400/10 text-amber-100"
+                : "border-emerald-300/20 bg-emerald-500/[0.08] text-emerald-100"
+          }`}
+        >
           {message}
         </div>
       ) : null}
@@ -178,6 +221,12 @@ function SecurityCheckCard({ check }: { check: SecurityCheck }) {
 function CheckGrid({ checks }: { checks: SecurityCheck[] }) {
   const attentionChecks = checks.filter((check) => !check.ok);
   const passingChecks = checks.filter((check) => check.ok);
+  const verifiedChecks = passingChecks.filter(
+    (check) => check.verification !== "implemented"
+  );
+  const builtInChecks = passingChecks.filter(
+    (check) => check.verification === "implemented"
+  );
 
   return (
     <section className={sectionClass}>
@@ -194,9 +243,9 @@ function CheckGrid({ checks }: { checks: SecurityCheck[] }) {
       ) : null}
       <AdminDisclosure
         className={attentionChecks.length ? "mt-4" : ""}
-        description="Verified and implemented controls are grouped here to keep the health view calm."
+        description="Live verification and built-in code coverage stay explicitly separated."
         id="passing-security-checks"
-        title={`${passingChecks.length} checks passing`}
+        title={`${verifiedChecks.length} live verified · ${builtInChecks.length} built-in`}
         variant="advanced"
       >
         <div className="grid gap-4 md:grid-cols-2">
@@ -371,7 +420,7 @@ function SecurityCountersSection({
         <div>
           <p className={labelClass}>Protection activity</p>
           <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
-            Guards working in real time
+            Recent guard signals
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/42">
             Blocked requests are successful defenses, not a failed security
@@ -423,8 +472,12 @@ function SecurityCountersSection({
 
       <details className="mt-4 rounded-[18px] border border-white/9 bg-black/22 p-4">
         <summary className="cursor-pointer text-xs font-semibold text-white/52">
-          View implemented protection coverage
+          View built-in protection coverage
         </summary>
+        <p className="mt-3 text-xs leading-5 text-white/34">
+          These are code-level controls, not live probes. Their presence never
+          increases the live posture score.
+        </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {protections.map((protection) => (
             <span
@@ -477,6 +530,12 @@ function AdminProfileForm({
   mode?: "edit" | "new";
 }) {
   const disabled = !canManageAdmins;
+  const mfaLabel =
+    profile?.mfaEnrolled === true
+      ? "MFA enrolled"
+      : profile?.mfaEnrolled === false
+        ? "MFA missing"
+        : "MFA unknown";
 
   return (
     <AdminDisclosure
@@ -487,7 +546,11 @@ function AdminProfileForm({
           </span>
         ) : null
       }
-      description={mode === "new" ? "Grant access to another Supabase user." : `${profile?.role}${isCurrentAdmin ? " · Current session" : ""}`}
+      description={
+        mode === "new"
+          ? "Grant access to an existing Supabase Auth user."
+          : `${profile?.role} · ${mfaLabel}${isCurrentAdmin ? " · Current session" : ""}`
+      }
       id={mode === "new" ? "admin-profile-new" : `admin-profile-${profile?.userId}`}
       title={mode === "new" ? "+ Add admin" : profile?.email || "Admin profile"}
       variant="item"
@@ -495,13 +558,23 @@ function AdminProfileForm({
       <form action={saveAdminProfile}>
         <fieldset disabled={disabled}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Supabase user ID" wide>
-              <TextInput
-                defaultValue={profile?.userId}
-                name="userId"
-                required
-              />
-            </Field>
+            {mode === "new" ? (
+              <Field label="Supabase user ID" wide>
+                <TextInput name="userId" required />
+              </Field>
+            ) : (
+              <div className="sm:col-span-2">
+                <span className={labelClass}>Supabase user ID</span>
+                <code className="mt-2 block overflow-x-auto rounded-xl border border-white/8 bg-black/24 px-3.5 py-2.5 text-xs text-white/52">
+                  {profile?.userId}
+                </code>
+                <input name="userId" type="hidden" value={profile?.userId} />
+                <p className="mt-2 text-[11px] leading-5 text-white/32">
+                  Identity is locked after creation. Create a new profile to
+                  grant access to a different Auth user.
+                </p>
+              </div>
+            )}
             <Field label="Email">
               <TextInput defaultValue={profile?.email} name="email" required />
             </Field>
@@ -527,6 +600,55 @@ function AdminProfileForm({
             Active
           </label>
 
+          {profile ? (
+            <div className="mt-4 grid gap-2 rounded-xl border border-white/8 bg-black/20 p-3 text-[11px] text-white/42 sm:grid-cols-2 xl:grid-cols-5">
+              <div>
+                <span className="block text-white/28">Auth user</span>
+                <span className="mt-1 block text-white/62">
+                  {profile.authUserFound === true
+                    ? "Verified"
+                    : profile.authUserFound === false
+                      ? "Missing"
+                      : "Unavailable"}
+                </span>
+              </div>
+              <div>
+                <span className="block text-white/28">MFA</span>
+                <span
+                  className={`mt-1 block ${
+                    profile.mfaEnrolled === false
+                      ? "text-amber-100/76"
+                      : "text-white/62"
+                  }`}
+                >
+                  {mfaLabel}
+                </span>
+              </div>
+              <div>
+                <span className="block text-white/28">Last sign-in</span>
+                <span className="mt-1 block text-white/62">
+                  {profile.lastSignInAt
+                    ? formatDate(profile.lastSignInAt)
+                    : "No recorded sign-in"}
+                </span>
+              </div>
+              <div>
+                <span className="block text-white/28">Access updated</span>
+                <span className="mt-1 block text-white/62">
+                  {formatDate(profile.updatedAt)}
+                </span>
+              </div>
+              <div>
+                <span className="block text-white/28">Auth created</span>
+                <span className="mt-1 block text-white/62">
+                  {profile.authCreatedAt
+                    ? formatDate(profile.authCreatedAt)
+                    : "Unavailable"}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-5 flex justify-end">
             <ActionButton
               className={buttonClass}
@@ -541,6 +663,32 @@ function AdminProfileForm({
 
       {profile ? (
         <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <form
+            action={revokeAdminSessions}
+            onSubmit={(event) => {
+              if (
+                !window.confirm(
+                  `Revoke every active session for ${profile.email}? They will need to sign in and pass MFA again.`
+                )
+              ) {
+                event.preventDefault();
+              }
+            }}
+          >
+            <input name="userId" type="hidden" value={profile.userId} />
+            <ActionButton
+              className={dangerButtonClass}
+              disabled={disabled || isCurrentAdmin}
+              pendingLabel="Revoking..."
+              title={
+                isCurrentAdmin
+                  ? "Use sign out for the current session. Another owner can revoke all of your sessions."
+                  : undefined
+              }
+            >
+              Revoke all sessions
+            </ActionButton>
+          </form>
           <form
             action={resetAdminMfa}
             onSubmit={(event) => {
@@ -625,7 +773,60 @@ function AdminProfilesSection({
   );
 }
 
-function AuditLogSection({ auditLogs }: { auditLogs: AuditLogEntry[] }) {
+function getAuditCategory(action: string) {
+  if (
+    action.startsWith("security_") ||
+    action.startsWith("admin_login_") ||
+    action.startsWith("admin_password_") ||
+    action.startsWith("booking_email_") ||
+    action === "booking_inquiry_persistence_failed"
+  ) {
+    return "protection";
+  }
+  if (
+    action.startsWith("admin_profile_") ||
+    action.startsWith("admin_mfa_") ||
+    action.startsWith("admin_sessions_")
+  ) {
+    return "access";
+  }
+  return "content";
+}
+
+function AuditLogSection({
+  auditLogs,
+  profiles,
+}: {
+  auditLogs: AuditLogEntry[];
+  profiles: AdminProfile[];
+}) {
+  const [category, setCategory] = useState("all");
+  const [query, setQuery] = useState("");
+  const profileEmails = useMemo(
+    () => new Map(profiles.map((profile) => [profile.userId, profile.email])),
+    [profiles]
+  );
+  const visibleLogs = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return auditLogs.filter((entry) => {
+      if (category !== "all" && getAuditCategory(entry.action) !== category) {
+        return false;
+      }
+      if (!normalizedQuery) return true;
+
+      const haystack = [
+        entry.action,
+        entry.tableName,
+        entry.recordId,
+        profileEmails.get(entry.actorId) || entry.actorId,
+        JSON.stringify(entry.metadata),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [auditLogs, category, profileEmails, query]);
+
   return (
     <section className={sectionClass}>
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -633,12 +834,40 @@ function AuditLogSection({ auditLogs }: { auditLogs: AuditLogEntry[] }) {
           <p className={labelClass}>Audit</p>
           <h2 className="heading-ui mt-2 text-2xl text-white">Recent Activity</h2>
         </div>
-        <span className="text-sm text-white/45">{auditLogs.length} entries</span>
+        <span className="text-sm text-white/45">
+          {visibleLogs.length} of {auditLogs.length} latest entries
+        </span>
       </div>
 
-      {auditLogs.length ? (
+      <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_180px]">
+        <label>
+          <span className="sr-only">Search audit log</span>
+          <input
+            className={inputClass}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search action, actor, or record…"
+            type="search"
+            value={query}
+          />
+        </label>
+        <label>
+          <span className="sr-only">Filter audit category</span>
+          <select
+            className={inputClass}
+            onChange={(event) => setCategory(event.target.value)}
+            value={category}
+          >
+            <option value="all">All activity</option>
+            <option value="protection">Protection</option>
+            <option value="access">Admin access</option>
+            <option value="content">Content & media</option>
+          </select>
+        </label>
+      </div>
+
+      {visibleLogs.length ? (
         <div className="grid gap-3">
-          {auditLogs.map((entry) => (
+          {visibleLogs.map((entry) => (
             <div className={itemClass} key={entry.id}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -647,7 +876,9 @@ function AuditLogSection({ auditLogs }: { auditLogs: AuditLogEntry[] }) {
                   </h3>
                   <p className="mt-1 text-xs text-white/45">
                     {entry.tableName || "system"}
-                    {entry.recordId ? ` / ${entry.recordId}` : ""}
+                    {entry.recordId
+                      ? ` / ${profileEmails.get(entry.recordId) || entry.recordId}`
+                      : ""}
                   </p>
                 </div>
                 <span className="text-xs text-white/40">
@@ -655,7 +886,9 @@ function AuditLogSection({ auditLogs }: { auditLogs: AuditLogEntry[] }) {
                 </span>
               </div>
               <div className="mt-3 text-xs text-white/42">
-                <div>Actor: {entry.actorId || "unknown"}</div>
+                <div>
+                  Actor: {profileEmails.get(entry.actorId) || entry.actorId || "System"}
+                </div>
                 <details className="mt-3 rounded-xl border border-white/8 bg-black/24 px-3 py-2">
                   <summary className="cursor-pointer font-semibold text-white/46">
                     View technical details
@@ -670,7 +903,9 @@ function AuditLogSection({ auditLogs }: { auditLogs: AuditLogEntry[] }) {
         </div>
       ) : (
         <div className="rounded-lg border border-white/10 bg-black/25 p-6 text-sm text-white/45">
-          No audit logs yet.
+          {auditLogs.length
+            ? "No audit entries match these filters."
+            : "No audit logs yet."}
         </div>
       )}
     </section>
@@ -686,12 +921,20 @@ function SecurityPosture({
   profiles: AdminProfile[];
   summary: SecurityEventSummary;
 }) {
-  const passed = checks.filter((check) => check.ok).length;
-  const attention = checks.length - passed;
-  const score = checks.length ? Math.round((passed / checks.length) * 100) : 0;
+  const liveChecks = checks.filter(
+    (check) => check.verification !== "implemented"
+  );
+  const builtInChecks = checks.filter(
+    (check) => check.verification === "implemented"
+  );
+  const verified = liveChecks.filter((check) => check.ok).length;
+  const attention = liveChecks.length - verified;
+  const score = liveChecks.length
+    ? Math.round((verified / liveChecks.length) * 100)
+    : 0;
 
   return (
-    <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
+    <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
       <article
         className={`relative overflow-hidden rounded-[22px] border p-5 ${
           attention
@@ -702,15 +945,16 @@ function SecurityPosture({
         <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.09),transparent_67%)]" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className={labelClass}>Security posture</p>
+            <p className={labelClass}>Live security posture</p>
             <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
               {attention ? "Attention recommended" : "Portfolio protected"}
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-white/46">
               {attention
-                ? `${attention} configuration check${attention === 1 ? "" : "s"} need review.`
-                : "All available configuration checks are passing."}
-              {" "}Blocked activity below means the guards worked.
+                ? `${attention} live check${attention === 1 ? "" : "s"} need review.`
+                : "Every live runtime check is passing."}
+              {" "}Built-in controls are reported separately and never pad
+              this score.
             </p>
           </div>
           <div
@@ -725,7 +969,7 @@ function SecurityPosture({
                   {score}%
                 </span>
                 <span className="text-[9px] uppercase tracking-[0.12em] text-white/32">
-                  checks
+                  live
                 </span>
               </span>
             </div>
@@ -733,14 +977,23 @@ function SecurityPosture({
         </div>
       </article>
 
-      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
         <div className="rounded-[18px] border border-white/9 bg-white/[0.04] p-4">
-          <p className={labelClass}>Passing</p>
+          <p className={labelClass}>Live verified</p>
           <p className="mt-3 text-3xl font-semibold text-white">
-            {passed}/{checks.length}
+            {verified}/{liveChecks.length}
           </p>
           <p className="mt-2 text-[11px] text-white/32">
-            Configuration checks
+            Runtime and configuration checks
+          </p>
+        </div>
+        <div className="rounded-[18px] border border-white/9 bg-white/[0.04] p-4">
+          <p className={labelClass}>Built-in coverage</p>
+          <p className="mt-3 text-3xl font-semibold text-white">
+            {builtInChecks.length}
+          </p>
+          <p className="mt-2 text-[11px] text-white/32">
+            Code-level guard groups
           </p>
         </div>
         <div className="rounded-[18px] border border-white/9 bg-white/[0.04] p-4">
@@ -768,12 +1021,24 @@ function SecurityPosture({
 
 type SecurityWorkspaceSection = {
   id: string;
+  number: string;
   label: string;
-  kicker: string;
   description: string;
   count?: number;
   node: ReactNode;
 };
+
+const securityHashAliases: Record<string, string> = {
+  health: "configuration",
+  threats: "activity",
+  allowlist: "configuration",
+  "admin-profiles": "access",
+};
+
+function normalizeSecurityHash(hash: string) {
+  const value = hash.replace(/^#/, "");
+  return securityHashAliases[value] || value;
+}
 
 export default function SecurityCenter({
   currentAdminId,
@@ -787,7 +1052,7 @@ export default function SecurityCenter({
   loadError,
   status,
 }: SecurityCenterProps) {
-  const [activeSectionId, setActiveSectionId] = useState("health");
+  const [activeSectionId, setActiveSectionId] = useState("overview");
   const {
     clearDirty,
     confirmDiscard,
@@ -796,10 +1061,11 @@ export default function SecurityCenter({
   } = useUnsavedChangesGuard(
     "You have unsaved admin profile changes. Switch views and discard them?"
   );
+  const dirtyFormsRef = useRef<Set<HTMLFormElement>>(new Set());
 
   useEffect(() => {
     const syncHash = () => {
-      const hash = window.location.hash.replace(/^#/, "");
+      const hash = normalizeSecurityHash(window.location.hash);
       if (hash) setActiveSectionId(hash);
     };
     const frame = window.requestAnimationFrame(syncHash);
@@ -811,35 +1077,35 @@ export default function SecurityCenter({
   }, []);
   const sections: SecurityWorkspaceSection[] = [
     {
-      id: "health",
-      label: "Health",
-      kicker: "Configuration",
+      id: "overview",
+      number: "00",
+      label: "Overview",
       description:
-        "Supabase, service key, authorization, database rate limits, and email checks.",
-      count: checks.filter((check) => !check.ok).length,
-      node: <CheckGrid checks={checks} />,
+        "Live posture, built-in coverage, protection activity, and admin access at a glance.",
+      count: checks.filter(
+        (check) => check.verification !== "implemented" && !check.ok
+      ).length,
+      node: (
+        <SecurityPosture
+          checks={checks}
+          profiles={profiles}
+          summary={securitySummary}
+        />
+      ),
     },
     {
-      id: "threats",
-      label: "Threats",
-      kicker: "Monitor",
-      description: "Blocked contact, analytics, and admin-origin attempts.",
+      id: "activity",
+      number: "01",
+      label: "Protection activity",
+      description: "Blocked requests, auth failures, and operational signals.",
       count: securitySummary.total7d,
       node: <SecurityCountersSection summary={securitySummary} />,
     },
     {
-      id: "allowlist",
-      label: "Local fallback",
-      kicker: "Environment",
-      description: "Development-only fallback emails from ADMIN_EMAILS.",
-      count: allowedEmails.length,
-      node: <AllowlistSection allowedEmails={allowedEmails} />,
-    },
-    {
-      id: "admin-profiles",
-      label: "Admin Profiles",
-      kicker: "Access",
-      description: "Owner/admin roles and active Supabase admin profiles.",
+      id: "access",
+      number: "02",
+      label: "Admin access",
+      description: "Roles, MFA state, sign-ins, sessions, and access profiles.",
       count: profiles.length,
       node: (
         <AdminProfilesSection
@@ -851,37 +1117,130 @@ export default function SecurityCenter({
     },
     {
       id: "audit",
+      number: "03",
       label: "Audit Log",
-      kicker: "Activity",
       description: "Recent admin actions and security event metadata.",
       count: auditLogs.length,
-      node: <AuditLogSection auditLogs={auditLogs} />,
+      node: <AuditLogSection auditLogs={auditLogs} profiles={profiles} />,
+    },
+    {
+      id: "configuration",
+      number: "04",
+      label: "Configuration",
+      description:
+        "Runtime checks, code-level controls, and development fallback settings.",
+      count: checks.filter(
+        (check) => check.verification !== "implemented" && !check.ok
+      ).length,
+      node: (
+        <div className="grid gap-4">
+          <CheckGrid checks={checks} />
+          {process.env.NODE_ENV !== "production" ? (
+            <AllowlistSection allowedEmails={allowedEmails} />
+          ) : null}
+        </div>
+      ),
     },
   ];
   const activeSection =
     sections.find((section) => section.id === activeSectionId) || sections[0];
 
   function openSection(id: string) {
-    if (id === activeSection.id) return;
-    if (!confirmDiscard()) return;
+    if (id === activeSection.id) return true;
+    if (!confirmDiscard()) return false;
 
+    dirtyFormsRef.current.clear();
     setActiveSectionId(id);
     window.history.replaceState(
-      null,
+      window.history.state,
       "",
       `${window.location.pathname}${window.location.search}#${id}`
     );
     document
       .getElementById("security-workspace")
       ?.scrollIntoView({ block: "start" });
+    return true;
+  }
+
+  function rememberDirtyForm(target: EventTarget | null) {
+    if (!(target instanceof Element)) return;
+    const form = target.closest<HTMLFormElement>("form");
+    if (!form) return;
+
+    dirtyFormsRef.current.add(form);
+    markDirty();
+  }
+
+  function submitSecurityForm(form: HTMLFormElement) {
+    const otherDraftForms = [...dirtyFormsRef.current].filter(
+      (dirtyForm) => dirtyForm !== form && dirtyForm.isConnected
+    );
+
+    if (
+      otherDraftForms.length > 0 &&
+      !window.confirm(
+        "You also have unsaved changes in another admin profile. Continuing reloads this view and discards those drafts. Continue?"
+      )
+    ) {
+      return false;
+    }
+
+    dirtyFormsRef.current.clear();
+    clearDirty();
+    return true;
+  }
+
+  function handleTabKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    let nextIndex = index;
+    if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + sections.length) % sections.length;
+    } else if (event.key === "ArrowRight") {
+      nextIndex = (index + 1) % sections.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = sections.length - 1;
+    }
+
+    const nextSection = sections[nextIndex];
+    if (!openSection(nextSection.id)) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(`security-tab-${nextSection.id}`)?.focus();
+    });
   }
 
   return (
     <div
       className="grid gap-4"
-      onChangeCapture={markDirty}
+      onChangeCapture={(event) => {
+        const target = event.target;
+        if (
+          (target instanceof HTMLInputElement ||
+            target instanceof HTMLSelectElement ||
+            target instanceof HTMLTextAreaElement) &&
+          target.name &&
+          target.closest("form")
+        ) {
+          rememberDirtyForm(target);
+        }
+      }}
       onSubmit={(event) => {
-        if (!event.defaultPrevented) clearDirty();
+        if (event.defaultPrevented) return;
+        const form = event.target;
+        if (
+          form instanceof HTMLFormElement &&
+          !submitSecurityForm(form)
+        ) {
+          event.preventDefault();
+        }
       }}
     >
       <StatusNotice
@@ -901,13 +1260,7 @@ export default function SecurityCenter({
         </div>
       ) : null}
 
-      <SecurityPosture
-        checks={checks}
-        profiles={profiles}
-        summary={securitySummary}
-      />
-
-      <div className="rounded-[22px] border border-white/9 bg-[#0f0f11]/90 p-3">
+      <div className="sticky top-3 z-20 rounded-[22px] border border-white/9 bg-[#0f0f11]/95 p-2 shadow-[0_14px_38px_rgba(0,0,0,0.3)] backdrop-blur-xl">
         {hasUnsavedChanges ? (
           <div
             className="mb-2 rounded-lg border border-amber-300/18 bg-amber-400/[0.06] px-3 py-2 text-[11px] text-amber-100/70"
@@ -918,25 +1271,43 @@ export default function SecurityCenter({
         ) : null}
         <nav
           aria-label="Security views"
-          className="grid gap-1 sm:grid-cols-5"
+          className="admin-scrollbar-none flex snap-x gap-1 overflow-x-auto"
+          role="tablist"
         >
-          {sections.map((section) => {
+          {sections.map((section, index) => {
             const active = section.id === activeSection.id;
 
             return (
               <button
-                aria-pressed={active}
-                className={`min-h-12 rounded-xl border px-3 py-2 text-left transition ${
+                aria-controls={`security-panel-${section.id}`}
+                aria-selected={active}
+                className={`min-h-12 min-w-[148px] flex-1 snap-start rounded-xl border px-3 py-2 text-left transition ${
                   active
                     ? "border-white/14 bg-white/[0.09] text-white"
                     : "border-transparent text-white/48 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"
                 }`}
+                id={`security-tab-${section.id}`}
                 key={section.id}
-                onClick={() => openSection(section.id)}
+                onClick={() => {
+                  if (openSection(section.id)) return;
+                  window.requestAnimationFrame(() => {
+                    document
+                      .getElementById(`security-tab-${activeSection.id}`)
+                      ?.focus();
+                  });
+                }}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                role="tab"
+                tabIndex={active ? 0 : -1}
                 type="button"
               >
                 <span className="flex items-center justify-between gap-2 text-xs font-semibold">
-                  {section.label}
+                  <span>
+                    <span className="mr-2 text-[9px] tracking-[0.12em] text-white/28">
+                      {section.number}
+                    </span>
+                    {section.label}
+                  </span>
                   {typeof section.count === "number" ? (
                     <span className="rounded-full border border-white/8 px-1.5 py-0.5 text-[9px] tabular-nums text-white/36">
                       {section.count}
@@ -953,7 +1324,26 @@ export default function SecurityCenter({
       </div>
 
       <div className="scroll-mt-28" id="security-workspace">
-        {activeSection.node}
+        {sections
+          .filter((section) => section.id !== activeSection.id)
+          .map((section) => (
+            <div
+              aria-labelledby={`security-tab-${section.id}`}
+              hidden
+              id={`security-panel-${section.id}`}
+              key={section.id}
+              role="tabpanel"
+            />
+          ))}
+        <div
+          aria-labelledby={`security-tab-${activeSection.id}`}
+          id={`security-panel-${activeSection.id}`}
+          key={activeSection.id}
+          role="tabpanel"
+          tabIndex={0}
+        >
+          {activeSection.node}
+        </div>
       </div>
     </div>
   );

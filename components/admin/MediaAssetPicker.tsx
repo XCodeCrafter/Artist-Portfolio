@@ -63,7 +63,21 @@ export default function MediaAssetPicker({
         : defaultMediaType
   );
   const [libraryOpen, setLibraryOpen] = useState(openLibraryByDefault);
+  const [search, setSearch] = useState("");
+  const [visibleLimit, setVisibleLimit] = useState(24);
   const selected = options.find((asset) => asset.src === value);
+  const filteredOptions = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return options;
+
+    return options.filter((asset) =>
+      [asset.label, asset.alt, asset.mediaType]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle)
+    );
+  }, [options, search]);
+  const visibleOptions = filteredOptions.slice(0, visibleLimit);
   const activeType =
     kind === "video"
       ? "video"
@@ -115,28 +129,33 @@ export default function MediaAssetPicker({
       </div>
       ) : null}
 
-      <label className="mt-3 block">
-        <span className={labelClass}>Source URL</span>
-        <input
-          className={inputClass}
-          name={name}
-          onChange={(event) => {
-            const nextValue = event.target.value;
-            setValue(nextValue);
-            const nextAsset = options.find((asset) => asset.src === nextValue);
-            if (
-              nextAsset?.mediaType === "image" ||
-              nextAsset?.mediaType === "video"
-            ) {
-              setMediaType(nextAsset.mediaType);
-            }
-            onValueChange?.(nextValue, nextAsset);
-          }}
-          required={required}
-          type="text"
-          value={value}
-        />
-      </label>
+      <details className="mt-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-3">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.16em] text-white/42">
+          Advanced source URL
+        </summary>
+        <label className="mt-3 block">
+          <span className={labelClass}>Source URL</span>
+          <input
+            className={inputClass}
+            name={name}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setValue(nextValue);
+              const nextAsset = options.find((asset) => asset.src === nextValue);
+              if (
+                nextAsset?.mediaType === "image" ||
+                nextAsset?.mediaType === "video"
+              ) {
+                setMediaType(nextAsset.mediaType);
+              }
+              onValueChange?.(nextValue, nextAsset);
+            }}
+            required={required}
+            type="text"
+            value={value}
+          />
+        </label>
+      </details>
 
       {kind === "media" && mediaTypeName ? (
         <label className="mt-3 block">
@@ -165,8 +184,25 @@ export default function MediaAssetPicker({
           {selected ? ` — ${selected.label}` : ""}
         </summary>
         {options.length ? (
-          <div className="mt-3 grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
-            {options.map((asset) => (
+          <div className="mt-3">
+            <label className="block">
+              <span className="sr-only">Search media library</span>
+              <input
+                className={inputClass}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setVisibleLimit(24);
+                }}
+                placeholder="Search by label or alt text..."
+                type="search"
+                value={search}
+              />
+            </label>
+            <p className="mt-2 text-xs text-white/38" role="status">
+              Showing {Math.min(visibleOptions.length, filteredOptions.length)} of {filteredOptions.length}
+            </p>
+            <div className="mt-3 grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
+            {visibleOptions.map((asset) => (
               <button
                 aria-label={`Use ${asset.label}`}
                 aria-pressed={asset.src === value}
@@ -181,13 +217,9 @@ export default function MediaAssetPicker({
                 type="button"
               >
                 {asset.mediaType === "video" ? (
-                  <video
-                    className="h-full w-full object-cover"
-                    muted
-                    playsInline
-                    preload="metadata"
-                    src={asset.src}
-                  />
+                  <span className="grid h-full place-items-center bg-white/[0.04] px-2 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-white/42">
+                    Video
+                  </span>
                 ) : (
                   <Image
                     alt={asset.alt || asset.label}
@@ -206,6 +238,21 @@ export default function MediaAssetPicker({
                 </span>
               </button>
             ))}
+            </div>
+            {visibleLimit < filteredOptions.length ? (
+              <button
+                className="mt-3 h-10 w-full rounded-xl border border-white/10 text-sm font-semibold text-white/65 transition hover:border-white/25 hover:bg-white/[0.06] hover:text-white"
+                onClick={() => setVisibleLimit((limit) => limit + 24)}
+                type="button"
+              >
+                Load 24 more
+              </button>
+            ) : null}
+            {!filteredOptions.length ? (
+              <p className="mt-4 text-center text-sm text-white/42">
+                No media matches this search.
+              </p>
+            ) : null}
           </div>
         ) : (
           <p className="mt-3 text-sm leading-6 text-white/42">

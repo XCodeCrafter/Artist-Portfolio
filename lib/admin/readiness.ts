@@ -54,6 +54,7 @@ async function inspectSupabase() {
       mediaResult,
       videosResult,
       presentationResult,
+      inquiriesResult,
       recoveryResult,
       rateLimitResult,
       ownerResult,
@@ -73,13 +74,21 @@ async function inspectSupabase() {
         .limit(1),
       supabase
         .from("media_assets")
-        .select("id, storage_bucket, storage_path, file_size, mime_type")
+        .select(
+          "id, storage_bucket, storage_path, file_size, mime_type, deleted_at"
+        )
         .limit(1),
       supabase
         .from("videos")
         .select("id, description, video_type, is_featured")
         .limit(1),
       supabase.from("gallery_presentation").select("id").limit(1),
+      supabase
+        .from("booking_inquiries")
+        .select(
+          "id, resend_email_id, email_status, email_status_changed_at, email_status_provider_at, email_status_webhook_id"
+        )
+        .limit(1),
       supabase.from("admin_recovery_challenges").select("id").limit(1),
       probeDatabaseRateLimit(supabase),
       supabase
@@ -97,6 +106,7 @@ async function inspectSupabase() {
       mediaResult,
       videosResult,
       presentationResult,
+      inquiriesResult,
       recoveryResult,
     ].every((result) => !result.error);
 
@@ -184,7 +194,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       critical: true,
       detail: supabase.schemaOk
         ? "Required tables and columns are available."
-        : "Apply all Supabase migrations through 0021.",
+        : "Apply all Supabase migrations through 0023.",
       href: "/admin/security#health",
     },
     {
@@ -235,6 +245,36 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       detail: hasEmailEnv()
         ? "Resend and booking addresses are configured."
         : "Configure Resend and booking sender/recipient addresses.",
+      href: "/admin/security#health",
+    },
+    {
+      id: "delivery-webhook",
+      label: "Delivery monitoring",
+      ok: Boolean(process.env.RESEND_WEBHOOK_SECRET),
+      critical: false,
+      detail: process.env.RESEND_WEBHOOK_SECRET
+        ? "Signed Resend delivery events are connected."
+        : "Set RESEND_WEBHOOK_SECRET after creating the Resend webhook.",
+      href: "/admin/security#health",
+    },
+    {
+      id: "retention-scheduler",
+      label: "Retention scheduler",
+      ok: Boolean(process.env.CRON_SECRET),
+      critical: false,
+      detail: process.env.CRON_SECRET
+        ? "Authenticated daily retention maintenance is configured."
+        : "Set CRON_SECRET in Vercel for the daily maintenance job.",
+      href: "/admin/security#health",
+    },
+    {
+      id: "deep-health-monitor",
+      label: "Dependency health monitor",
+      ok: Boolean(process.env.HEALTHCHECK_SECRET),
+      critical: false,
+      detail: process.env.HEALTHCHECK_SECRET
+        ? "Authenticated database and storage health checks are available."
+        : "Set HEALTHCHECK_SECRET for deep dependency monitoring.",
       href: "/admin/security#health",
     },
     {

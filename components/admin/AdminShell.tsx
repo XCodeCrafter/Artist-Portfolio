@@ -100,9 +100,11 @@ function getPageEditorHref(
 function AdminNavLink({
   item,
   active,
+  mobile = false,
 }: {
   item: (typeof navItems)[number];
   active: AdminSection;
+  mobile?: boolean;
 }) {
   const isActive = item.key === active;
 
@@ -127,7 +129,13 @@ function AdminNavLink({
       >
         {item.icon}
       </span>
-      <span className="sidebar-copy min-w-0 whitespace-nowrap opacity-100 transition duration-150 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100">
+      <span
+        className={cx(
+          "sidebar-copy min-w-0 whitespace-nowrap opacity-100 transition duration-150",
+          !mobile &&
+            "lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100"
+        )}
+      >
         <span className="block text-sm font-semibold">{item.label}</span>
         <span className="mt-0.5 block truncate text-[11px] text-white/36">
           {item.description}
@@ -137,11 +145,22 @@ function AdminNavLink({
   );
 }
 
-function AdminNav({ active }: { active: AdminSection }) {
+function AdminNav({
+  active,
+  mobile = false,
+}: {
+  active: AdminSection;
+  mobile?: boolean;
+}) {
   return (
     <nav aria-label="Admin navigation" className="grid gap-1">
       {navItems.map((item) => (
-        <AdminNavLink active={active} item={item} key={item.key} />
+        <AdminNavLink
+          active={active}
+          item={item}
+          key={item.key}
+          mobile={mobile}
+        />
       ))}
     </nav>
   );
@@ -149,9 +168,11 @@ function AdminNav({ active }: { active: AdminSection }) {
 
 function PublicPageNav({
   hiddenNavPageSlugs = [],
+  mobile = false,
   portfolioType,
 }: {
   hiddenNavPageSlugs?: PageSlug[];
+  mobile?: boolean;
   portfolioType?: PortfolioType;
 }) {
   if (!portfolioType) return null;
@@ -163,7 +184,13 @@ function PublicPageNav({
   ).length;
 
   return (
-    <div className="sidebar-copy mt-6 min-w-[246px] opacity-100 transition duration-150 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100">
+    <div
+      className={cx(
+        "sidebar-copy mt-6 min-w-[246px] opacity-100 transition duration-150",
+        !mobile &&
+          "lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100"
+      )}
+    >
       <div className="mb-2 flex items-center justify-between px-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/28">
           Your website
@@ -212,18 +239,26 @@ function PublicPageNav({
 
 function AccountMenu({
   adminEmail,
+  mobile = false,
   portfolioType,
 }: {
   adminEmail: string;
+  mobile?: boolean;
   portfolioType?: PortfolioType;
 }) {
   return (
-    <details className="group rounded-2xl border border-white/8 bg-black/25 p-2.5">
+    <details className="group/account rounded-2xl border border-white/8 bg-black/25 p-2.5">
       <summary className="flex cursor-pointer list-none items-center gap-3">
         <span className="grid h-9 w-9 place-items-center rounded-xl border border-white/8 bg-white/[0.05] text-white/55">
           <FaUserCircle />
         </span>
-        <span className="sidebar-copy min-w-0 flex-1 whitespace-nowrap opacity-100 transition duration-150 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100">
+        <span
+          className={cx(
+            "sidebar-copy min-w-0 flex-1 whitespace-nowrap opacity-100 transition duration-150",
+            !mobile &&
+              "lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100"
+          )}
+        >
           <span className="block truncate text-xs font-semibold text-white/78">
             {adminEmail}
           </span>
@@ -231,7 +266,13 @@ function AccountMenu({
             {portfolioType || "admin session"}
           </span>
         </span>
-        <FaChevronDown className="sidebar-copy text-[10px] text-white/35 opacity-100 transition group-open:rotate-180 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100" />
+        <FaChevronDown
+          className={cx(
+            "sidebar-copy text-[10px] text-white/35 opacity-100 transition group-open/account:rotate-180",
+            !mobile &&
+              "lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100"
+          )}
+        />
       </summary>
       <div className="mt-2 border-t border-white/8 pt-2">
         <LogoutButton />
@@ -293,7 +334,7 @@ export default function AdminShell({
         />
 
         <div className="lg:hidden">
-          <details className="group rounded-[22px] border border-white/10 bg-[#0d0d0f]/94 p-2.5 shadow-[0_18px_60px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
+          <details className="group/mobile-menu rounded-[22px] border border-white/10 bg-[#0d0d0f]/94 p-2.5 shadow-[0_18px_60px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#ff3b1f] text-sm text-white">
@@ -301,26 +342,48 @@ export default function AdminShell({
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-white">
-                    {activeItem.label}
+                    {title}
                   </p>
                   <p className="truncate text-[11px] text-white/38">
-                    {adminEmail}
+                    {activeItem.description}
                   </p>
                 </div>
               </div>
-              <FaChevronDown className="shrink-0 text-xs text-white/45 transition group-open:rotate-180" />
+              <FaChevronDown className="shrink-0 text-xs text-white/45 transition group-open/mobile-menu:rotate-180" />
             </summary>
             <div className="mt-3 border-t border-white/8 pt-3">
-              <AdminNav active={active} />
+              <AdminNav active={active} mobile />
               {active !== "content" ? (
                 <PublicPageNav
                   hiddenNavPageSlugs={hiddenNavPageSlugs}
+                  mobile
                   portfolioType={portfolioType}
                 />
               ) : null}
+              <div className="mt-3 flex gap-2 border-t border-white/8 pt-3">
+                {active === "media" ? (
+                  <Link
+                    className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-xs font-semibold text-white/68 transition hover:bg-white hover:text-black"
+                    href="/admin/media#upload"
+                  >
+                    <FaUpload className="text-[10px]" />
+                    Upload media
+                  </Link>
+                ) : null}
+                <Link
+                  className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-black transition hover:bg-white/84"
+                  href="/"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  View site
+                  <FaExternalLinkAlt className="text-[10px]" />
+                </Link>
+              </div>
               <div className="mt-3">
                 <AccountMenu
                   adminEmail={adminEmail}
+                  mobile
                   portfolioType={portfolioType}
                 />
               </div>
@@ -331,15 +394,15 @@ export default function AdminShell({
         <section className="min-w-0 flex-1" id="admin-main-content" tabIndex={-1}>
           <header
             className={cx(
-              "relative z-20 rounded-[26px] border border-white/9 bg-[#0d0d0f]/86 shadow-[0_22px_80px_rgba(0,0,0,0.34)] backdrop-blur-2xl",
+              "relative z-20 hidden rounded-[26px] border border-white/9 bg-[#0d0d0f]/86 px-6 py-5 shadow-[0_22px_80px_rgba(0,0,0,0.34)] backdrop-blur-2xl lg:block",
               active === "content"
-                ? "px-4 py-3 sm:px-5 sm:py-3.5"
-                : "px-5 py-4 sm:px-6 sm:py-5"
+                ? "sm:px-5 sm:py-3.5"
+                : ""
             )}
           >
             <div
               className={cx(
-                "flex flex-col xl:flex-row xl:items-center xl:justify-between",
+                "flex items-center justify-between",
                 active === "content" ? "gap-3" : "gap-4"
               )}
             >
@@ -365,8 +428,8 @@ export default function AdminShell({
                   className={cx(
                     "heading-ui font-semibold tracking-[-0.035em] text-white",
                     active === "content"
-                      ? "mt-1.5 text-2xl sm:text-3xl"
-                      : "mt-2 text-3xl sm:text-4xl"
+                      ? "mt-1.5 text-3xl"
+                      : "mt-2 text-4xl"
                   )}
                 >
                   {title}
@@ -384,22 +447,13 @@ export default function AdminShell({
               </div>
 
               <div className="flex shrink-0 flex-wrap gap-2">
-                <Link
-                  className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3.5 text-xs font-semibold text-white/68 transition hover:bg-white hover:text-black"
-                  href="/admin/media#upload"
-                >
-                  <FaUpload className="text-[10px]" />
-                  Add media
-                </Link>
-                {active !== "content" ? (
+                {active === "media" ? (
                   <Link
-                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-xs font-semibold text-black transition hover:bg-white/84"
-                    href="/"
-                    rel="noreferrer"
-                    target="_blank"
+                    className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[11px] font-semibold text-white/68 transition hover:bg-white hover:text-black sm:min-h-10 sm:px-3.5 sm:text-xs"
+                    href="/admin/media#upload"
                   >
-                    Preview site
-                    <FaExternalLinkAlt className="text-[10px]" />
+                    <FaUpload className="text-[10px]" />
+                    Upload media
                   </Link>
                 ) : null}
               </div>

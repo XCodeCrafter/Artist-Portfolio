@@ -4,6 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const DEFAULT_MESSAGE =
   "You have unsaved changes. Leave this editor and discard them?";
+const HISTORY_GUARD_KEY = "__portfolioEditorGuard";
+
+function getHistoryState() {
+  const state = window.history.state;
+  return state && typeof state === "object" && !Array.isArray(state)
+    ? (state as Record<string, unknown>)
+    : {};
+}
 
 export default function useUnsavedChangesGuard(
   message = DEFAULT_MESSAGE
@@ -11,16 +19,28 @@ export default function useUnsavedChangesGuard(
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const dirtyRef = useRef(false);
   const historyGuardActiveRef = useRef(false);
+  const historyGuardIdRef = useRef<string | null>(null);
   const restoringHistoryRef = useRef(false);
+
+  const removeCurrentHistoryMarker = useCallback(() => {
+    const guardId = historyGuardIdRef.current;
+    if (!guardId) return;
+
+    const currentState = getHistoryState();
+    if (currentState[HISTORY_GUARD_KEY] !== guardId) return;
+
+    const nextState = { ...currentState };
+    delete nextState[HISTORY_GUARD_KEY];
+    window.history.replaceState(nextState, "", window.location.href);
+  }, []);
 
   const markDirty = useCallback(() => {
     if (!historyGuardActiveRef.current) {
-      const currentState =
-        window.history.state && typeof window.history.state === "object"
-          ? window.history.state
-          : {};
+      const currentState = getHistoryState();
+      const guardId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      historyGuardIdRef.current = guardId;
       window.history.pushState(
-        { ...currentState, __portfolioEditorGuard: true },
+        { ...currentState, [HISTORY_GUARD_KEY]: guardId },
         "",
         window.location.href
       );
@@ -32,10 +52,13 @@ export default function useUnsavedChangesGuard(
   }, []);
 
   const clearDirty = useCallback(() => {
+    removeCurrentHistoryMarker();
     dirtyRef.current = false;
     historyGuardActiveRef.current = false;
+    historyGuardIdRef.current = null;
+    restoringHistoryRef.current = false;
     setHasUnsavedChanges(false);
-  }, []);
+  }, [removeCurrentHistoryMarker]);
 
   const confirmDiscard = useCallback(() => {
     if (!dirtyRef.current) return true;

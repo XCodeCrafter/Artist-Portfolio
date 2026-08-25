@@ -9,10 +9,12 @@
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint && npm run build",
+    "check": "npm test && npm run typecheck && npm run lint && npm run build",
     "audit:prod": "npm audit --omit=dev --audit-level=moderate",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:init": "supabase init",
     "db:link": "supabase link",
     "db:status": "supabase migration list",
@@ -40,9 +42,11 @@
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.11",
     "tailwindcss": "^4.3.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   },
   "overrides": {
+    "nanoid": "^3.3.18",
     "postcss": "^8.5.16",
     "sharp": "^0.35.3"
   }

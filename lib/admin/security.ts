@@ -17,6 +17,10 @@ export type AdminProfile = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  authUserFound: boolean | null;
+  authCreatedAt: string;
+  lastSignInAt: string;
+  mfaEnrolled: boolean | null;
 };
 
 export type AuditLogEntry = {
@@ -54,6 +58,7 @@ export const SECURITY_EVENT_ACTIONS = [
   "security_admin_password_reset_rate_limited",
   "security_admin_mfa_rate_limited",
   "security_admin_media_upload_rejected",
+  "security_admin_session_revoke_failed",
   "security_admin_mfa_session_revoke_failed",
   "admin_login_failed",
   "admin_login_denied",
@@ -61,6 +66,9 @@ export const SECURITY_EVENT_ACTIONS = [
   "admin_password_reset_request_failed",
   "admin_password_update_failed",
   "booking_email_failed",
+  "booking_email_tracking_failed",
+  "booking_email_webhook_unmatched",
+  "booking_inquiry_persistence_failed",
 ] as const;
 
 export type SecurityEventAction = (typeof SECURITY_EVENT_ACTIONS)[number];
@@ -196,6 +204,10 @@ function buildSecurityEventSummary(
 
     if (
       log.action === "booking_email_failed" ||
+      log.action === "booking_email_tracking_failed" ||
+      log.action === "booking_email_webhook_unmatched" ||
+      log.action === "booking_inquiry_persistence_failed" ||
+      log.action === "security_admin_session_revoke_failed" ||
       log.action === "security_admin_mfa_session_revoke_failed"
     ) {
       summary.operationsFailures7d += 1;
@@ -270,6 +282,10 @@ function mapAdminProfile(row: AdminProfileRow): AdminProfile {
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    authUserFound: null,
+    authCreatedAt: "",
+    lastSignInAt: "",
+    mfaEnrolled: null,
   };
 }
 
@@ -287,7 +303,10 @@ function mapAuditLog(row: AuditLogRow): AuditLogEntry {
 
 function getSecurityChecks(
   profiles: AdminProfile[],
-  databaseRateLimitReady: boolean
+  databaseRateLimitReady: boolean,
+  auditReadReady = false,
+  latestAuditAt = "",
+  authDirectoryReady = false
 ): SecurityCheck[] {
   const allowedEmails = getAllowedAdminEmails();
   const hasServiceKey = hasAdminServiceEnv();
@@ -300,6 +319,7 @@ function getSecurityChecks(
     {
       label: "Supabase Auth",
       ok: hasSupabaseBrowserEnv(),
+      verification: "runtime",
       detail: hasSupabaseBrowserEnv()
         ? "Public Supabase auth variables are configured."
         : "Set NEXT_PUBLIC_SUPABASE_URL and a publishable/anon key.",
@@ -307,6 +327,7 @@ function getSecurityChecks(
     {
       label: "Server Admin Key",
       ok: hasAdminServiceEnv(),
+      verification: "runtime",
       detail: hasAdminServiceEnv()
         ? "Server-side Supabase service key is configured."
         : "Set SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY.",
@@ -321,10 +342,12 @@ function getSecurityChecks(
         : isProduction
           ? "Production requires the server key and active admin profiles."
           : `${allowedEmails.length} local fallback email(s) in ADMIN_EMAILS.`,
+      verification: "runtime",
     },
     {
       label: "Owner Profile",
       ok: (!hasServiceKey && !isProduction) || activeOwners > 0,
+      verification: "runtime",
       detail:
         activeOwners > 0
           ? `${activeOwners} active owner profile(s).`
@@ -335,8 +358,10 @@ function getSecurityChecks(
     {
       label: "Database Rate Limit",
       ok: databaseRateLimitReady,
-      detail:
-        "Admin auth, contact, and analytics throttling use an atomic Supabase database function.",
+      verification: "runtime",
+      detail: databaseRateLimitReady
+        ? "Admin auth, contact, and analytics throttling can reach the atomic database function."
+        : "The atomic database rate-limit function could not be verified. Apply the current migrations and inspect Supabase access.",
     },
     {
       label: "Email Delivery",
@@ -345,7 +370,55 @@ function getSecurityChecks(
           process.env.BOOKING_TO_EMAIL &&
           process.env.BOOKING_FROM_EMAIL
       ),
-      detail: "Booking email delivery depends on Resend and sender settings.",
+      verification: "runtime",
+      detail:
+        process.env.RESEND_API_KEY &&
+        process.env.BOOKING_TO_EMAIL &&
+        process.env.BOOKING_FROM_EMAIL
+          ? "Resend and the booking sender/recipient settings are configured. Delivery webhooks are a separate signal."
+          : "Configure RESEND_API_KEY, BOOKING_TO_EMAIL, and BOOKING_FROM_EMAIL.",
+    },
+    {
+      label: "Delivery Webhook",
+      ok: Boolean(process.env.RESEND_WEBHOOK_SECRET),
+      verification: "runtime",
+      detail: process.env.RESEND_WEBHOOK_SECRET
+        ? "Signed Resend delivery events can update inquiry delivery health."
+        : "Create the /api/resend/webhook endpoint in Resend and set RESEND_WEBHOOK_SECRET.",
+    },
+    {
+      label: "Retention Scheduler",
+      ok: Boolean(process.env.CRON_SECRET),
+      verification: "runtime",
+      detail: process.env.CRON_SECRET
+        ? "The authenticated daily maintenance endpoint is configured."
+        : "Set CRON_SECRET in Vercel so the scheduled retention endpoint can run.",
+    },
+    {
+      label: "Deep Health Monitor",
+      ok: Boolean(process.env.HEALTHCHECK_SECRET),
+      verification: "runtime",
+      detail: process.env.HEALTHCHECK_SECRET
+        ? "Authenticated database and storage health checks are available."
+        : "Set HEALTHCHECK_SECRET for dependency monitoring; public health remains liveness-only.",
+    },
+    {
+      label: "Admin Auth Directory",
+      ok: authDirectoryReady,
+      verification: "runtime",
+      detail: authDirectoryReady
+        ? "Supabase Auth users, MFA enrollment, and sign-in metadata are readable."
+        : "Admin Auth metadata could not be verified with the server key.",
+    },
+    {
+      label: "Audit Read Path",
+      ok: auditReadReady,
+      verification: "runtime",
+      detail: auditReadReady
+        ? latestAuditAt
+          ? `Audit storage is readable. Latest recorded event: ${latestAuditAt}. Write failures are reported separately by server actions.`
+          : "Audit storage is readable. No events have been recorded yet; a safe write probe is not performed on page load."
+        : "The audit log table could not be read. Audit writes also report explicit server errors.",
     },
     {
       label: "Public API Guards",
@@ -425,7 +498,8 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
   canManageAdmins: boolean;
   loadError?: string;
 }> {
-  const allowedEmails = getAllowedAdminEmails();
+  const allowedEmails =
+    process.env.NODE_ENV === "production" ? [] : getAllowedAdminEmails();
 
   if (!hasAdminServiceEnv()) {
     return {
@@ -452,8 +526,13 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
     };
   }
 
-  const [profilesResult, logsResult, securityLogsResult, rateLimitResult] =
-    await Promise.all([
+  const [
+    profilesResult,
+    logsResult,
+    securityLogsResult,
+    rateLimitResult,
+    authDirectoryResult,
+  ] = await Promise.all([
     supabase
       .from("admin_profiles")
       .select("*")
@@ -467,9 +546,29 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
       .returns<AuditLogRow[]>(),
     getSecurityEventLogs(),
     probeDatabaseRateLimit(supabase),
+    supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
   ]);
 
-  const profiles = (profilesResult.data || []).map(mapAdminProfile);
+  const authDirectoryReady = !authDirectoryResult.error;
+  const authUsersById = new Map(
+    (authDirectoryResult.data?.users || []).map((user) => [user.id, user])
+  );
+  const profiles = (profilesResult.data || []).map((row) => {
+    const profile = mapAdminProfile(row);
+    const authUser = authUsersById.get(profile.userId);
+
+    return {
+      ...profile,
+      authUserFound: authDirectoryReady ? Boolean(authUser) : null,
+      authCreatedAt: authUser?.created_at || "",
+      lastSignInAt: authUser?.last_sign_in_at || "",
+      mfaEnrolled: authUser
+        ? Boolean(
+            authUser.factors?.some((factor) => factor.status === "verified")
+          )
+        : null,
+    };
+  });
   const auditLogs = (logsResult.data || []).map(mapAuditLog);
 
   return {
@@ -479,7 +578,13 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
       securityLogsResult.logs,
       securityLogsResult.isCapped
     ),
-    checks: getSecurityChecks(profiles, rateLimitResult),
+    checks: getSecurityChecks(
+      profiles,
+      rateLimitResult,
+      !logsResult.error,
+      auditLogs[0]?.createdAt || "",
+      authDirectoryReady
+    ),
     allowedEmails,
     isConfigured: true,
     canManageAdmins: currentAdmin.role === "owner",

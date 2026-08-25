@@ -1,7 +1,11 @@
 import AdminShell from "@/components/admin/AdminShell";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getAnalyticsSummary } from "@/lib/admin/analytics";
+import {
+  ANALYTICS_RANGE_DAYS,
+  getAnalyticsSummary,
+  type AnalyticsRangeDays,
+} from "@/lib/admin/analytics";
 import { getBookingInquiries } from "@/lib/admin/inquiries";
 import { getPortfolioContent } from "@/lib/content";
 
@@ -14,13 +18,24 @@ export const dynamic = "force-dynamic";
 export default async function AdminAnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{
+    inquiryPage?: string;
+    range?: string;
+    status?: string;
+  }>;
 }) {
   const admin = await requireAdmin();
   const params = await searchParams;
+  const requestedRange = Number(params.range);
+  const rangeDays = ANALYTICS_RANGE_DAYS.includes(
+    requestedRange as AnalyticsRangeDays
+  )
+    ? (requestedRange as AnalyticsRangeDays)
+    : 30;
+  const inquiryPage = Math.max(1, Number.parseInt(params.inquiryPage || "1", 10) || 1);
   const [analyticsResult, inquiriesResult, content] = await Promise.all([
-    getAnalyticsSummary(),
-    getBookingInquiries(),
+    getAnalyticsSummary({ rangeDays }),
+    getBookingInquiries({ page: inquiryPage }),
     getPortfolioContent(),
   ]);
 
@@ -35,13 +50,19 @@ export default async function AdminAnalyticsPage({
     >
       <AnalyticsDashboard
         analytics={analyticsResult.summary}
+        analyticsAvailable={
+          analyticsResult.isConfigured && !analyticsResult.loadError
+        }
+        analyticsConfigured={analyticsResult.isConfigured}
         analyticsError={analyticsResult.loadError}
         inquiries={inquiriesResult.inquiries}
-        inquiriesError={inquiriesResult.loadError}
-        inquirySummary={inquiriesResult.summary}
-        isConfigured={
-          analyticsResult.isConfigured && inquiriesResult.isConfigured
+        inquiriesAvailable={
+          inquiriesResult.isConfigured && !inquiriesResult.loadError
         }
+        inquiriesConfigured={inquiriesResult.isConfigured}
+        inquiriesError={inquiriesResult.loadError}
+        inquiryPagination={inquiriesResult.pagination}
+        inquirySummary={inquiriesResult.summary}
         status={params.status}
       />
     </AdminShell>

@@ -45,6 +45,8 @@ export type MediaAsset = {
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string;
+  deletedBy: string;
 };
 
 type MediaAssetRow = {
@@ -63,6 +65,8 @@ type MediaAssetRow = {
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
 };
 
 function mapAsset(row: MediaAssetRow): MediaAsset {
@@ -82,6 +86,8 @@ function mapAsset(row: MediaAssetRow): MediaAsset {
     metadata: row.metadata || {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    deletedAt: row.deleted_at || "",
+    deletedBy: row.deleted_by || "",
   };
 }
 
@@ -107,7 +113,8 @@ export function formatBytes(bytes: number) {
     unitIndex += 1;
   }
 
-  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+  const precision = Number.isInteger(value) || value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }
 
 export async function ensureMediaBucket(supabase: SupabaseClient) {
@@ -136,7 +143,9 @@ export async function ensureMediaBucket(supabase: SupabaseClient) {
   return { data: { name: MEDIA_BUCKET }, error: null };
 }
 
-export async function getMediaAssets(): Promise<{
+export async function getMediaAssets(options?: {
+  includeDeleted?: boolean;
+}): Promise<{
   assets: MediaAsset[];
   isConfigured: boolean;
   loadError?: string;
@@ -175,7 +184,9 @@ export async function getMediaAssets(): Promise<{
   }
 
   return {
-    assets: (data || []).map(mapAsset),
+    assets: (data || [])
+      .map(mapAsset)
+      .filter((asset) => options?.includeDeleted || !asset.deletedAt),
     isConfigured: true,
   };
 }

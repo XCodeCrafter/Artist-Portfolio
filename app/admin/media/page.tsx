@@ -21,7 +21,7 @@ export default async function AdminMediaPage({
   const admin = await requireAdmin();
   const params = await searchParams;
   const [mediaResult, contentResult] = await Promise.all([
-    getMediaAssets(),
+    getMediaAssets({ includeDeleted: true }),
     getEditablePortfolioContent(),
   ]);
   const portfolioType = contentResult.content.settings.portfolioType;

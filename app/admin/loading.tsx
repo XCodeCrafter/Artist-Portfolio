@@ -24,7 +24,7 @@ export default function AdminLoading() {
         </aside>
 
         <section className="min-w-0 flex-1">
-          <SkeletonBlock className="h-72" />
+          <SkeletonBlock className="h-16 lg:h-40" />
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
               <SkeletonBlock className="h-44" key={index} />

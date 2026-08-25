@@ -30,6 +30,7 @@ const PUBLIC_PAGE_PATHS = [
 ] as const;
 
 const PublicPagePathSchema = z.enum(PUBLIC_PAGE_PATHS);
+const SessionIdSchema = z.string().uuid().optional().default("");
 const PageViewMetadataSchema = z
   .object({
     title: z.string().trim().max(300).optional(),
@@ -38,6 +39,24 @@ const PageViewMetadataSchema = z
   .optional()
   .default({});
 const EmptyMetadataSchema = z.object({}).strict().optional().default({});
+const EngagementMetadataSchema = z
+  .object({
+    action: z.enum([
+      "cta_click",
+      "gallery_open",
+      "video_open",
+      "video_play",
+      "contact_start",
+    ]),
+  })
+  .strict();
+const WebVitalMetadataSchema = z
+  .object({
+    name: z.enum(["LCP", "INP", "CLS"]),
+    value: z.number().finite().min(0).max(120_000),
+    rating: z.enum(["good", "needs-improvement", "poor"]),
+  })
+  .strict();
 
 function isSafeHttpsUrl(value: string) {
   try {
@@ -67,6 +86,7 @@ const AnalyticsEventSchema = z.discriminatedUnion("eventName", [
   z.object({
     eventName: z.literal("page_view"),
     pagePath: PublicPagePathSchema,
+    sessionId: SessionIdSchema,
     targetLabel: z.literal("").optional().default(""),
     targetUrl: z.literal("").optional().default(""),
     metadata: PageViewMetadataSchema,
@@ -74,9 +94,26 @@ const AnalyticsEventSchema = z.discriminatedUnion("eventName", [
   z.object({
     eventName: z.literal("outbound_click"),
     pagePath: PublicPagePathSchema,
+    sessionId: SessionIdSchema,
     targetLabel: z.string().trim().max(220).optional().default(""),
     targetUrl: SafeHttpsUrlSchema,
     metadata: EmptyMetadataSchema,
+  }),
+  z.object({
+    eventName: z.literal("engagement"),
+    pagePath: PublicPagePathSchema,
+    sessionId: SessionIdSchema,
+    targetLabel: z.string().trim().max(220).optional().default(""),
+    targetUrl: z.literal("").optional().default(""),
+    metadata: EngagementMetadataSchema,
+  }),
+  z.object({
+    eventName: z.literal("web_vital"),
+    pagePath: PublicPagePathSchema,
+    sessionId: SessionIdSchema,
+    targetLabel: z.literal("").optional().default(""),
+    targetUrl: z.literal("").optional().default(""),
+    metadata: WebVitalMetadataSchema,
   }),
 ]);
 
@@ -91,9 +128,41 @@ function sanitizeHeaderValue(value?: string | null) {
 function getRequestMeta(req: Request) {
   const userAgent = req.headers.get("user-agent") || "";
 
+  let referrerDomain = "";
+  const referrer = getReferrerWithoutQuery(req.headers);
+  if (referrer) {
+    try {
+      referrerDomain = new URL(referrer).hostname.replace(/^www\./, "").slice(0, 120);
+      const requestHost = (req.headers.get("host") || "")
+        .split(":")[0]
+        .replace(/^www\./, "");
+      if (referrerDomain && referrerDomain === requestHost) {
+        referrerDomain = "Internal navigation";
+      }
+    } catch {
+      referrerDomain = "";
+    }
+  }
+
+  const deviceCategory = /tablet|ipad/i.test(userAgent)
+    ? "Tablet"
+    : /mobile|iphone|android/i.test(userAgent)
+      ? "Mobile"
+      : "Desktop";
+  const browserCategory = /edg\//i.test(userAgent)
+    ? "Edge"
+    : /firefox\//i.test(userAgent)
+      ? "Firefox"
+      : /chrome\//i.test(userAgent)
+        ? "Chrome"
+        : /safari\//i.test(userAgent)
+          ? "Safari"
+          : "Other / unknown";
+
   return {
-    referrer: getReferrerWithoutQuery(req.headers),
-    userAgent: userAgent.slice(0, 500),
+    referrerDomain: referrerDomain || "Direct / unknown",
+    deviceCategory,
+    browserCategory,
   };
 }
 
@@ -186,9 +255,14 @@ export async function POST(req: Request) {
   }
 
   const clientMetadata =
-    parsed.data.eventName === "page_view" && parsed.data.metadata.title
-      ? { title: parsed.data.metadata.title }
-      : {};
+    parsed.data.eventName === "page_view"
+      ? parsed.data.metadata.title
+        ? { title: parsed.data.metadata.title }
+        : {}
+      : parsed.data.eventName === "engagement" ||
+          parsed.data.eventName === "web_vital"
+        ? parsed.data.metadata
+        : {};
 
   const { error } = await supabase.from("analytics_events").insert({
     event_name: parsed.data.eventName,
@@ -197,6 +271,7 @@ export async function POST(req: Request) {
     target_url: parsed.data.targetUrl,
     metadata: {
       ...clientMetadata,
+      ...(parsed.data.sessionId ? { sessionId: parsed.data.sessionId } : {}),
       ...getRequestMeta(req),
     },
   });

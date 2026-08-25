@@ -29,9 +29,15 @@ function formChecked(formData: FormData, key: string) {
   return formData.get(key) === "on";
 }
 
+function isLastOwnerError(error: { message?: string } | null) {
+  return Boolean(
+    error?.message?.toLowerCase().includes("at least one active owner")
+  );
+}
+
 function redirectToStatus(status: string): never {
   const params = new URLSearchParams({ status });
-  redirect(`${SECURITY_PATH}?${params.toString()}#admin-profiles`);
+  redirect(`${SECURITY_PATH}?${params.toString()}#access`);
 }
 
 async function getOwnerWriteContext() {
@@ -50,6 +56,46 @@ async function getOwnerWriteContext() {
   }
 
   return { admin, supabase };
+}
+
+async function revokeSessions(
+  supabase: NonNullable<ReturnType<typeof createAdminServiceClient>>,
+  actorId: string,
+  targetUserId: string
+) {
+  const result = await supabase.rpc("revoke_admin_user_sessions", {
+    target_user_id: targetUserId,
+  });
+
+  if (!result.error) return true;
+
+  console.error(result.error);
+  await writeAuditLog({
+    actorId,
+    action: "security_admin_session_revoke_failed",
+    tableName: "auth",
+    recordId: targetUserId,
+    metadata: { errorCode: result.error.code || "unknown" },
+  });
+  return false;
+}
+
+async function hasAdminProfile(
+  supabase: NonNullable<ReturnType<typeof createAdminServiceClient>>,
+  userId: string
+) {
+  const result = await supabase
+    .from("admin_profiles")
+    .select("user_id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle<{ user_id: string }>();
+
+  if (result.error) {
+    console.error(result.error);
+    redirectToStatus("profile-check-error");
+  }
+  return Boolean(result.data);
 }
 
 export async function saveAdminProfile(formData: FormData) {
@@ -92,16 +138,20 @@ export async function saveAdminProfile(formData: FormData) {
 
   if (result.error) {
     console.error(result.error);
+    if (isLastOwnerError(result.error)) {
+      redirectToStatus("last-owner-required");
+    }
     redirectToStatus("save-error");
   }
 
-  if (!parsed.data.isActive) {
-    await supabase.rpc("revoke_admin_user_sessions", {
-      target_user_id: parsed.data.userId,
-    });
+  if (
+    !parsed.data.isActive &&
+    !(await revokeSessions(supabase, admin.id, parsed.data.userId))
+  ) {
+    redirectToStatus("session-revoke-error");
   }
 
-  await writeAuditLog({
+  const auditResult = await writeAuditLog({
     actorId: admin.id,
     action: "admin_profile_save",
     tableName: "admin_profiles",
@@ -115,7 +165,7 @@ export async function saveAdminProfile(formData: FormData) {
 
   revalidatePath(SECURITY_PATH);
   revalidatePath("/admin");
-  redirectToStatus("saved");
+  redirectToStatus(auditResult.ok ? "saved" : "saved-audit-warning");
 }
 
 export async function deleteAdminProfile(formData: FormData) {
@@ -130,6 +180,13 @@ export async function deleteAdminProfile(formData: FormData) {
   if (parsed.data.userId === admin.id) {
     redirectToStatus("self-protected");
   }
+  if (!(await hasAdminProfile(supabase, parsed.data.userId))) {
+    redirectToStatus("admin-not-found");
+  }
+
+  if (!(await revokeSessions(supabase, admin.id, parsed.data.userId))) {
+    redirectToStatus("session-revoke-error");
+  }
 
   const result = await supabase
     .from("admin_profiles")
@@ -138,14 +195,13 @@ export async function deleteAdminProfile(formData: FormData) {
 
   if (result.error) {
     console.error(result.error);
+    if (isLastOwnerError(result.error)) {
+      redirectToStatus("last-owner-required");
+    }
     redirectToStatus("delete-error");
   }
 
-  await supabase.rpc("revoke_admin_user_sessions", {
-    target_user_id: parsed.data.userId,
-  });
-
-  await writeAuditLog({
+  const auditResult = await writeAuditLog({
     actorId: admin.id,
     action: "admin_profile_delete",
     tableName: "admin_profiles",
@@ -154,7 +210,34 @@ export async function deleteAdminProfile(formData: FormData) {
 
   revalidatePath(SECURITY_PATH);
   revalidatePath("/admin");
-  redirectToStatus("deleted");
+  redirectToStatus(auditResult.ok ? "deleted" : "deleted-audit-warning");
+}
+
+export async function revokeAdminSessions(formData: FormData) {
+  const parsed = deleteProfileSchema.safeParse({
+    userId: formValue(formData, "userId"),
+  });
+  if (!parsed.success) redirectToStatus("invalid");
+
+  const { admin, supabase } = await getOwnerWriteContext();
+  if (!(await hasAdminProfile(supabase, parsed.data.userId))) {
+    redirectToStatus("admin-not-found");
+  }
+  if (!(await revokeSessions(supabase, admin.id, parsed.data.userId))) {
+    redirectToStatus("session-revoke-error");
+  }
+
+  const auditResult = await writeAuditLog({
+    actorId: admin.id,
+    action: "admin_sessions_revoked",
+    tableName: "auth",
+    recordId: parsed.data.userId,
+  });
+
+  revalidatePath(SECURITY_PATH);
+  redirectToStatus(
+    auditResult.ok ? "sessions-revoked" : "sessions-revoked-audit-warning"
+  );
 }
 
 export async function resetAdminMfa(formData: FormData) {
@@ -164,6 +247,9 @@ export async function resetAdminMfa(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid");
 
   const { admin, supabase } = await getOwnerWriteContext();
+  if (!(await hasAdminProfile(supabase, parsed.data.userId))) {
+    redirectToStatus("admin-not-found");
+  }
   const factors = await supabase.auth.admin.mfa.listFactors({
     userId: parsed.data.userId,
   });

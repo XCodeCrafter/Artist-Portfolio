@@ -1,10 +1,25 @@
 import "server-only";
 
-type JsonBodyErrorCode =
+type LimitedBodyErrorCode =
   | "invalid-content-length"
   | "invalid-payload"
-  | "payload-too-large"
-  | "unsupported-media-type";
+  | "payload-too-large";
+
+type JsonBodyErrorCode = LimitedBodyErrorCode | "unsupported-media-type";
+
+export type TextBodyReadResult =
+  | {
+      ok: true;
+      body: string;
+      bytes: number;
+    }
+  | {
+      ok: false;
+      status: 400 | 413;
+      code: LimitedBodyErrorCode;
+      bytes: number;
+      declaredLength?: number;
+    };
 
 export type JsonBodyReadResult =
   | {
@@ -25,25 +40,16 @@ function getMediaType(contentType: string | null) {
 }
 
 /**
- * Reads a JSON request body without ever buffering more than maxBytes.
+ * Reads a UTF-8 request body without ever buffering more than maxBytes.
  * Content-Length is only an early rejection hint; the stream limit remains
  * authoritative because clients can omit or falsify that header.
  */
-export async function readJsonBodyWithLimit(
+export async function readTextBodyWithLimit(
   request: Request,
   maxBytes: number
-): Promise<JsonBodyReadResult> {
+): Promise<TextBodyReadResult> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
     throw new RangeError("maxBytes must be a positive safe integer");
-  }
-
-  if (getMediaType(request.headers.get("content-type")) !== "application/json") {
-    return {
-      ok: false,
-      status: 415,
-      code: "unsupported-media-type",
-      bytes: 0,
-    };
   }
 
   const rawContentLength = request.headers.get("content-length");
@@ -130,13 +136,46 @@ export async function readJsonBodyWithLimit(
 
   try {
     const raw = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
-    return { ok: true, body: JSON.parse(raw) as unknown, bytes };
+    return { ok: true, body: raw, bytes };
   } catch {
     return {
       ok: false,
       status: 400,
       code: "invalid-payload",
       bytes,
+    };
+  }
+}
+
+/** Reads and parses a bounded JSON body with strict UTF-8 and media type checks. */
+export async function readJsonBodyWithLimit(
+  request: Request,
+  maxBytes: number
+): Promise<JsonBodyReadResult> {
+  if (getMediaType(request.headers.get("content-type")) !== "application/json") {
+    return {
+      ok: false,
+      status: 415,
+      code: "unsupported-media-type",
+      bytes: 0,
+    };
+  }
+
+  const result = await readTextBodyWithLimit(request, maxBytes);
+  if (!result.ok) return result;
+
+  try {
+    return {
+      ok: true,
+      body: JSON.parse(result.body) as unknown,
+      bytes: result.bytes,
+    };
+  } catch {
+    return {
+      ok: false,
+      status: 400,
+      code: "invalid-payload",
+      bytes: result.bytes,
     };
   }
 }

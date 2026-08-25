@@ -3,8 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
+  createContext,
+  useCallback,
   useEffect,
   useId,
+  useContext,
   useMemo,
   useRef,
   useState,
@@ -801,6 +804,39 @@ type StudioPanel = {
   node: ReactNode;
 };
 
+const DirtyPanelsContext = createContext<ReadonlySet<string>>(new Set());
+const EditorSectionNavigationContext = createContext<ReactNode>(null);
+
+function useHorizontalOverflowCue<T extends HTMLElement>() {
+  const [element, setElement] = useState<T | null>(null);
+  const [showEndCue, setShowEndCue] = useState(false);
+  const scrollRef = useCallback((node: T | null) => {
+    setElement(node);
+  }, []);
+
+  useEffect(() => {
+    if (!element) return;
+
+    const updateCue = () => {
+      setShowEndCue(
+        element.scrollLeft + element.clientWidth < element.scrollWidth - 2
+      );
+    };
+    const frame = window.requestAnimationFrame(updateCue);
+    const observer = new ResizeObserver(updateCue);
+    observer.observe(element);
+    element.addEventListener("scroll", updateCue, { passive: true });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      element.removeEventListener("scroll", updateCue);
+    };
+  }, [element]);
+
+  return { scrollRef, showEndCue };
+}
+
 function StudioWorkspace({
   description,
   label,
@@ -817,13 +853,20 @@ function StudioWorkspace({
   sectionId: string;
 }) {
   const workspaceId = useId().replace(/:/g, "");
+  const dirtyPanelIds = useContext(DirtyPanelsContext);
+  const sectionNavigation = useContext(EditorSectionNavigationContext);
   const [activePanelId, setActivePanelId] = useState("preview");
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const { scrollRef: tabScrollerRef, showEndCue: showTabEndCue } =
+    useHorizontalOverflowCue<HTMLDivElement>();
+  const hasWorkspaceDrafts = panels.some((panel) =>
+    dirtyPanelIds.has(panel.id)
+  );
   const tabs = [
     {
       description: "Latest saved version of the public page.",
       id: "preview",
-      label: "Page preview",
+      label: "Saved preview",
     },
     ...panels,
   ];
@@ -882,42 +925,30 @@ function StudioWorkspace({
 
   return (
     <div className="min-w-0">
-      <section className="sticky top-3 z-30 overflow-hidden rounded-[24px] border border-white/10 bg-[#0d0d0f]/96 shadow-[0_22px_75px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
-        <div className="flex flex-col gap-3 border-b border-white/8 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#ff3b1f]" />
-              <p className="truncate text-sm font-semibold text-white/82">
-                {label}
-              </p>
-            </div>
-            <p className="mt-1 text-xs leading-5 text-white/38">{description}</p>
-          </div>
-          <Link
-            aria-label={`Open ${label} on the public site`}
-            className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[11px] font-semibold text-white/60 transition hover:bg-white hover:text-black sm:self-auto"
-            href={publicHref}
-            rel="noreferrer"
-            target="_blank"
-          >
-            Open public page
-            <FaExternalLinkAlt className="text-[9px]" />
-          </Link>
-        </div>
-
+      <section
+        aria-describedby={`${workspaceId}-description`}
+        className="sticky top-3 z-40 overflow-hidden rounded-[24px] border border-white/10 bg-[#0d0d0f]/96 shadow-[0_22px_75px_rgba(0,0,0,0.38)] backdrop-blur-2xl"
+      >
+        <p className="sr-only" id={`${workspaceId}-description`}>
+          {description}
+        </p>
+        {sectionNavigation}
         <div className="relative">
           <div
+            aria-describedby={`${workspaceId}-scroll-help`}
             aria-label={`${label} editor sections`}
-            className="admin-scrollbar-none flex snap-x gap-1.5 overflow-x-auto p-2.5 pr-12 lg:pr-2.5"
+            className="admin-scrollbar-none flex snap-x gap-1.5 overflow-x-auto p-2.5 pr-14 sm:pr-28"
+            ref={tabScrollerRef}
             role="tablist"
           >
             {tabs.map((tab, index) => {
               const active = tab.id === activePanelId;
+              const dirty = tab.id !== "preview" && dirtyPanelIds.has(tab.id);
               const tabId = `${workspaceId}-tab-${tab.id}`;
               const panelId = `${workspaceId}-panel-${tab.id}`;
               return (
                 <button
-                  aria-label={`${String(index).padStart(2, "0")} ${tab.label}: ${tab.description}`}
+                  aria-label={`${String(index).padStart(2, "0")} ${tab.label}: ${tab.description}${dirty ? " — unsaved changes" : ""}`}
                   aria-controls={panelId}
                   aria-selected={active}
                   className={`group/tab flex min-h-11 min-w-max snap-start items-center gap-2.5 rounded-xl border px-3.5 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-white/60 ${
@@ -944,18 +975,40 @@ function StudioWorkspace({
                     {String(index).padStart(2, "0")}
                   </span>
                   <span className="text-xs font-semibold">{tab.label}</span>
+                  {dirty ? (
+                    <span
+                      aria-hidden="true"
+                      className="h-1.5 w-1.5 rounded-full bg-amber-200 shadow-[0_0_10px_rgba(253,230,138,0.7)]"
+                    />
+                  ) : null}
                 </button>
               );
             })}
           </div>
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#0d0d0f] via-[#0d0d0f]/88 to-transparent lg:hidden"
-          />
+          <span className="sr-only" id={`${workspaceId}-scroll-help`}>
+            Scroll horizontally to reveal more editor sections.
+          </span>
+          {showTabEndCue ? (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-[#0d0d0f] via-[#0d0d0f]/92 to-transparent sm:w-28"
+            />
+          ) : null}
+          <Link
+            aria-label={`Open ${label} on the public site`}
+            className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#171719] text-[11px] font-semibold text-white/60 shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition hover:bg-white hover:text-black sm:w-auto sm:px-3"
+            href={publicHref}
+            rel="noreferrer"
+            target="_blank"
+            title={`Open ${label} on the public site`}
+          >
+            <span className="hidden sm:inline">View page</span>
+            <FaExternalLinkAlt className="text-[9px]" />
+          </Link>
         </div>
       </section>
 
-      <div className="mt-4">
+      <div className="mt-4" id="site-editor-active-panel">
         <div
           aria-labelledby={`${workspaceId}-tab-preview`}
           data-editor-panel-id="preview"
@@ -965,13 +1018,31 @@ function StudioWorkspace({
         >
           {activePanelId === "preview" ? (
             <>
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.045] px-4 py-2.5">
-              <span className="inline-flex items-center gap-2 text-[11px] font-semibold text-emerald-100/64">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+            <div
+              className={`mb-3 flex items-center justify-between gap-3 rounded-2xl border px-4 py-2.5 ${
+                hasWorkspaceDrafts
+                  ? "border-amber-300/14 bg-amber-300/[0.05]"
+                  : "border-emerald-300/10 bg-emerald-300/[0.045]"
+              }`}
+            >
+              <span
+                className={`inline-flex items-center gap-2 text-[11px] font-semibold ${
+                  hasWorkspaceDrafts
+                    ? "text-amber-100/70"
+                    : "text-emerald-100/64"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    hasWorkspaceDrafts ? "bg-amber-300" : "bg-emerald-300"
+                  }`}
+                />
                 Latest saved version
               </span>
               <span className="text-[10px] text-white/30">
-                Save a panel to refresh this view
+                {hasWorkspaceDrafts
+                  ? "Unsaved drafts are not shown"
+                  : "Save a panel to refresh this view"}
               </span>
             </div>
             {preview}
@@ -2273,8 +2344,8 @@ function BioParagraphsEditor({
                 <div className="flex items-start gap-2 lg:flex-col">
                   <span className="grid h-10 min-w-10 place-items-center rounded-xl border border-white/10 text-sm font-semibold text-white/55">{String(index + 1).padStart(2, "0")}</span>
                   <div className="flex gap-1">
-                    <button aria-label="Move paragraph up" className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 text-white/55 hover:bg-white hover:text-black disabled:opacity-30" disabled={index === 0} onClick={() => moveParagraph(index, -1)} type="button"><FaArrowUp /></button>
-                    <button aria-label="Move paragraph down" className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 text-white/55 hover:bg-white hover:text-black disabled:opacity-30" disabled={index === paragraphs.length - 1} onClick={() => moveParagraph(index, 1)} type="button"><FaArrowDown /></button>
+                    <button aria-label="Move paragraph up" className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 text-white/55 hover:bg-white hover:text-black disabled:opacity-30" data-editor-dirty-action disabled={index === 0} onClick={() => moveParagraph(index, -1)} type="button"><FaArrowUp /></button>
+                    <button aria-label="Move paragraph down" className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 text-white/55 hover:bg-white hover:text-black disabled:opacity-30" data-editor-dirty-action disabled={index === paragraphs.length - 1} onClick={() => moveParagraph(index, 1)} type="button"><FaArrowDown /></button>
                   </div>
                 </div>
 
@@ -2286,14 +2357,14 @@ function BioParagraphsEditor({
                 <div className="grid content-start gap-3">
                   <label><span className={labelClass}>Reveal delay</span><input className={inputClass} min="0" max="5000" onChange={(event) => updateParagraph(item.clientKey, { revealDelay: Number(event.target.value) || 0 })} type="number" value={item.revealDelay} /></label>
                   <label className="flex h-11 items-center gap-3 rounded-xl border border-white/10 px-3 text-sm text-white/70"><input checked={item.isPublished} className="h-4 w-4 accent-white" onChange={(event) => updateParagraph(item.clientKey, { isPublished: event.target.checked })} type="checkbox" /> Published</label>
-                  <button className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-300/20 text-sm font-semibold text-red-200 hover:bg-red-500/10" onClick={() => setParagraphs((current) => current.filter((entry) => entry.clientKey !== item.clientKey))} type="button"><FaTrash /> Remove</button>
+                  <button className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-300/20 text-sm font-semibold text-red-200 hover:bg-red-500/10" data-editor-dirty-action onClick={() => setParagraphs((current) => current.filter((entry) => entry.clientKey !== item.clientKey))} type="button"><FaTrash /> Remove</button>
                 </div>
               </div>
             ))}
           </div>
 
           <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/12 px-4 text-sm font-semibold text-white/75 hover:bg-white hover:text-black" onClick={addParagraph} type="button"><FaPlus /> Add paragraph</button>
+            <button className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/12 px-4 text-sm font-semibold text-white/75 hover:bg-white hover:text-black" data-editor-dirty-action onClick={addParagraph} type="button"><FaPlus /> Add paragraph</button>
             <ActionButton className={buttonClass} disabled={disabled || paragraphs.some((item) => !item.body.trim())} pendingLabel="Saving all...">Save all paragraphs</ActionButton>
           </div>
         </fieldset>
@@ -3138,6 +3209,9 @@ export default function ContentEditor({
   const [dirtyPanelIds, setDirtyPanelIds] = useState<Set<string>>(
     () => new Set()
   );
+  const [dirtyForms, setDirtyForms] = useState<Set<HTMLFormElement>>(
+    () => new Set()
+  );
 
   useEffect(() => {
     const syncHash = () => {
@@ -3181,11 +3255,30 @@ export default function ContentEditor({
   const resolvedSectionId = sectionAliases[activeSectionId] || activeSectionId;
   const activeSection =
     sections.find((section) => section.id === resolvedSectionId) || sections[0];
+  const sectionNavRef = useRef<HTMLElement | null>(null);
+  const {
+    scrollRef: sectionNavScrollerRef,
+    showEndCue: showSectionNavEndCue,
+  } = useHorizontalOverflowCue<HTMLDivElement>();
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      sectionNavRef.current
+        ?.querySelector<HTMLElement>("[aria-pressed='true']")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "nearest",
+        });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeSection?.id]);
 
   function openSection(id: string) {
     if (id === activeSection?.id) return;
     if (!confirmDiscard()) return;
     setDirtyPanelIds(new Set());
+    setDirtyForms(new Set());
     setActiveSectionId(id);
     window.history.replaceState(
       window.history.state,
@@ -3197,7 +3290,7 @@ export default function ContentEditor({
       ?.scrollIntoView({ block: "start" });
   }
 
-  function rememberDirtyPanel(target: EventTarget | null) {
+  function rememberDirtyDraft(target: EventTarget | null) {
     if (!(target instanceof Element)) return;
     const panelId = target
       .closest<HTMLElement>("[data-editor-panel-id]")
@@ -3207,6 +3300,15 @@ export default function ContentEditor({
       if (current.has(panelId)) return current;
       const next = new Set(current);
       next.add(panelId);
+      return next;
+    });
+
+    const form = target.closest<HTMLFormElement>("form");
+    if (!form) return;
+    setDirtyForms((current) => {
+      if (current.has(form)) return current;
+      const next = new Set(current);
+      next.add(form);
       return next;
     });
   }
@@ -3250,13 +3352,137 @@ export default function ContentEditor({
   const sharedSections = sections.filter((section) =>
     ["navigation", "settings", "socials"].includes(section.id)
   );
+  const siteEditorNavigation = (
+    <nav
+      aria-label="Site editor sections"
+      className="relative overflow-hidden border-b border-white/8"
+      ref={sectionNavRef}
+    >
+      <div
+        aria-describedby="site-editor-sections-scroll-help"
+        className="admin-scrollbar-none flex items-center gap-2 overflow-x-auto p-2.5 pr-12"
+        ref={sectionNavScrollerRef}
+      >
+        <span className="shrink-0 px-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/26">
+          Pages
+        </span>
+        {publicPageItems.map((page) => {
+          const active = page.sectionId === activeSection?.id;
+          const contentNode = (
+            <>
+              <span className="text-[11px]">{page.icon}</span>
+              <span className="whitespace-nowrap text-xs font-semibold">
+                {page.label}
+              </span>
+              <span
+                aria-label={
+                  page.isVisible ? "Shown in navbar" : "Hidden from navbar"
+                }
+                className={`h-1.5 w-1.5 rounded-full ${
+                  page.isVisible ? "bg-emerald-300/70" : "bg-amber-300/65"
+                }`}
+                role="img"
+              />
+              {page.editorHref ? (
+                <FaExternalLinkAlt className="text-[8px] text-white/32" />
+              ) : null}
+            </>
+          );
+          const className = `flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 transition ${
+            active
+              ? "border-[#ff7059]/28 bg-[#ff3b1f] text-white"
+              : "border-white/7 bg-white/[0.025] text-white/48 hover:border-white/14 hover:bg-white/[0.065] hover:text-white"
+          }`;
+
+          return page.editorHref ? (
+            <Link
+              className={className}
+              href={page.editorHref}
+              key={`${page.key}-${page.href}`}
+            >
+              {contentNode}
+            </Link>
+          ) : (
+            <button
+              aria-controls="site-editor-active-panel"
+              aria-pressed={active}
+              className={className}
+              id={`site-editor-section-${page.sectionId}`}
+              key={`${page.key}-${page.href}`}
+              onClick={() => openSection(page.sectionId)}
+              type="button"
+            >
+              {contentNode}
+            </button>
+          );
+        })}
+
+        <span className="mx-1 h-7 w-px shrink-0 bg-white/10" />
+        <span className="shrink-0 px-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/26">
+          Site-wide
+        </span>
+        {sharedSections.map((section) => {
+          const active = section.id === activeSection?.id;
+          const icon =
+            section.id === "navigation" ? (
+              <FaBars />
+            ) : section.id === "settings" ? (
+              <FaPalette />
+            ) : (
+              <FaGlobe />
+            );
+
+          return (
+            <button
+              aria-controls="site-editor-active-panel"
+              aria-pressed={active}
+              className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${
+                active
+                  ? "border-[#ff7059]/28 bg-[#ff3b1f] text-white"
+                  : "border-white/7 bg-white/[0.025] text-white/48 hover:border-white/14 hover:bg-white/[0.065] hover:text-white"
+              }`}
+              id={`site-editor-section-${section.id}`}
+              key={section.id}
+              onClick={() => openSection(section.id)}
+              type="button"
+            >
+              <span className="text-[11px]">{icon}</span>
+              <span className="whitespace-nowrap">{section.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <span className="sr-only" id="site-editor-sections-scroll-help">
+        Scroll horizontally to reveal more pages and site-wide settings.
+      </span>
+      {showSectionNavEndCue ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 grid w-10 place-items-center bg-gradient-to-l from-[#0d0d0f] via-[#0d0d0f]/92 to-transparent text-xs text-white/36"
+        >
+          →
+        </span>
+      ) : null}
+    </nav>
+  );
 
   return (
     <div
       className="grid gap-4"
       onChangeCapture={(event) => {
+        const target = event.target;
+        if (
+          !(
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLSelectElement ||
+            target instanceof HTMLTextAreaElement
+          ) ||
+          !target.name
+        ) {
+          return;
+        }
         markDirty();
-        rememberDirtyPanel(event.target);
+        rememberDirtyDraft(target);
       }}
       onClickCapture={(event) => {
         const target = event.target;
@@ -3265,10 +3491,12 @@ export default function ContentEditor({
         if (
           button instanceof HTMLButtonElement &&
           button.type === "button" &&
-          button.closest("form")
+          button.closest("form") &&
+          (button.hasAttribute("data-editor-dirty-action") ||
+            button.getAttribute("aria-label")?.startsWith("Use "))
         ) {
           markDirty();
-          rememberDirtyPanel(button);
+          rememberDirtyDraft(button);
         }
       }}
       onSubmit={(event) => {
@@ -3280,14 +3508,17 @@ export default function ContentEditor({
                 .closest<HTMLElement>("[data-editor-panel-id]")
                 ?.getAttribute("data-editor-panel-id")
             : null;
-        const otherDrafts = [...dirtyPanelIds].filter(
+        const otherDraftForms = [...dirtyForms].filter(
+          (dirtyForm) => dirtyForm !== form && dirtyForm.isConnected
+        );
+        const otherDraftPanels = [...dirtyPanelIds].filter(
           (panelId) => panelId !== submittingPanelId
         );
 
         if (
-          otherDrafts.length > 0 &&
+          (otherDraftForms.length > 0 || otherDraftPanels.length > 0) &&
           !window.confirm(
-            "You also have unsaved changes in another panel. Saving now reloads the editor and discards those drafts. Continue?"
+            "You also have unsaved changes in another form. Saving now reloads the editor and discards those drafts. Continue?"
           )
         ) {
           event.preventDefault();
@@ -3295,6 +3526,7 @@ export default function ContentEditor({
         }
 
         setDirtyPanelIds(new Set());
+        setDirtyForms(new Set());
         clearDirty();
       }}
     >
@@ -3305,109 +3537,20 @@ export default function ContentEditor({
       />
 
       <div className="min-w-0">
-        <nav
-          aria-label="Site editor sections"
-          className="relative mb-4 overflow-hidden rounded-[24px] border border-white/10 bg-[#0d0d0f]/94 shadow-[0_20px_70px_rgba(0,0,0,0.25)]"
-        >
-          <div className="admin-scrollbar-none flex items-center gap-2 overflow-x-auto p-2.5 pr-12 lg:pr-2.5">
-            <span className="shrink-0 px-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/26">
-              Pages
-            </span>
-            {publicPageItems.map((page) => {
-              const active = page.sectionId === activeSection?.id;
-              const contentNode = (
-                <>
-                  <span className="text-[11px]">{page.icon}</span>
-                  <span className="whitespace-nowrap text-xs font-semibold">
-                    {page.label}
-                  </span>
-                  <span
-                    aria-label={
-                      page.isVisible ? "Shown in navbar" : "Hidden from navbar"
-                    }
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      page.isVisible ? "bg-emerald-300/70" : "bg-amber-300/65"
-                    }`}
-                    role="img"
-                  />
-                  {page.editorHref ? (
-                    <FaExternalLinkAlt className="text-[8px] text-white/32" />
-                  ) : null}
-                </>
-              );
-              const className = `flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 transition ${
-                active
-                  ? "border-[#ff7059]/28 bg-[#ff3b1f] text-white"
-                  : "border-white/7 bg-white/[0.025] text-white/48 hover:border-white/14 hover:bg-white/[0.065] hover:text-white"
-              }`;
-
-              return page.editorHref ? (
-                <Link
-                  className={className}
-                  href={page.editorHref}
-                  key={`${page.key}-${page.href}`}
-                >
-                  {contentNode}
-                </Link>
-              ) : (
-                <button
-                  aria-pressed={active}
-                  className={className}
-                  key={`${page.key}-${page.href}`}
-                  onClick={() => openSection(page.sectionId)}
-                  type="button"
-                >
-                  {contentNode}
-                </button>
-              );
-            })}
-
-            <span className="mx-1 h-7 w-px shrink-0 bg-white/10" />
-            <span className="shrink-0 px-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/26">
-              Site-wide
-            </span>
-            {sharedSections.map((section) => {
-              const active = section.id === activeSection?.id;
-              const icon =
-                section.id === "navigation" ? (
-                  <FaBars />
-                ) : section.id === "settings" ? (
-                  <FaPalette />
-                ) : (
-                  <FaGlobe />
-                );
-
-              return (
-                <button
-                  aria-pressed={active}
-                  className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${
-                    active
-                      ? "border-[#ff7059]/28 bg-[#ff3b1f] text-white"
-                      : "border-white/7 bg-white/[0.025] text-white/48 hover:border-white/14 hover:bg-white/[0.065] hover:text-white"
-                  }`}
-                  key={section.id}
-                  onClick={() => openSection(section.id)}
-                  type="button"
-                >
-                  <span className="text-[11px]">{icon}</span>
-                  <span className="whitespace-nowrap">{section.label}</span>
-                </button>
-              );
-            })}
-          </div>
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#0d0d0f] via-[#0d0d0f]/88 to-transparent lg:hidden"
-          />
-        </nav>
-
         <div className="min-w-0">
           <div
+            aria-labelledby={`site-editor-section-${activeSection?.id}`}
             className="scroll-mt-28"
             id="content-workspace"
             key={activeSection?.id}
+            role="region"
+            tabIndex={-1}
           >
-            {activeSection?.node}
+            <EditorSectionNavigationContext.Provider value={siteEditorNavigation}>
+              <DirtyPanelsContext.Provider value={dirtyPanelIds}>
+                {activeSection?.node}
+              </DirtyPanelsContext.Provider>
+            </EditorSectionNavigationContext.Provider>
           </div>
         </div>
       </div>
@@ -3419,7 +3562,9 @@ export default function ContentEditor({
           role="status"
         >
           <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-          Unsaved changes
+          {dirtyPanelIds.size === 1
+            ? "1 panel has unsaved changes"
+            : `${dirtyPanelIds.size} panels have unsaved changes`}
         </div>
       ) : null}
     </div>

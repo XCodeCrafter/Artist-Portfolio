@@ -109,9 +109,12 @@ async function writeBookingInquiry(input: {
   inquiryType: "booking" | "collaboration";
   ipKey: string;
   userAgent: string;
-}) {
+}): Promise<
+  | { ok: true; id: string }
+  | { ok: false; reason: "insert-failed" | "not-configured" }
+> {
   const supabase = createAdminServiceClient();
-  if (!supabase) return;
+  if (!supabase) return { ok: false, reason: "not-configured" };
 
   const row = {
     name: input.name,
@@ -124,27 +127,154 @@ async function writeBookingInquiry(input: {
     user_agent: input.userAgent,
   };
 
-  const result = await supabase.from("booking_inquiries").insert(row);
+  const result = await supabase
+    .from("booking_inquiries")
+    .insert({ ...row, email_status: "pending" })
+    .select("id")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
 
   if (
     result.error?.message.includes("portfolio_type") ||
-    result.error?.message.includes("inquiry_type")
+    result.error?.message.includes("inquiry_type") ||
+    result.error?.message.includes("email_status")
   ) {
-    const fallbackResult = await supabase.from("booking_inquiries").insert({
-      name: input.name,
-      email: input.email,
-      message: input.message,
-      status: "new",
-      source_ip: input.ipKey,
-      user_agent: input.userAgent,
-    });
+    const fallbackResult = await supabase
+      .from("booking_inquiries")
+      .insert({
+        name: input.name,
+        email: input.email,
+        message: input.message,
+        status: "new",
+        source_ip: input.ipKey,
+        user_agent: input.userAgent,
+      })
+      .select("id")
+      .limit(1)
+      .maybeSingle<{ id: string }>();
 
     if (fallbackResult.error) {
       console.error(fallbackResult.error);
+      return { ok: false, reason: "insert-failed" };
     }
+    return fallbackResult.data?.id
+      ? { ok: true, id: fallbackResult.data.id }
+      : { ok: false, reason: "insert-failed" };
   } else if (result.error) {
     console.error(result.error);
+    return { ok: false, reason: "insert-failed" };
   }
+
+  return result.data?.id
+    ? { ok: true, id: result.data.id }
+    : { ok: false, reason: "insert-failed" };
+}
+
+async function updateInquiryEmailStatus(
+  inquiryId: string | null,
+  status:
+    | "sent"
+    | "delivered"
+    | "delayed"
+    | "bounced"
+    | "complained"
+    | "failed"
+    | "suppressed",
+  resendEmailId?: string
+): Promise<
+  | { ok: true }
+  | {
+      ok: false;
+      reason:
+        | "inquiry-unavailable"
+        | "migration-required"
+        | "not-configured"
+        | "provider-id-missing"
+        | "update-failed";
+      errorCode?: string;
+    }
+> {
+  if (!inquiryId) return { ok: false, reason: "inquiry-unavailable" };
+  const supabase = createAdminServiceClient();
+  if (!supabase) return { ok: false, reason: "not-configured" };
+  const providerIdMissing = status === "sent" && !resendEmailId;
+
+  const result = await supabase
+    .from("booking_inquiries")
+    .update({
+      email_status: status,
+      email_status_changed_at: new Date().toISOString(),
+      ...(resendEmailId ? { resend_email_id: resendEmailId } : {}),
+    })
+    .eq("id", inquiryId)
+    .select("id")
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
+  if (result.error) {
+    const message = result.error.message.toLowerCase();
+    const migrationRequired =
+      message.includes("email_status") ||
+      message.includes("resend_email_id") ||
+      ["42703", "PGRST204", "PGRST205"].includes(result.error.code || "");
+
+    console.error(result.error);
+    return {
+      ok: false,
+      reason: migrationRequired ? "migration-required" : "update-failed",
+      errorCode: result.error.code || undefined,
+    };
+  }
+
+  if (!result.data?.id) return { ok: false, reason: "update-failed" };
+  return providerIdMissing
+    ? { ok: false, reason: "provider-id-missing" }
+    : { ok: true };
+}
+
+async function updateInquiryEmailTracking(input: {
+  inquiryId: string | null;
+  email: string;
+  portfolioType: PortfolioType;
+  inquiryType: "booking" | "collaboration";
+  status:
+    | "sent"
+    | "delivered"
+    | "delayed"
+    | "bounced"
+    | "complained"
+    | "failed"
+    | "suppressed";
+  resendEmailId?: string;
+}) {
+  const trackingResult = await updateInquiryEmailStatus(
+    input.inquiryId,
+    input.status,
+    input.resendEmailId
+  );
+
+  if (!trackingResult.ok) {
+    await writeAuditLog({
+      action: "booking_email_tracking_failed",
+      tableName: "booking_inquiries",
+      recordId:
+        input.inquiryId ||
+        keyedDigest("booking-email-record", input.email) ||
+        randomUUID(),
+      metadata: {
+        portfolioType: input.portfolioType,
+        inquiryType: input.inquiryType,
+        provider: "resend",
+        status: input.status,
+        reason: trackingResult.reason,
+        ...(trackingResult.errorCode
+          ? { errorCode: trackingResult.errorCode }
+          : {}),
+      },
+    });
+  }
+
+  return trackingResult;
 }
 
 async function writeBookingAnalytics(input: {
@@ -154,6 +284,12 @@ async function writeBookingAnalytics(input: {
 }) {
   const supabase = createAdminServiceClient();
   if (!supabase) return;
+
+  const deviceCategory = /tablet|ipad/i.test(input.userAgent)
+    ? "Tablet"
+    : /mobile|iphone|android/i.test(input.userAgent)
+      ? "Mobile"
+      : "Desktop";
 
   await supabase.from("analytics_events").insert({
     event_name: "booking_submit",
@@ -166,7 +302,7 @@ async function writeBookingAnalytics(input: {
     metadata: {
       portfolioType: input.portfolioType,
       inquiryType: input.inquiryType,
-      userAgent: input.userAgent.slice(0, 500),
+      deviceCategory,
     },
   });
 }
@@ -305,17 +441,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const apiKey = process.env.RESEND_API_KEY;
-    const to = process.env.BOOKING_TO_EMAIL;
-    const from = process.env.BOOKING_FROM_EMAIL;
-
-    if (!apiKey || !to || !from) {
-      return jsonError(500, "Server is not configured for email sending.");
-    }
-
-    const resend = new Resend(apiKey);
-
-    await writeBookingInquiry({
+    const inquiry = await writeBookingInquiry({
       name,
       email,
       message,
@@ -324,6 +450,65 @@ export async function POST(req: Request) {
       ipKey,
       userAgent,
     });
+    const inquiryId = inquiry.ok ? inquiry.id : null;
+
+    if (!inquiry.ok) {
+      await writeAuditLog({
+        action: "booking_inquiry_persistence_failed",
+        tableName: "booking_inquiries",
+        recordId: keyedDigest("booking-inquiry-record", email) || randomUUID(),
+        metadata: {
+          portfolioType,
+          inquiryType,
+          reason: inquiry.reason,
+        },
+      });
+    }
+
+    const apiKey = process.env.RESEND_API_KEY;
+    const to = process.env.BOOKING_TO_EMAIL;
+    const from = process.env.BOOKING_FROM_EMAIL;
+
+    if (!apiKey || !to || !from) {
+      await updateInquiryEmailTracking({
+        inquiryId,
+        email,
+        portfolioType,
+        inquiryType,
+        status: "failed",
+      });
+      await writeAuditLog({
+        action: "booking_email_failed",
+        tableName: "booking_inquiries",
+        recordId:
+          inquiryId || keyedDigest("booking-email-record", email) || randomUUID(),
+        metadata: {
+          portfolioType,
+          inquiryType,
+          provider: "resend",
+          reason: "not-configured",
+        },
+      });
+
+      if (!inquiry.ok) {
+        return jsonError(
+          503,
+          "Message could not be saved or sent. Please try again later."
+        );
+      }
+
+      await writeBookingAnalytics({ userAgent, portfolioType, inquiryType });
+      return NextResponse.json(
+        {
+          ok: true,
+          message:
+            "Message received. Email notification is temporarily unavailable, but it is saved in the inbox.",
+        },
+        { status: 202 }
+      );
+    }
+
+    const resend = new Resend(apiKey);
 
     const isCollaboration = inquiryType === "collaboration";
     const safeName = sanitizeHeaderValue(name) || "Unknown sender";
@@ -347,29 +532,81 @@ export async function POST(req: Request) {
       `Time: ${new Date().toISOString()}`,
     ].join("\n");
 
-    const emailResult = await resend.emails.send({
-      from,
-      to,
-      replyTo: email,
-      subject,
-      text,
-    });
-
-    if (emailResult.error) {
-      console.error(emailResult.error);
+    let emailResult: Awaited<ReturnType<Resend["emails"]["send"]>>;
+    try {
+      emailResult = await resend.emails.send({
+        from,
+        to,
+        replyTo: email,
+        subject,
+        text,
+      });
+    } catch (error) {
+      console.error(error);
+      await updateInquiryEmailTracking({
+        inquiryId,
+        email,
+        portfolioType,
+        inquiryType,
+        status: "failed",
+      });
       await writeAuditLog({
         action: "booking_email_failed",
         tableName: "booking_inquiries",
         recordId:
-          keyedDigest("booking-email-record", email) || randomUUID(),
+          inquiryId || keyedDigest("booking-email-record", email) || randomUUID(),
         metadata: {
           portfolioType,
           inquiryType,
           provider: "resend",
+          reason: "provider-request-failed",
         },
       });
-      return jsonError(502, "Message was saved, but email delivery failed.");
+      return jsonError(
+        502,
+        inquiry.ok
+          ? "Message was saved, but email delivery failed."
+          : "Message could not be saved or sent. Please try again later."
+      );
     }
+
+    if (emailResult.error) {
+      console.error(emailResult.error);
+      await updateInquiryEmailTracking({
+        inquiryId,
+        email,
+        portfolioType,
+        inquiryType,
+        status: "failed",
+      });
+      await writeAuditLog({
+        action: "booking_email_failed",
+        tableName: "booking_inquiries",
+        recordId:
+          inquiryId || keyedDigest("booking-email-record", email) || randomUUID(),
+        metadata: {
+          portfolioType,
+          inquiryType,
+          provider: "resend",
+          reason: "provider-rejected",
+        },
+      });
+      return jsonError(
+        502,
+        inquiry.ok
+          ? "Message was saved, but email delivery failed."
+          : "Message could not be saved or sent. Please try again later."
+      );
+    }
+
+    await updateInquiryEmailTracking({
+      inquiryId,
+      email,
+      portfolioType,
+      inquiryType,
+      status: "sent",
+      resendEmailId: emailResult.data?.id,
+    });
 
     await writeBookingAnalytics({ userAgent, portfolioType, inquiryType });
 

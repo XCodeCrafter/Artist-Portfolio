@@ -33,6 +33,7 @@ Required production environment variables:
 SITE_URL=https://your-domain.com
 NEXT_PUBLIC_SITE_URL=https://your-domain.com
 RESEND_API_KEY=...
+RESEND_WEBHOOK_SECRET=random-resend-signing-secret
 BOOKING_TO_EMAIL=...
 BOOKING_FROM_EMAIL=...
 NEXT_PUBLIC_SUPABASE_URL=...
@@ -42,6 +43,8 @@ SUPABASE_SECRET_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 SUPABASE_MEDIA_BUCKET=portfolio-media
 AUTH_SECURITY_SECRET=at-least-32-random-characters
+CRON_SECRET=at-least-16-random-characters
+HEALTHCHECK_SECRET=random-monitor-bearer-token
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=optional-public-site-key
 GOOGLE_SITE_VERIFICATION=optional-search-console-token
 SECURITY_CONTACT_EMAIL=public-security-contact@example.com
@@ -227,6 +230,15 @@ page in both desktop and mobile navigation. This setting affects only the menu:
 hidden pages remain editable, publicly reachable by direct URL, and available
 to the sitemap and discovery endpoints.
 
+Migration `0022_repair_footer_effect.sql` repairs installations where the
+footer interaction column was missing after a partial rollout.
+
+Migration `0023_admin_operations_hardening.sql` adds recoverable Media Trash,
+transactional media reference checks, a database-level trash invariant, a
+transactional last-owner invariant, and replay-safe Resend delivery state for
+booking inquiries. Apply it before enabling Trash, delivery webhooks, or the
+latest readiness checks.
+
 ## Search and AI discovery
 
 - `/robots.txt` allows public search/discovery crawlers, blocks `/api`, and
@@ -247,7 +259,7 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. Apply all Supabase migrations through `0021_navbar_visibility.sql`.
+1. Apply all Supabase migrations through `0023_admin_operations_hardening.sql`.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare
@@ -255,19 +267,23 @@ consistent in the admin content.
 3. Create Auth users only from the dashboard or trusted server tooling, then
    create matching active owner/admin profile rows.
 4. Configure the HTTPS site URL, Supabase keys, `AUTH_SECURITY_SECRET`, and
-   Resend. Admin auth fails closed in production without migration 0018 or the
-   secret.
+   Resend. Add a Resend webhook for `/api/resend/webhook`, subscribe to sent,
+   delivered, delayed, bounced, complained, failed, and suppressed e-mail
+   events, then save its signing secret as `RESEND_WEBHOOK_SECRET`.
 5. For security-sensitive deployments, enable a session time-box, inactivity
    timeout, and single-session mode in Supabase Auth settings.
 6. Sign in once per admin and complete TOTP enrollment.
 7. Confirm all checks pass in `/admin`, then test recovery, MFA, upload, and
    contact delivery.
-8. Monitor `GET /api/health` as a lightweight process liveness check. Use the
-   authenticated `/admin` readiness panel for database, storage, email, and
-   rate-limit integration checks.
-9. Schedule the service-role-only `cleanup_security_retention(...)` RPC and
-   choose a private staging bucket if unpublished media must remain secret.
-10. Run `npm run check` and `npm run audit:prod` before a release.
+8. Monitor `GET /api/health`. Anonymous requests receive a cheap cached
+   liveness response. Set `HEALTHCHECK_SECRET` and send it as
+   `Authorization: Bearer ...` to receive the rate-safe deep database/storage
+   check; the deep response returns HTTP 503 when a dependency is degraded.
+9. Generate a random `CRON_SECRET` (16+ characters) in Vercel. `vercel.json`
+   schedules `/api/cron/maintenance` daily; the secured endpoint invokes the
+   service-role-only retention RPC.
+10. Run `npm run check` and `npm run audit:prod` before a release. `check`
+    includes the automated test suite.
 
 ## Scripts
 
@@ -275,6 +291,7 @@ consistent in the admin content.
 npm run dev
 npm run typecheck
 npm run lint
+npm test
 npm run build
 npm run check
 npm run audit:prod
@@ -290,7 +307,9 @@ npm run db:push
 
 - Do not commit `.env.local` or production secrets.
 - Booking submissions are validated with Zod, protected by dual honeypots, checked for same-origin browser submissions, rate-limited atomically in Supabase, logged once per blocked rate-limit window, and sent through Resend when accepted.
-- Analytics events use payload limits, origin/referer checks, bot filters, metadata sanitizing, and mandatory production database rate limiting.
+- Analytics events use payload limits, origin/referer checks, bot filters,
+  coarse device/browser/referrer metadata, and mandatory production database
+  rate limiting. Raw user-agent strings are not retained in analytics events.
 - Admin write actions verify same-origin requests before changing content, media, inquiries, or admin profiles.
 - Supabase session cookies are `HttpOnly`, `Secure` in production, `SameSite=Lax`, high priority, and admin authorization requires an `aal2` MFA session.
 - Raw client IP addresses are not persisted by the application; rate-limit and audit identifiers use HMAC-SHA-256 with `AUTH_SECURITY_SECRET`.

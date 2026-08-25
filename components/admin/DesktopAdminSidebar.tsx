@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { FaChevronLeft, FaChevronRight, FaMagic } from "react-icons/fa";
 
 type DesktopAdminSidebarProps = {
@@ -10,41 +16,63 @@ type DesktopAdminSidebarProps = {
 };
 
 const PINNED_STORAGE_KEY = "artist-admin-sidebar-pinned";
+const PINNED_CHANGE_EVENT = "artist-admin-sidebar-pinned-change";
+const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
+let memoryPinned: boolean | undefined;
+
+function readPinnedPreference() {
+  if (typeof memoryPinned === "boolean") return memoryPinned;
+
+  try {
+    return window.localStorage.getItem(PINNED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function subscribeToPinnedPreference(onChange: () => void) {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key && event.key !== PINNED_STORAGE_KEY) return;
+    memoryPinned = undefined;
+    onChange();
+  };
+
+  window.addEventListener(PINNED_CHANGE_EVENT, onChange);
+  window.addEventListener("storage", handleStorage);
+  return () => {
+    window.removeEventListener(PINNED_CHANGE_EVENT, onChange);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+function readFinePointer() {
+  return window.matchMedia(FINE_POINTER_QUERY).matches;
+}
+
+function subscribeToFinePointer(onChange: () => void) {
+  const query = window.matchMedia(FINE_POINTER_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
 
 export default function DesktopAdminSidebar({
   footer,
   navigation,
 }: DesktopAdminSidebarProps) {
-  const [pinned, setPinned] = useState(false);
+  const pinned = useSyncExternalStore(
+    subscribeToPinnedPreference,
+    readPinnedPreference,
+    () => false
+  );
+  const finePointer = useSyncExternalStore(
+    subscribeToFinePointer,
+    readFinePointer,
+    () => true
+  );
   const [pointerOpen, setPointerOpen] = useState(false);
   const [focusOpen, setFocusOpen] = useState(false);
-  const finePointerRef = useRef(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const expanded = pinned || pointerOpen || focusOpen;
-
-  useEffect(() => {
-    const finePointerQuery = window.matchMedia(
-      "(hover: hover) and (pointer: fine)"
-    );
-    finePointerRef.current = finePointerQuery.matches;
-    const syncFinePointer = (event: MediaQueryListEvent) => {
-      finePointerRef.current = event.matches;
-      if (!event.matches) setPointerOpen(false);
-    };
-    finePointerQuery.addEventListener("change", syncFinePointer);
-
-    const frame = window.requestAnimationFrame(() => {
-      try {
-        setPinned(window.localStorage.getItem(PINNED_STORAGE_KEY) === "true");
-      } catch {
-        // Storage may be unavailable in hardened/private browser contexts.
-      }
-    });
-    return () => {
-      window.cancelAnimationFrame(frame);
-      finePointerQuery.removeEventListener("change", syncFinePointer);
-    };
-  }, []);
+  const expanded = pinned || pointerOpen || focusOpen || !finePointer;
 
   useEffect(() => {
     if (expanded) return;
@@ -54,22 +82,21 @@ export default function DesktopAdminSidebar({
   }, [expanded]);
 
   function togglePinned() {
-    setPinned((current) => {
-      const next = !current;
-      try {
-        window.localStorage.setItem(PINNED_STORAGE_KEY, String(next));
-      } catch {
-        // The pin still works for this session when persistence is blocked.
-      }
-      return next;
-    });
+    const next = !pinned;
+    memoryPinned = next;
+    try {
+      window.localStorage.setItem(PINNED_STORAGE_KEY, String(next));
+    } catch {
+      // The pin still works for this session when persistence is blocked.
+    }
+    window.dispatchEvent(new Event(PINNED_CHANGE_EVENT));
   }
 
   return (
     <aside
       aria-label="Studio Admin"
       className={`relative z-40 hidden shrink-0 transition-[width] duration-200 ease-out motion-reduce:transition-none lg:sticky lg:top-4 lg:block lg:h-[calc(100vh-2rem)] ${
-        pinned ? "lg:w-[276px]" : "lg:w-[82px]"
+        pinned || !finePointer ? "lg:w-[276px]" : "lg:w-[82px]"
       }`}
     >
       <div
@@ -91,7 +118,7 @@ export default function DesktopAdminSidebar({
           document.getElementById("admin-main-content")?.focus();
         }}
         onPointerEnter={() => {
-          if (finePointerRef.current) setPointerOpen(true);
+          if (finePointer) setPointerOpen(true);
         }}
         onPointerLeave={() => setPointerOpen(false)}
         ref={panelRef}
@@ -115,7 +142,7 @@ export default function DesktopAdminSidebar({
               </span>
             </span>
           </Link>
-          <button
+          {finePointer ? <button
             aria-label={pinned ? "Use auto-hide sidebar" : "Keep sidebar open"}
             aria-pressed={pinned}
             className="sidebar-copy grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/8 text-white/38 opacity-0 outline-none transition hover:bg-white/8 hover:text-white focus-visible:ring-2 focus-visible:ring-white/55 group-data-[expanded=true]/sidebar:opacity-100"
@@ -128,10 +155,10 @@ export default function DesktopAdminSidebar({
             ) : (
               <FaChevronRight className="text-[10px] text-white/38" />
             )}
-          </button>
+          </button> : null}
         </div>
 
-        <div className="mt-4 flex-1 overflow-y-auto overflow-x-hidden pr-0.5">
+        <div className="admin-scrollbar-none mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-0.5">
           {navigation}
         </div>
 
