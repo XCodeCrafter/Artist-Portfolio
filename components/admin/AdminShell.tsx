@@ -9,12 +9,12 @@ import {
   FaEye,
   FaEyeSlash,
   FaImages,
-  FaMagic,
   FaShieldAlt,
   FaUpload,
   FaUserCircle,
 } from "react-icons/fa";
 import LogoutButton from "@/components/admin/LogoutButton";
+import DesktopAdminSidebar from "@/components/admin/DesktopAdminSidebar";
 import { getProfilePublicModules } from "@/lib/content/modules";
 import type { PageSlug, PortfolioType } from "@/lib/content/types";
 
@@ -127,7 +127,7 @@ function AdminNavLink({
       >
         {item.icon}
       </span>
-      <span className="min-w-0">
+      <span className="sidebar-copy min-w-0 whitespace-nowrap opacity-100 transition duration-150 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100">
         <span className="block text-sm font-semibold">{item.label}</span>
         <span className="mt-0.5 block truncate text-[11px] text-white/36">
           {item.description}
@@ -163,7 +163,7 @@ function PublicPageNav({
   ).length;
 
   return (
-    <div className="mt-6">
+    <div className="sidebar-copy mt-6 min-w-[246px] opacity-100 transition duration-150 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100">
       <div className="mb-2 flex items-center justify-between px-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/28">
           Your website
@@ -223,7 +223,7 @@ function AccountMenu({
         <span className="grid h-9 w-9 place-items-center rounded-xl border border-white/8 bg-white/[0.05] text-white/55">
           <FaUserCircle />
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="sidebar-copy min-w-0 flex-1 whitespace-nowrap opacity-100 transition duration-150 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100">
           <span className="block truncate text-xs font-semibold text-white/78">
             {adminEmail}
           </span>
@@ -231,7 +231,7 @@ function AccountMenu({
             {portfolioType || "admin session"}
           </span>
         </span>
-        <FaChevronDown className="text-[10px] text-white/35 transition group-open:rotate-180" />
+        <FaChevronDown className="sidebar-copy text-[10px] text-white/35 opacity-100 transition group-open:rotate-180 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100" />
       </summary>
       <div className="mt-2 border-t border-white/8 pt-2">
         <LogoutButton />
@@ -253,32 +253,14 @@ export default function AdminShell({
   const activeItem = navItems.find((item) => item.key === active) || navItems[0];
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#070708] font-ui text-white">
+    <main className="relative min-h-screen overflow-x-clip bg-[#070708] font-ui text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_8%_0%,rgba(255,59,31,0.14),transparent_26%),radial-gradient(circle_at_88%_8%,rgba(255,255,255,0.07),transparent_24%)]" />
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.016)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.016)_1px,transparent_1px)] bg-[size:56px_56px] opacity-60" />
 
       <div className="relative mx-auto flex w-full max-w-[1920px] flex-col gap-3 px-3 py-3 sm:px-4 lg:flex-row lg:gap-4 lg:p-4">
-        <aside className="hidden lg:sticky lg:top-4 lg:flex lg:h-[calc(100vh-2rem)] lg:w-[276px] lg:shrink-0 lg:flex-col">
-          <div className="flex h-full flex-col rounded-[26px] border border-white/9 bg-[#0d0d0f]/92 p-3 shadow-[0_28px_100px_rgba(0,0,0,0.42)] backdrop-blur-2xl">
-            <Link
-              className="group flex items-center gap-3 rounded-2xl px-2.5 py-2.5 transition hover:bg-white/[0.045]"
-              href="/admin"
-            >
-              <span className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-xl bg-[#ff3b1f] text-white shadow-[0_12px_32px_rgba(255,59,31,0.24)]">
-                <FaMagic className="relative z-10 text-sm" />
-                <span className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.32),transparent_50%)]" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[9px] font-semibold uppercase tracking-[0.28em] text-white/30">
-                  Artist portfolio
-                </span>
-                <span className="mt-1 block truncate text-base font-semibold tracking-tight text-white">
-                  Studio Admin
-                </span>
-              </span>
-            </Link>
-
-            <div className="mt-4 flex-1 overflow-y-auto pr-0.5">
+        <DesktopAdminSidebar
+          navigation={
+            <>
               <AdminNav active={active} />
               {active !== "content" ? (
                 <PublicPageNav
@@ -286,25 +268,29 @@ export default function AdminShell({
                   portfolioType={portfolioType}
                 />
               ) : null}
-            </div>
-
-            <div className="mt-3 grid gap-2">
+            </>
+          }
+          footer={
+            <>
               <Link
-                className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/9 bg-white/[0.045] px-3 text-xs font-semibold text-white/62 transition hover:bg-white hover:text-black"
+                aria-label="Open live site"
+                className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/9 bg-white/[0.045] px-3 text-xs font-semibold text-white/62 transition hover:bg-white hover:text-black group-data-[expanded=true]/sidebar:justify-start"
                 href="/"
                 rel="noreferrer"
                 target="_blank"
               >
                 <FaExternalLinkAlt className="text-[10px]" />
-                Open live site
+                <span className="sidebar-copy whitespace-nowrap opacity-100 transition duration-150 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100">
+                  Open live site
+                </span>
               </Link>
               <AccountMenu
                 adminEmail={adminEmail}
                 portfolioType={portfolioType}
               />
-            </div>
-          </div>
-        </aside>
+            </>
+          }
+        />
 
         <div className="lg:hidden">
           <details className="group rounded-[22px] border border-white/10 bg-[#0d0d0f]/94 p-2.5 shadow-[0_18px_60px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
@@ -342,9 +328,21 @@ export default function AdminShell({
           </details>
         </div>
 
-        <section className="min-w-0 flex-1">
-          <header className="relative z-20 rounded-[26px] border border-white/9 bg-[#0d0d0f]/86 px-5 py-4 shadow-[0_22px_80px_rgba(0,0,0,0.34)] backdrop-blur-2xl sm:px-6 sm:py-5">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <section className="min-w-0 flex-1" id="admin-main-content" tabIndex={-1}>
+          <header
+            className={cx(
+              "relative z-20 rounded-[26px] border border-white/9 bg-[#0d0d0f]/86 shadow-[0_22px_80px_rgba(0,0,0,0.34)] backdrop-blur-2xl",
+              active === "content"
+                ? "px-4 py-3 sm:px-5 sm:py-3.5"
+                : "px-5 py-4 sm:px-6 sm:py-5"
+            )}
+          >
+            <div
+              className={cx(
+                "flex flex-col xl:flex-row xl:items-center xl:justify-between",
+                active === "content" ? "gap-3" : "gap-4"
+              )}
+            >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/34">
@@ -363,10 +361,24 @@ export default function AdminShell({
                     </>
                   ) : null}
                 </div>
-                <h1 className="heading-ui mt-2 text-3xl font-semibold tracking-[-0.035em] text-white sm:text-4xl">
+                <h1
+                  className={cx(
+                    "heading-ui font-semibold tracking-[-0.035em] text-white",
+                    active === "content"
+                      ? "mt-1.5 text-2xl sm:text-3xl"
+                      : "mt-2 text-3xl sm:text-4xl"
+                  )}
+                >
                   {title}
                 </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-white/48">
+                <p
+                  className={cx(
+                    "max-w-3xl text-white/48",
+                    active === "content"
+                      ? "mt-1 text-xs leading-5"
+                      : "mt-2 text-sm leading-6"
+                  )}
+                >
                   {description}
                 </p>
               </div>
@@ -379,15 +391,17 @@ export default function AdminShell({
                   <FaUpload className="text-[10px]" />
                   Add media
                 </Link>
-                <Link
-                  className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-xs font-semibold text-black transition hover:bg-white/84"
-                  href="/"
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  Preview site
-                  <FaExternalLinkAlt className="text-[10px]" />
-                </Link>
+                {active !== "content" ? (
+                  <Link
+                    className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-xs font-semibold text-black transition hover:bg-white/84"
+                    href="/"
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Preview site
+                    <FaExternalLinkAlt className="text-[10px]" />
+                  </Link>
+                ) : null}
               </div>
             </div>
           </header>

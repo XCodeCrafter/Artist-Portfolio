@@ -10,16 +10,16 @@ export default function AdminLoading() {
   return (
     <main className="relative min-h-screen bg-[#050506] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(255,59,31,0.18),transparent_32%),radial-gradient(circle_at_76%_0%,rgba(255,255,255,0.12),transparent_28%)]" />
-      <div className="relative mx-auto flex w-full max-w-[1800px] flex-col gap-5 px-4 py-4 sm:px-6 lg:flex-row lg:p-6">
-        <aside className="hidden lg:block lg:w-[300px] lg:shrink-0">
-          <div className="sticky top-6 h-[calc(100vh-3rem)] rounded-[30px] border border-white/12 bg-white/[0.075] p-4 backdrop-blur-2xl">
-            <SkeletonBlock className="h-20" />
-            <div className="mt-5 grid gap-2">
+      <div className="relative mx-auto flex w-full max-w-[1920px] flex-col gap-3 px-3 py-3 sm:px-4 lg:flex-row lg:gap-4 lg:p-4">
+        <aside className="hidden lg:block lg:w-[82px] lg:shrink-0">
+          <div className="sticky top-4 h-[calc(100vh-2rem)] rounded-[26px] border border-white/12 bg-white/[0.075] p-3 backdrop-blur-2xl">
+            <SkeletonBlock className="h-12 rounded-2xl" />
+            <div className="mt-4 grid gap-2">
               {Array.from({ length: 5 }).map((_, index) => (
-                <SkeletonBlock className="h-14" key={index} />
+                <SkeletonBlock className="h-12 rounded-2xl" key={index} />
               ))}
             </div>
-            <SkeletonBlock className="mt-5 h-20" />
+            <SkeletonBlock className="mt-5 h-12 rounded-2xl" />
           </div>
         </aside>
 

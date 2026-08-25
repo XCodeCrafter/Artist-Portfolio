@@ -13,6 +13,7 @@ type AdminDisclosureProps = {
   badge?: ReactNode;
   children: ReactNode;
   className?: string;
+  collapsible?: boolean;
   contentClassName?: string;
   defaultOpen?: boolean;
   description?: string;
@@ -31,6 +32,7 @@ export default function AdminDisclosure({
   badge,
   children,
   className,
+  collapsible = true,
   contentClassName,
   defaultOpen = false,
   description,
@@ -44,7 +46,7 @@ export default function AdminDisclosure({
   const panelId = id || `admin-panel-${generatedId}`;
   const triggerId = `${panelId}-trigger`;
   const regionId = `${panelId}-content`;
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [isOpen, setIsOpen] = useState(defaultOpen || !collapsible);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const regionRef = useRef<HTMLDivElement | null>(null);
 
@@ -54,7 +56,10 @@ export default function AdminDisclosure({
       if (!hash) return;
 
       const target = document.getElementById(hash);
-      if (hash === panelId || (target && regionRef.current?.contains(target))) {
+      if (
+        collapsible &&
+        (hash === panelId || (target && regionRef.current?.contains(target)))
+      ) {
         setIsOpen(true);
       }
     }
@@ -62,14 +67,62 @@ export default function AdminDisclosure({
     openHashTarget();
     window.addEventListener("hashchange", openHashTarget);
     return () => window.removeEventListener("hashchange", openHashTarget);
-  }, [panelId]);
+  }, [collapsible, panelId]);
 
   function togglePanel() {
     if (isOpen && regionRef.current?.contains(document.activeElement)) {
       window.requestAnimationFrame(() => triggerRef.current?.focus());
     }
-    setIsOpen((open) => !open);
+    if (collapsible) setIsOpen((open) => !open);
   }
+
+  const headerContent = (
+    <>
+      {icon ? (
+        <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.055] text-white/58">
+          {icon}
+        </span>
+      ) : null}
+      <span className="min-w-0 flex-1">
+        {eyebrow ? (
+          <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/34">
+            {eyebrow}
+          </span>
+        ) : null}
+        <span
+          className={cx(
+            "block font-semibold text-white/88",
+            variant === "section" ? "mt-0.5 text-base" : "text-sm"
+          )}
+        >
+          {title}
+        </span>
+        {description ? (
+          <span className="mt-1 block text-xs leading-5 text-white/38 sm:truncate">
+            {description}
+          </span>
+        ) : null}
+      </span>
+      {badge ? <span className="shrink-0">{badge}</span> : null}
+      {collapsible ? (
+        <FaChevronDown
+          aria-hidden="true"
+          className={cx(
+            "shrink-0 text-[11px] text-white/35 transition-transform duration-200",
+            isOpen && "rotate-180"
+          )}
+        />
+      ) : null}
+    </>
+  );
+
+  const headerClassName = cx(
+    "group flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left outline-none sm:px-5",
+    collapsible &&
+      "transition hover:bg-white/[0.045] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/55",
+    variant === "item" && "min-h-14 py-2.5",
+    variant === "advanced" && "min-h-12 py-2.5"
+  );
 
   return (
     <section
@@ -86,53 +139,23 @@ export default function AdminDisclosure({
       )}
       id={panelId}
     >
-      <button
-        aria-controls={regionId}
-        aria-expanded={isOpen}
-        className={cx(
-          "group flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left outline-none transition hover:bg-white/[0.045] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/55 sm:px-5",
-          variant === "item" && "min-h-14 py-2.5",
-          variant === "advanced" && "min-h-12 py-2.5"
-        )}
-        id={triggerId}
-        onClick={togglePanel}
-        ref={triggerRef}
-        type="button"
-      >
-        {icon ? (
-          <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.055] text-white/58">
-            {icon}
-          </span>
-        ) : null}
-        <span className="min-w-0 flex-1">
-          {eyebrow ? (
-            <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/34">
-              {eyebrow}
-            </span>
-          ) : null}
-          <span
-            className={cx(
-              "block font-semibold text-white/88",
-              variant === "section" ? "mt-0.5 text-base" : "text-sm"
-            )}
-          >
-            {title}
-          </span>
-          {description ? (
-            <span className="mt-1 block truncate text-xs text-white/38">
-              {description}
-            </span>
-          ) : null}
-        </span>
-        {badge ? <span className="shrink-0">{badge}</span> : null}
-        <FaChevronDown
-          aria-hidden="true"
-          className={cx(
-            "shrink-0 text-[11px] text-white/35 transition-transform duration-200",
-            isOpen && "rotate-180"
-          )}
-        />
-      </button>
+      {collapsible ? (
+        <button
+          aria-controls={regionId}
+          aria-expanded={isOpen}
+          className={headerClassName}
+          id={triggerId}
+          onClick={togglePanel}
+          ref={triggerRef}
+          type="button"
+        >
+          {headerContent}
+        </button>
+      ) : (
+        <div className={headerClassName} id={triggerId}>
+          {headerContent}
+        </div>
+      )}
       <div
         aria-labelledby={triggerId}
         className={cx(
@@ -140,7 +163,7 @@ export default function AdminDisclosure({
           variant === "advanced" && "p-3",
           contentClassName
         )}
-        hidden={!isOpen}
+        hidden={collapsible && !isOpen}
         id={regionId}
         ref={regionRef}
         role="region"

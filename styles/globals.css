@@ -100,6 +100,15 @@ select {
   display: none;
 }
 
+.admin-scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.admin-scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* --- Parallax backdrop layers (shards) --- */
 .parallax-shards {
   background-image:

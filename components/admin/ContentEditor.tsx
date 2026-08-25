@@ -2,7 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import {
   FaArrowDown,
   FaArrowUp,
@@ -514,7 +522,7 @@ function NavigationSettingsForm({
     <form
       action={updateNavigationSettings}
       className={sectionClass}
-      id="navigation"
+      id="navigation-settings"
     >
       <SectionHeader
         count={visiblePageSlugs.length}
@@ -685,16 +693,23 @@ function NavigationWorkspace({
   return (
     <StudioWorkspace
       description="The same primary menu your visitors see"
-      editor={
-        <NavigationSettingsForm
-          content={content}
-          disabled={disabled}
-          modules={modules}
-          setVisiblePageSlugs={setVisiblePageSlugs}
-          visiblePageSlugs={visiblePageSlugs}
-        />
-      }
       label="Main navigation"
+      panels={[
+        {
+          description: "Choose the pages shown in the public navbar.",
+          id: "navigation-settings",
+          label: "Menu visibility",
+          node: (
+            <NavigationSettingsForm
+              content={content}
+              disabled={disabled}
+              modules={modules}
+              setVisiblePageSlugs={setVisiblePageSlugs}
+              visiblePageSlugs={visiblePageSlugs}
+            />
+          ),
+        },
+      ]}
       preview={
         <NavigationSnapshot
           artistName={content.settings.artistName}
@@ -703,6 +718,7 @@ function NavigationWorkspace({
         />
       }
       publicHref="/"
+      sectionId="navigation"
     />
   );
 }
@@ -777,77 +793,207 @@ function FooterSnapshot({ content }: { content: EditablePortfolioContent }) {
   );
 }
 
+type StudioPanel = {
+  aliases?: string[];
+  description: string;
+  id: string;
+  label: string;
+  node: ReactNode;
+};
+
 function StudioWorkspace({
   description,
-  editor,
   label,
+  panels,
   preview,
   publicHref,
+  sectionId,
 }: {
   description: string;
-  editor: ReactNode;
   label: string;
+  panels: StudioPanel[];
   preview: ReactNode;
   publicHref: string;
+  sectionId: string;
 }) {
-  const previewId = useId();
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const workspaceId = useId().replace(/:/g, "");
+  const [activePanelId, setActivePanelId] = useState("preview");
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabs = [
+    {
+      description: "Latest saved version of the public page.",
+      id: "preview",
+      label: "Page preview",
+    },
+    ...panels,
+  ];
+
+  useEffect(() => {
+    function syncHash() {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (!hash || hash === sectionId) {
+        setActivePanelId("preview");
+        return;
+      }
+
+      const target = panels.find(
+        (panel) => panel.id === hash || panel.aliases?.includes(hash)
+      );
+      if (target) setActivePanelId(target.id);
+    }
+
+    const frame = window.requestAnimationFrame(syncHash);
+    window.addEventListener("hashchange", syncHash);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", syncHash);
+    };
+  }, [panels, sectionId]);
+
+  function activatePanel(id: string) {
+    setActivePanelId(id);
+    const hash = id === "preview" ? sectionId : id;
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${window.location.search}#${hash}`
+    );
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex = index;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+    else if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + tabs.length) % tabs.length;
+    } else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = tabs.length - 1;
+    else return;
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    activatePanel(nextTab.id);
+    tabRefs.current[nextIndex]?.focus();
+    tabRefs.current[nextIndex]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }
 
   return (
-    <div className="grid items-start gap-5 2xl:grid-cols-[minmax(390px,0.82fr)_minmax(0,1.18fr)]">
-      <aside className="min-w-0 2xl:sticky 2xl:top-4">
-        <div className="rounded-[24px] border border-white/10 bg-[#0d0d0f]/94 p-3 shadow-[0_22px_75px_rgba(0,0,0,0.28)]">
-          <div className="flex items-center justify-between gap-3 px-1 pb-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#ff3b1f]" />
-                <p className="truncate text-xs font-semibold text-white/80">
-                  {label}
-                </p>
-              </div>
-              <p className="mt-1 truncate text-[11px] text-white/34">
-                {description}
+    <div className="min-w-0">
+      <section className="sticky top-3 z-30 overflow-hidden rounded-[24px] border border-white/10 bg-[#0d0d0f]/96 shadow-[0_22px_75px_rgba(0,0,0,0.38)] backdrop-blur-2xl">
+        <div className="flex flex-col gap-3 border-b border-white/8 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[#ff3b1f]" />
+              <p className="truncate text-sm font-semibold text-white/82">
+                {label}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                aria-controls={previewId}
-                aria-expanded={previewOpen}
-                className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[11px] font-semibold text-white/60 transition hover:bg-white hover:text-black 2xl:hidden"
-                onClick={() => setPreviewOpen((open) => !open)}
-                type="button"
-              >
-                {previewOpen ? <FaEyeSlash /> : <FaEye />}
-                {previewOpen ? "Hide mirror" : "Show mirror"}
-              </button>
-              <Link
-                aria-label={`Open ${label} on the public site`}
-                className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[11px] font-semibold text-white/60 transition hover:bg-white hover:text-black"
-                href={publicHref}
-                rel="noreferrer"
-                target="_blank"
-              >
-                View
-                <FaExternalLinkAlt className="text-[9px]" />
-              </Link>
-            </div>
+            <p className="mt-1 text-xs leading-5 text-white/38">{description}</p>
           </div>
-          <div
-            className={`${previewOpen ? "block" : "hidden"} max-h-[calc(100vh-9.5rem)] overflow-y-auto rounded-[18px] bg-black/35 p-2 2xl:block`}
-            id={previewId}
+          <Link
+            aria-label={`Open ${label} on the public site`}
+            className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-white/10 bg-white/[0.045] px-3 text-[11px] font-semibold text-white/60 transition hover:bg-white hover:text-black sm:self-auto"
+            href={publicHref}
+            rel="noreferrer"
+            target="_blank"
           >
-            {preview}
+            Open public page
+            <FaExternalLinkAlt className="text-[9px]" />
+          </Link>
+        </div>
+
+        <div className="relative">
+          <div
+            aria-label={`${label} editor sections`}
+            className="admin-scrollbar-none flex snap-x gap-1.5 overflow-x-auto p-2.5 pr-12 lg:pr-2.5"
+            role="tablist"
+          >
+            {tabs.map((tab, index) => {
+              const active = tab.id === activePanelId;
+              const tabId = `${workspaceId}-tab-${tab.id}`;
+              const panelId = `${workspaceId}-panel-${tab.id}`;
+              return (
+                <button
+                  aria-label={`${String(index).padStart(2, "0")} ${tab.label}: ${tab.description}`}
+                  aria-controls={panelId}
+                  aria-selected={active}
+                  className={`group/tab flex min-h-11 min-w-max snap-start items-center gap-2.5 rounded-xl border px-3.5 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-white/60 ${
+                    active
+                      ? "border-[#ff7059]/28 bg-[#ff3b1f] text-white shadow-[0_10px_28px_rgba(255,59,31,0.18)]"
+                      : "border-white/8 bg-white/[0.035] text-white/52 hover:border-white/14 hover:bg-white/[0.07] hover:text-white"
+                  }`}
+                  id={tabId}
+                  key={tab.id}
+                  onClick={() => activatePanel(tab.id)}
+                  onKeyDown={(event) => handleTabKeyDown(event, index)}
+                  ref={(element) => {
+                    tabRefs.current[index] = element;
+                  }}
+                  role="tab"
+                  tabIndex={active ? 0 : -1}
+                  type="button"
+                >
+                  <span
+                    className={`font-mono text-[10px] tabular-nums ${
+                      active ? "text-white/72" : "text-white/28"
+                    }`}
+                  >
+                    {String(index).padStart(2, "0")}
+                  </span>
+                  <span className="text-xs font-semibold">{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#0d0d0f] via-[#0d0d0f]/88 to-transparent lg:hidden"
+          />
         </div>
-      </aside>
-      <div className="min-w-0">
-        <div className="mb-4 rounded-[20px] border border-white/9 bg-white/[0.045] px-4 py-3">
-          <p className="text-xs leading-5 text-white/48">
-            The editor follows the same order as the public page. Save each
-            block when it is ready; the preview refreshes after saving.
-          </p>
+      </section>
+
+      <div className="mt-4">
+        <div
+          aria-labelledby={`${workspaceId}-tab-preview`}
+          data-editor-panel-id="preview"
+          hidden={activePanelId !== "preview"}
+          id={`${workspaceId}-panel-preview`}
+          role="tabpanel"
+        >
+          {activePanelId === "preview" ? (
+            <>
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-emerald-300/10 bg-emerald-300/[0.045] px-4 py-2.5">
+              <span className="inline-flex items-center gap-2 text-[11px] font-semibold text-emerald-100/64">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                Latest saved version
+              </span>
+              <span className="text-[10px] text-white/30">
+                Save a panel to refresh this view
+              </span>
+            </div>
+            {preview}
+            </>
+          ) : null}
         </div>
-        <div className="grid gap-5">{editor}</div>
+
+        {panels.map((panel) => {
+          const active = panel.id === activePanelId;
+          return (
+            <div
+              aria-labelledby={`${workspaceId}-tab-${panel.id}`}
+              data-editor-panel-id={panel.id}
+              hidden={!active}
+              id={`${workspaceId}-panel-${panel.id}`}
+              key={panel.id}
+              role="tabpanel"
+            >
+              {panel.node}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1090,11 +1236,14 @@ function StatusNotice({
   loadError?: string;
 }) {
   const message = status ? statusCopy[status] : "";
+  const success = Boolean(
+    status && (status.startsWith("saved-") || status === "deleted")
+  );
 
   if (!message && isConfigured && !loadError) return null;
 
   return (
-    <div className="mt-8 space-y-3">
+    <div className="space-y-3">
       {!isConfigured ? (
         <div className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-100">
           Supabase service role key is not configured. The editor is in
@@ -1107,27 +1256,40 @@ function StatusNotice({
         </div>
       ) : null}
       {message ? (
-        <div className="rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-sm leading-6 text-white/80">
-          {message}
-        </div>
+        success ? (
+          <div className="flex justify-end" role="status">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/14 bg-emerald-300/[0.065] px-3.5 py-2 text-xs text-emerald-100/72">
+              <FaCheck className="text-[10px]" />
+              {message}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-sm leading-6 text-white/80">
+            {message}
+          </div>
+        )
       ) : null}
     </div>
   );
 }
 
 function SiteSettingsForm({
+  brandPanel = "identity",
   content,
   disabled,
   mode = "brand",
 }: {
+  brandPanel?: "identity" | "typography" | "footer";
   content: EditablePortfolioContent;
   disabled: boolean;
   mode?: "brand" | "contact" | "music";
 }) {
   if (mode === "brand") {
     return (
-      <div className="grid gap-3" id="settings">
-        <AdminDisclosure
+      <div className="grid gap-3">
+        {brandPanel === "identity" ? (
+          <AdminDisclosure
+          collapsible={false}
           defaultOpen
           description="Artist name, portfolio mode, tagline, and public site description."
           eyebrow="01 · Identity"
@@ -1174,9 +1336,12 @@ function SiteSettingsForm({
               <SaveRow disabled={disabled} label="Save identity" />
             </fieldset>
           </form>
-        </AdminDisclosure>
+          </AdminDisclosure>
+        ) : null}
 
-        <AdminDisclosure
+        {brandPanel === "typography" ? (
+          <AdminDisclosure
+          collapsible={false}
           description="Display, paragraph, and interface font families."
           eyebrow="02 · Type system"
           id="settings-typography"
@@ -1228,9 +1393,12 @@ function SiteSettingsForm({
               <SaveRow disabled={disabled} label="Save typography" />
             </fieldset>
           </form>
-        </AdminDisclosure>
+          </AdminDisclosure>
+        ) : null}
 
-        <AdminDisclosure
+        {brandPanel === "footer" ? (
+          <AdminDisclosure
+          collapsible={false}
           description="Pointer effect used in the public footer on desktop."
           eyebrow="03 · Interaction"
           id="settings-footer-effect"
@@ -1244,7 +1412,8 @@ function SiteSettingsForm({
               <SaveRow disabled={disabled} label="Save interaction" />
             </fieldset>
           </form>
-        </AdminDisclosure>
+          </AdminDisclosure>
+        ) : null}
       </div>
     );
   }
@@ -1267,6 +1436,7 @@ function SiteSettingsForm({
 
   return (
     <AdminDisclosure
+      collapsible={false}
       description={copy.description}
       eyebrow={copy.eyebrow}
       id={`${mode}-settings`}
@@ -1330,7 +1500,7 @@ function HeroForms({
   content,
   disabled,
   activePageSlugs,
-  returnSection = "home",
+  returnSection = "home-hero",
 }: {
   assets: MediaAsset[];
   content: EditablePortfolioContent;
@@ -1349,10 +1519,11 @@ function HeroForms({
           {heroes[0]?.mediaType || "media"}
         </span>
       }
+      collapsible={false}
       defaultOpen
       description="Opening title, supporting text, action, and background media."
       eyebrow="01 · Page opening"
-      id={`${returnSection}-hero`}
+      id={returnSection}
       title="Hero"
     >
       <div className="grid gap-4">
@@ -1503,10 +1674,12 @@ function HomePresentationForm({
   assets,
   content,
   disabled,
+  panel,
 }: {
   assets: MediaAsset[];
   content: EditablePortfolioContent;
   disabled: boolean;
+  panel: "about" | "interlude" | "story";
 }) {
   const legacyStoryImages = content.galleryImages
     .filter((image) => image.isFreelanceStory)
@@ -1556,8 +1729,10 @@ function HomePresentationForm({
     { bodyName: "storyImage4Body", bodyValue: item.storyImage4Body, name: "storyImage4Src", titleName: "storyImage4Title", titleValue: item.storyImage4Title, value: item.storyImage4Src },
   ];
   return (
-    <div className="grid gap-3" id="home">
-      <AdminDisclosure
+    <div className="grid gap-3">
+      {panel === "about" ? (
+        <AdminDisclosure
+        collapsible={false}
         description="Heading, portrait, introduction, and optional call to action."
         eyebrow="02 · About"
         id="home-about"
@@ -1576,9 +1751,12 @@ function HomePresentationForm({
           <SaveRow disabled={disabled} />
           </fieldset>
         </form>
-      </AdminDisclosure>
+        </AdminDisclosure>
+      ) : null}
 
-      <AdminDisclosure
+      {panel === "interlude" ? (
+        <AdminDisclosure
+        collapsible={false}
         description="Full-width video transition between the opening story and gallery."
         eyebrow="03 · Feature"
         id="home-interlude"
@@ -1586,6 +1764,7 @@ function HomePresentationForm({
       >
         <form action={updateHomePresentation}>
           <fieldset disabled={disabled}>
+          <input name="returnSection" type="hidden" value="home-interlude" />
           <p className="mt-2 text-sm leading-6 text-white/48">Text, link, video, and poster for the full-width section directly below About.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field label="Heading" wide><TextInput defaultValue={item.featureTitle} name="featureTitle" required /></Field>
@@ -1599,9 +1778,12 @@ function HomePresentationForm({
           <SaveRow disabled={disabled} />
           </fieldset>
         </form>
-      </AdminDisclosure>
+        </AdminDisclosure>
+      ) : null}
 
-      <AdminDisclosure
+      {panel === "story" ? (
+        <AdminDisclosure
+        collapsible={false}
         badge={
           <span className="text-xs tabular-nums text-white/42">4 scenes</span>
         }
@@ -1612,6 +1794,7 @@ function HomePresentationForm({
       >
         <form action={updateHomePresentation}>
           <fieldset disabled={disabled}>
+          <input name="returnSection" type="hidden" value="home-freelancer-life" />
           <p className="mt-2 text-sm leading-6 text-white/48">Each scene has its own image, heading, and paragraph. Public text changes together with the active image while the visitor scrolls.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <input name="storyTitle" type="hidden" value={item.storyTitle} />
@@ -1631,7 +1814,8 @@ function HomePresentationForm({
           <SaveRow disabled={disabled} />
           </fieldset>
         </form>
-      </AdminDisclosure>
+        </AdminDisclosure>
+      ) : null}
     </div>
   );
 }
@@ -1641,15 +1825,19 @@ function BioForms({
   content,
   disabled,
   isActor,
+  panel,
 }: {
   assets: MediaAsset[];
   content: EditablePortfolioContent;
   disabled: boolean;
   isActor: boolean;
+  panel: "intro" | "gallery" | "paragraphs";
 }) {
   return (
-    <div className="grid gap-3" id="bio">
-      <AdminDisclosure
+    <div className="grid gap-3">
+      {panel === "intro" ? (
+        <AdminDisclosure
+        collapsible={false}
         description="The opening biography label, caption, and introduction."
         eyebrow="02 · Biography"
         id="bio-intro"
@@ -1675,9 +1863,12 @@ function BioForms({
             <SaveRow disabled={disabled} />
           </fieldset>
         </form>
-      </AdminDisclosure>
+        </AdminDisclosure>
+      ) : null}
 
-      <AdminDisclosure
+      {panel === "gallery" ? (
+        <AdminDisclosure
+        collapsible={false}
         badge={<span className="text-xs text-white/42">{content.bio.galleryImages.length} items</span>}
         description="Portraits shown alongside the biography. Open only the image you want to edit."
         eyebrow="03 · Visual story"
@@ -1701,9 +1892,12 @@ function BioForms({
             mode="new"
           />
         </div>
-      </AdminDisclosure>
+        </AdminDisclosure>
+      ) : null}
 
-      <AdminDisclosure
+      {panel === "paragraphs" ? (
+        <AdminDisclosure
+        collapsible={false}
         badge={<span className="text-xs text-white/42">{content.bio.paragraphs.length} paragraphs</span>}
         description="Long-form biography paragraphs and their reveal order."
         eyebrow="04 · Story"
@@ -1711,7 +1905,8 @@ function BioForms({
         title="Biography paragraphs"
       >
         <BioParagraphsEditor disabled={disabled} items={content.bio.paragraphs} />
-      </AdminDisclosure>
+        </AdminDisclosure>
+      ) : null}
     </div>
   );
 }
@@ -1725,6 +1920,7 @@ function ActorResumeSection({
 }) {
   return (
     <AdminDisclosure
+      collapsible={false}
       description="Playing profile, representation, languages, skills, and resume link."
       eyebrow="05 · Actor profile"
       id="actor-resume"
@@ -1813,6 +2009,7 @@ function ActorCreditsSection({
 }) {
   return (
     <AdminDisclosure
+      collapsible={false}
       badge={<span className="text-xs text-white/42">{items.length} credits</span>}
       description="Film, television, theatre, training, and other selected work."
       eyebrow="06 · Experience"
@@ -2117,10 +2314,11 @@ function SocialLinksSection({
   return (
     <AdminDisclosure
       badge={<span className="text-xs text-white/42">{items.length} links</span>}
+      collapsible={false}
       defaultOpen
       description="Social destinations shared by the public footer and navigation."
       eyebrow="Public presence"
-      id="socials"
+      id="socials-links"
       title="Footer links"
     >
       <div className="mb-4 grid gap-3 rounded-[18px] border border-white/10 bg-gradient-to-br from-white/[0.075] to-transparent p-4 sm:grid-cols-[auto_1fr] sm:items-center">
@@ -2308,6 +2506,7 @@ function MusicLinksSection({
   return (
     <AdminDisclosure
       badge={<span className="text-xs text-white/42">{items.length} links</span>}
+      collapsible={false}
       description="Streaming destinations and release cards."
       eyebrow="03 · Destinations"
       id="music-platforms"
@@ -2418,6 +2617,7 @@ function TracksSection({
   return (
     <AdminDisclosure
       badge={<span className="text-xs text-white/42">{items.length} tracks</span>}
+      collapsible={false}
       description="SoundCloud embeds and their public order."
       eyebrow="04 · Listening"
       id="tracks"
@@ -2531,25 +2731,65 @@ export default function ContentEditor({
         node: (
           <StudioWorkspace
             description="Live content, rendered as a compact page mirror"
-            editor={
-              <>
-                <HeroForms
-                  activePageSlugs={["home"]}
-                  assets={assets}
-                  content={content}
-                  disabled={disabled}
-                  returnSection="home"
-                />
-                <HomePresentationForm
-                  assets={assets}
-                  content={content}
-                  disabled={disabled}
-                />
-              </>
-            }
             label="Home page"
+            panels={[
+              {
+                description: "Opening title, action, and background media.",
+                id: "home-hero",
+                label: "Hero",
+                node: (
+                  <HeroForms
+                    activePageSlugs={["home"]}
+                    assets={assets}
+                    content={content}
+                    disabled={disabled}
+                    returnSection="home-hero"
+                  />
+                ),
+              },
+              {
+                description: "Portrait, introduction, and optional action.",
+                id: "home-about",
+                label: "About",
+                node: (
+                  <HomePresentationForm
+                    assets={assets}
+                    content={content}
+                    disabled={disabled}
+                    panel="about"
+                  />
+                ),
+              },
+              {
+                description: "Video transition between story and gallery.",
+                id: "home-interlude",
+                label: "Interlude",
+                node: (
+                  <HomePresentationForm
+                    assets={assets}
+                    content={content}
+                    disabled={disabled}
+                    panel="interlude"
+                  />
+                ),
+              },
+              {
+                description: "Four-scene scroll story.",
+                id: "home-freelancer-life",
+                label: "Freelancer life",
+                node: (
+                  <HomePresentationForm
+                    assets={assets}
+                    content={content}
+                    disabled={disabled}
+                    panel="story"
+                  />
+                ),
+              },
+            ]}
             preview={<HomeSnapshot content={content} />}
             publicHref="/"
+            sectionId="home"
           />
         ),
       },
@@ -2562,38 +2802,95 @@ export default function ContentEditor({
         node: (
           <StudioWorkspace
             description="Portraits and story, in the same order visitors see them"
-            editor={
-              <>
-                <HeroForms
-                  activePageSlugs={["bio"]}
-                  assets={assets}
-                  content={content}
-                  disabled={disabled}
-                  returnSection="bio"
-                />
-                <BioForms
-                  assets={assets}
-                  content={content}
-                  disabled={disabled}
-                  isActor={actorEnabled}
-                />
-                {actorEnabled ? (
-                  <ActorResumeSection
+            label="Bio page"
+            panels={[
+              {
+                description: "Opening title, action, and background media.",
+                id: "bio-hero",
+                label: "Hero",
+                node: (
+                  <HeroForms
+                    activePageSlugs={["bio"]}
+                    assets={assets}
                     content={content}
                     disabled={disabled}
+                    returnSection="bio-hero"
                   />
-                ) : null}
-                {actorEnabled ? (
-                  <ActorCreditsSection
+                ),
+              },
+              {
+                description: "Opening biography label and introduction.",
+                id: "bio-intro",
+                label: "Introduction",
+                node: (
+                  <BioForms
+                    assets={assets}
+                    content={content}
                     disabled={disabled}
-                    items={content.actorCredits}
+                    isActor={actorEnabled}
+                    panel="intro"
                   />
-                ) : null}
-              </>
-            }
-            label="Bio page"
+                ),
+              },
+              {
+                description: "Portraits shown throughout the biography.",
+                id: "bio-gallery",
+                label: "Portraits",
+                node: (
+                  <BioForms
+                    assets={assets}
+                    content={content}
+                    disabled={disabled}
+                    isActor={actorEnabled}
+                    panel="gallery"
+                  />
+                ),
+              },
+              {
+                aliases: ["bio-paragraphs"],
+                description: "Long-form biography and reveal order.",
+                id: "bio-paragraphs-panel",
+                label: "Biography",
+                node: (
+                  <BioForms
+                    assets={assets}
+                    content={content}
+                    disabled={disabled}
+                    isActor={actorEnabled}
+                    panel="paragraphs"
+                  />
+                ),
+              },
+              ...(actorEnabled
+                ? [
+                    {
+                      description: "Playing profile, skills, and representation.",
+                      id: "actor-resume",
+                      label: "Resume",
+                      node: (
+                        <ActorResumeSection
+                          content={content}
+                          disabled={disabled}
+                        />
+                      ),
+                    },
+                    {
+                      description: "Film, television, theatre, and training.",
+                      id: "actor-credits",
+                      label: "Credits",
+                      node: (
+                        <ActorCreditsSection
+                          disabled={disabled}
+                          items={content.actorCredits}
+                        />
+                      ),
+                    },
+                  ]
+                : []),
+            ]}
             preview={<BioSnapshot content={content} />}
             publicHref="/bio"
+            sectionId="bio"
           />
         ),
       },
@@ -2611,34 +2908,61 @@ export default function ContentEditor({
               node: (
                 <StudioWorkspace
                   description="Music destinations, releases, and listening sequence"
-                  editor={
-                    <>
-                      <HeroForms
-                        activePageSlugs={["music"]}
-                        assets={assets}
-                        content={content}
-                        disabled={disabled}
-                        returnSection="music-links"
-                      />
-                      <SiteSettingsForm
-                        content={content}
-                        disabled={disabled}
-                        mode="music"
-                      />
-                      <MusicLinksSection
-                        assets={assets}
-                        disabled={disabled}
-                        items={content.musicPlatforms}
-                      />
-                      <TracksSection
-                        disabled={disabled}
-                        items={content.soundcloudTracks}
-                      />
-                    </>
-                  }
                   label="Music page"
+                  panels={[
+                    {
+                      description: "Opening title, action, and background media.",
+                      id: "music-links-hero",
+                      label: "Hero",
+                      node: (
+                        <HeroForms
+                          activePageSlugs={["music"]}
+                          assets={assets}
+                          content={content}
+                          disabled={disabled}
+                          returnSection="music-links-hero"
+                        />
+                      ),
+                    },
+                    {
+                      description: "Spotify artist and embed links.",
+                      id: "music-settings",
+                      label: "Spotify",
+                      node: (
+                        <SiteSettingsForm
+                          content={content}
+                          disabled={disabled}
+                          mode="music"
+                        />
+                      ),
+                    },
+                    {
+                      description: "Streaming destinations and release cards.",
+                      id: "music-platforms",
+                      label: "Platforms",
+                      node: (
+                        <MusicLinksSection
+                          assets={assets}
+                          disabled={disabled}
+                          items={content.musicPlatforms}
+                        />
+                      ),
+                    },
+                    {
+                      description: "SoundCloud embeds and public order.",
+                      id: "tracks",
+                      label: "SoundCloud",
+                      node: (
+                        <TracksSection
+                          disabled={disabled}
+                          items={content.soundcloudTracks}
+                        />
+                      ),
+                    },
+                  ]}
                   preview={<MusicSnapshot content={content} />}
                   publicHref="/music"
+                  sectionId="music-links"
                 />
               ),
             },
@@ -2653,25 +2977,38 @@ export default function ContentEditor({
         node: (
           <StudioWorkspace
             description="Contact introduction and the public inquiry experience"
-            editor={
-              <>
-                <HeroForms
-                  activePageSlugs={["booking"]}
-                  assets={assets}
-                  content={content}
-                  disabled={disabled}
-                  returnSection="booking"
-                />
-                <SiteSettingsForm
-                  content={content}
-                  disabled={disabled}
-                  mode="contact"
-                />
-              </>
-            }
             label={portfolioType === "actor" ? "Contact page" : "Booking page"}
+            panels={[
+              {
+                description: "Opening title, action, and background media.",
+                id: "booking-hero",
+                label: "Hero",
+                node: (
+                  <HeroForms
+                    activePageSlugs={["booking"]}
+                    assets={assets}
+                    content={content}
+                    disabled={disabled}
+                    returnSection="booking-hero"
+                  />
+                ),
+              },
+              {
+                description: "Location and inquiry introduction.",
+                id: "contact-settings",
+                label: "Contact details",
+                node: (
+                  <SiteSettingsForm
+                    content={content}
+                    disabled={disabled}
+                    mode="contact"
+                  />
+                ),
+              },
+            ]}
             preview={<BookingSnapshot content={content} />}
             publicHref="/booking"
+            sectionId="booking"
           />
         ),
       },
@@ -2705,12 +3042,48 @@ export default function ContentEditor({
         node: (
           <StudioWorkspace
             description="Global choices that shape every public page"
-            editor={
-              <SiteSettingsForm content={content} disabled={disabled} />
-            }
             label="Brand system"
+            panels={[
+              {
+                description: "Artist name, portfolio mode, and public copy.",
+                id: "settings-identity",
+                label: "Identity",
+                node: (
+                  <SiteSettingsForm
+                    brandPanel="identity"
+                    content={content}
+                    disabled={disabled}
+                  />
+                ),
+              },
+              {
+                description: "Display, paragraph, and interface fonts.",
+                id: "settings-typography",
+                label: "Typography",
+                node: (
+                  <SiteSettingsForm
+                    brandPanel="typography"
+                    content={content}
+                    disabled={disabled}
+                  />
+                ),
+              },
+              {
+                description: "Desktop pointer behavior in the footer.",
+                id: "settings-footer-effect",
+                label: "Footer effect",
+                node: (
+                  <SiteSettingsForm
+                    brandPanel="footer"
+                    content={content}
+                    disabled={disabled}
+                  />
+                ),
+              },
+            ]}
             preview={<BrandSnapshot content={content} />}
             publicHref="/"
+            sectionId="settings"
           />
         ),
       },
@@ -2724,16 +3097,24 @@ export default function ContentEditor({
         node: (
           <StudioWorkspace
             description="Shared across the bottom of every portfolio page"
-            editor={
-              <SocialLinksSection
-                disabled={disabled}
-                items={content.socialLinks}
-                portfolioType={portfolioType}
-              />
-            }
             label="Shared footer"
+            panels={[
+              {
+                description: "Destinations, icons, visibility, and order.",
+                id: "socials-links",
+                label: "Social links",
+                node: (
+                  <SocialLinksSection
+                    disabled={disabled}
+                    items={content.socialLinks}
+                    portfolioType={portfolioType}
+                  />
+                ),
+              },
+            ]}
             preview={<FooterSnapshot content={content} />}
             publicHref="/"
+            sectionId="socials"
           />
         ),
       },
@@ -2754,6 +3135,9 @@ export default function ContentEditor({
     hasUnsavedChanges,
     markDirty,
   } = useUnsavedChangesGuard();
+  const [dirtyPanelIds, setDirtyPanelIds] = useState<Set<string>>(
+    () => new Set()
+  );
 
   useEffect(() => {
     const syncHash = () => {
@@ -2786,9 +3170,11 @@ export default function ContentEditor({
     "music-platforms": "music-links",
     "booking-hero": "booking",
     "contact-settings": "booking",
+    "navigation-settings": "navigation",
     "settings-identity": "settings",
     "settings-typography": "settings",
     "settings-footer-effect": "settings",
+    "socials-links": "socials",
     updates: "home",
     tracks: "music-links",
   };
@@ -2799,15 +3185,30 @@ export default function ContentEditor({
   function openSection(id: string) {
     if (id === activeSection?.id) return;
     if (!confirmDiscard()) return;
+    setDirtyPanelIds(new Set());
     setActiveSectionId(id);
     window.history.replaceState(
-      null,
+      window.history.state,
       "",
       `${window.location.pathname}${window.location.search}#${id}`
     );
     document
       .getElementById("content-workspace")
       ?.scrollIntoView({ block: "start" });
+  }
+
+  function rememberDirtyPanel(target: EventTarget | null) {
+    if (!(target instanceof Element)) return;
+    const panelId = target
+      .closest<HTMLElement>("[data-editor-panel-id]")
+      ?.getAttribute("data-editor-panel-id");
+    if (!panelId || panelId === "preview") return;
+    setDirtyPanelIds((current) => {
+      if (current.has(panelId)) return current;
+      const next = new Set(current);
+      next.add(panelId);
+      return next;
+    });
   }
 
   const hiddenNavPageSlugs = new Set(content.settings.hiddenNavPageSlugs);
@@ -2853,7 +3254,10 @@ export default function ContentEditor({
   return (
     <div
       className="grid gap-4"
-      onChangeCapture={markDirty}
+      onChangeCapture={(event) => {
+        markDirty();
+        rememberDirtyPanel(event.target);
+      }}
       onClickCapture={(event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
@@ -2864,10 +3268,34 @@ export default function ContentEditor({
           button.closest("form")
         ) {
           markDirty();
+          rememberDirtyPanel(button);
         }
       }}
       onSubmit={(event) => {
-        if (!event.defaultPrevented) clearDirty();
+        if (event.defaultPrevented) return;
+        const form = event.target;
+        const submittingPanelId =
+          form instanceof HTMLFormElement
+            ? form
+                .closest<HTMLElement>("[data-editor-panel-id]")
+                ?.getAttribute("data-editor-panel-id")
+            : null;
+        const otherDrafts = [...dirtyPanelIds].filter(
+          (panelId) => panelId !== submittingPanelId
+        );
+
+        if (
+          otherDrafts.length > 0 &&
+          !window.confirm(
+            "You also have unsaved changes in another panel. Saving now reloads the editor and discards those drafts. Continue?"
+          )
+        ) {
+          event.preventDefault();
+          return;
+        }
+
+        setDirtyPanelIds(new Set());
+        clearDirty();
       }}
     >
       <StatusNotice
@@ -2876,77 +3304,41 @@ export default function ContentEditor({
         status={status}
       />
 
-      <div className="grid items-start gap-4 xl:grid-cols-[250px_minmax(0,1fr)]">
-        <aside className="xl:sticky xl:top-4">
-          <AdminDisclosure
-            badge={
-              <span className="rounded-full border border-white/10 px-2 py-1 text-[9px] uppercase tracking-[0.1em] text-white/40">
-                Change
-              </span>
-            }
-            description="Open the portfolio map to switch pages or global settings."
-            eyebrow="Portfolio map"
-            id="portfolio-map"
-            title={`Editing: ${activeSection?.label || "Home"}`}
-            variant="advanced"
-          >
-          <div className="px-2 pb-2 pt-1">
-            <p className={labelClass}>Portfolio map</p>
-            <h2 className="heading-ui mt-2 text-lg font-semibold text-white">
-              Edit by page
-            </h2>
-            <p className="mt-2 text-xs leading-5 text-white/38">
-              Every portfolio page stays here, even when its navbar link is
-              hidden.
-            </p>
-          </div>
-
-          <nav
-            aria-label="Public page editors"
-            className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-1"
-          >
-            {publicPageItems.map((page, index) => {
+      <div className="min-w-0">
+        <nav
+          aria-label="Site editor sections"
+          className="relative mb-4 overflow-hidden rounded-[24px] border border-white/10 bg-[#0d0d0f]/94 shadow-[0_20px_70px_rgba(0,0,0,0.25)]"
+        >
+          <div className="admin-scrollbar-none flex items-center gap-2 overflow-x-auto p-2.5 pr-12 lg:pr-2.5">
+            <span className="shrink-0 px-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/26">
+              Pages
+            </span>
+            {publicPageItems.map((page) => {
               const active = page.sectionId === activeSection?.id;
               const contentNode = (
                 <>
+                  <span className="text-[11px]">{page.icon}</span>
+                  <span className="whitespace-nowrap text-xs font-semibold">
+                    {page.label}
+                  </span>
                   <span
-                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border text-xs ${
-                      active
-                        ? "border-[#ff7059]/30 bg-[#ff3b1f] text-white"
-                        : "border-white/8 bg-white/[0.04] text-white/40"
+                    aria-label={
+                      page.isVisible ? "Shown in navbar" : "Hidden from navbar"
+                    }
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      page.isVisible ? "bg-emerald-300/70" : "bg-amber-300/65"
                     }`}
-                  >
-                    {page.icon}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2 text-sm font-semibold">
-                      <span className="text-[9px] font-normal tabular-nums text-white/24">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <span className="truncate">{page.label}</span>
-                    </span>
-                    <span
-                      className={`mt-0.5 flex items-center gap-1.5 truncate text-[10px] ${
-                        page.isVisible
-                          ? "text-emerald-100/42"
-                          : "text-amber-100/42"
-                      }`}
-                    >
-                      {page.isVisible ? <FaEye /> : <FaEyeSlash />}
-                      {page.isVisible
-                        ? "Shown in navbar"
-                        : "Hidden from navbar"}
-                    </span>
-                  </span>
+                    role="img"
+                  />
                   {page.editorHref ? (
-                    <FaExternalLinkAlt className="shrink-0 text-[9px] text-white/26" />
+                    <FaExternalLinkAlt className="text-[8px] text-white/32" />
                   ) : null}
                 </>
               );
-              const className = `flex min-h-14 items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${
+              const className = `flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 transition ${
                 active
-                  ? "border-white/14 bg-white/[0.09] text-white"
-                  : "border-transparent text-white/56 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"
+                  ? "border-[#ff7059]/28 bg-[#ff3b1f] text-white"
+                  : "border-white/7 bg-white/[0.025] text-white/48 hover:border-white/14 hover:bg-white/[0.065] hover:text-white"
               }`;
 
               return page.editorHref ? (
@@ -2969,13 +3361,11 @@ export default function ContentEditor({
                 </button>
               );
             })}
-          </nav>
 
-          <div className="mx-2 my-3 border-t border-white/8" />
-          <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/28">
-            Site-wide
-          </p>
-          <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
+            <span className="mx-1 h-7 w-px shrink-0 bg-white/10" />
+            <span className="shrink-0 px-2 text-[9px] font-semibold uppercase tracking-[0.2em] text-white/26">
+              Site-wide
+            </span>
             {sharedSections.map((section) => {
               const active = section.id === activeSection?.id;
               const icon =
@@ -2990,57 +3380,48 @@ export default function ContentEditor({
               return (
                 <button
                   aria-pressed={active}
-                  className={`flex min-h-12 items-center gap-3 rounded-xl border px-2.5 py-2 text-left text-sm font-semibold transition ${
+                  className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition ${
                     active
-                      ? "border-white/14 bg-white/[0.09] text-white"
-                      : "border-transparent text-white/50 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"
+                      ? "border-[#ff7059]/28 bg-[#ff3b1f] text-white"
+                      : "border-white/7 bg-white/[0.025] text-white/48 hover:border-white/14 hover:bg-white/[0.065] hover:text-white"
                   }`}
                   key={section.id}
                   onClick={() => openSection(section.id)}
                   type="button"
                 >
-                  <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/8 bg-white/[0.04] text-[11px] text-white/42">
-                    {icon}
-                  </span>
-                  {section.label}
+                  <span className="text-[11px]">{icon}</span>
+                  <span className="whitespace-nowrap">{section.label}</span>
                 </button>
               );
             })}
           </div>
-          </AdminDisclosure>
-        </aside>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#0d0d0f] via-[#0d0d0f]/88 to-transparent lg:hidden"
+          />
+        </nav>
 
         <div className="min-w-0">
-          <div className="mb-4 flex flex-col gap-3 rounded-[22px] border border-white/9 bg-white/[0.045] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className={labelClass}>{activeSection?.kicker}</p>
-              <h2 className="heading-ui mt-1 text-xl font-semibold text-white">
-                {activeSection?.label}
-              </h2>
-              <p className="mt-1 text-xs leading-5 text-white/40">
-                {activeSection?.description}
-              </p>
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {hasUnsavedChanges ? (
-                <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-amber-300/16 bg-amber-400/[0.06] px-3 text-xs text-amber-100/68">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-                  Unsaved changes
-                </span>
-              ) : null}
-              {typeof activeSection?.count === "number" ? (
-                <span className="inline-flex min-h-8 items-center rounded-full border border-white/9 px-3 text-xs tabular-nums text-white/45">
-                  {activeSection.count} {activeSection.countLabel || "items"}
-                </span>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="scroll-mt-28" id="content-workspace">
+          <div
+            className="scroll-mt-28"
+            id="content-workspace"
+            key={activeSection?.id}
+          >
             {activeSection?.node}
           </div>
         </div>
       </div>
+
+      {hasUnsavedChanges ? (
+        <div
+          aria-live="polite"
+          className="fixed bottom-4 right-4 z-50 inline-flex min-h-10 items-center gap-2 rounded-full border border-amber-300/18 bg-[#17130c]/94 px-4 text-xs font-semibold text-amber-100/76 shadow-[0_14px_44px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+          role="status"
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+          Unsaved changes
+        </div>
+      ) : null}
     </div>
   );
 }

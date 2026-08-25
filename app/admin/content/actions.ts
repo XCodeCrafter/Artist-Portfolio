@@ -371,12 +371,33 @@ function formChecked(formData: FormData, key: string) {
 
 const CONTENT_RETURN_SECTIONS = new Set([
   "home",
+  "home-hero",
+  "home-about",
+  "home-interlude",
+  "home-freelancer-life",
   "bio",
+  "bio-hero",
+  "bio-intro",
+  "bio-gallery",
+  "bio-paragraphs-panel",
+  "actor-resume",
+  "actor-credits",
   "music-links",
+  "music-links-hero",
+  "music-settings",
+  "music-platforms",
+  "tracks",
   "booking",
+  "booking-hero",
+  "contact-settings",
   "navigation",
+  "navigation-settings",
   "settings",
+  "settings-identity",
+  "settings-typography",
+  "settings-footer-effect",
   "socials",
+  "socials-links",
 ]);
 
 function getReturnSection(formData: FormData, fallback: string) {
@@ -460,7 +481,7 @@ async function assertMutation(
 }
 
 export async function updateBrandIdentitySettings(formData: FormData) {
-  const section = "settings";
+  const section = "settings-identity";
   const parsed = brandIdentitySchema.safeParse({
     portfolioType: formValue(formData, "portfolioType"),
     artistName: formValue(formData, "artistName"),
@@ -496,7 +517,7 @@ export async function updateBrandIdentitySettings(formData: FormData) {
 }
 
 export async function updateTypographySettings(formData: FormData) {
-  const section = "settings";
+  const section = "settings-typography";
   const parsed = typographySettingsSchema.safeParse({
     displayFont: formValue(formData, "displayFont"),
     bodyFont: formValue(formData, "bodyFont"),
@@ -537,7 +558,7 @@ export async function updateTypographySettings(formData: FormData) {
 }
 
 export async function updateFooterEffectSettings(formData: FormData) {
-  const section = "settings";
+  const section = "settings-footer-effect";
   const parsed = footerEffectSettingsSchema.safeParse({
     footerEffect: formValue(formData, "footerEffect"),
   });
@@ -572,7 +593,7 @@ export async function updateFooterEffectSettings(formData: FormData) {
 }
 
 export async function updateContactSettings(formData: FormData) {
-  const section = "booking";
+  const section = "contact-settings";
   const parsed = contactSettingsSchema.safeParse({
     location: formValue(formData, "location"),
     contactBlurb: formValue(formData, "contactBlurb"),
@@ -607,7 +628,7 @@ export async function updateContactSettings(formData: FormData) {
 }
 
 export async function updateMusicSettings(formData: FormData) {
-  const section = "music-links";
+  const section = "music-settings";
   const parsed = musicSettingsSchema.safeParse({
     spotifyArtistUrl: formValue(formData, "spotifyArtistUrl"),
     spotifyEmbedUrl: formValue(formData, "spotifyEmbedUrl"),
@@ -642,7 +663,7 @@ export async function updateMusicSettings(formData: FormData) {
 }
 
 export async function updateNavigationSettings(formData: FormData) {
-  const section = "navigation";
+  const section = "navigation-settings";
   const parsed = navigationSettingsSchema.safeParse({
     portfolioType: formValue(formData, "portfolioType"),
     visibleNavPageSlugs: formData
@@ -755,6 +776,7 @@ export async function updatePageHero(formData: FormData) {
 }
 
 export async function updateAboutHome(formData: FormData) {
+  const section = "home-about";
   const parsed = aboutHomeSchema.safeParse({
     heading: formValue(formData, "heading"),
     body: formValue(formData, "body"),
@@ -764,9 +786,9 @@ export async function updateAboutHome(formData: FormData) {
     imageAlt: formValue(formData, "imageAlt"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid", "home");
+  if (!parsed.success) redirectToStatus("invalid", section);
 
-  const { admin, supabase } = await getWriteContext("home");
+  const { admin, supabase } = await getWriteContext(section);
   const result = await supabase.from("about_home").upsert({
     id: "main",
     heading: parsed.data.heading,
@@ -777,7 +799,7 @@ export async function updateAboutHome(formData: FormData) {
     image_alt: parsed.data.imageAlt,
   });
 
-  await assertMutation(result, "home");
+  await assertMutation(result, section);
   await writeAuditLog({
     actorId: admin.id,
     action: "content_update",
@@ -787,10 +809,11 @@ export async function updateAboutHome(formData: FormData) {
   });
 
   revalidatePortfolio();
-  redirectToStatus("saved-home", "home");
+  redirectToStatus("saved-home", section);
 }
 
 export async function updateHomePresentation(formData: FormData) {
+  const returnSection = getReturnSection(formData, "home-interlude");
   const parsed = homePresentationSchema.safeParse({
     updatesHeading: formValue(formData, "updatesHeading"),
     updatesImageSrc: formValue(formData, "updatesImageSrc"),
@@ -822,8 +845,8 @@ export async function updateHomePresentation(formData: FormData) {
     storyImage4Title: formValue(formData, "storyImage4Title"),
     storyImage4Body: formValue(formData, "storyImage4Body"),
   });
-  if (!parsed.success) redirectToStatus("invalid", "home");
-  const { admin, supabase } = await getWriteContext("home-presentation");
+  if (!parsed.success) redirectToStatus("invalid", returnSection);
+  const { admin, supabase } = await getWriteContext(returnSection);
   const result = await supabase.from("media_assets").upsert({
     id: "home-studio-settings",
     label: "Home Studio settings",
@@ -839,22 +862,23 @@ export async function updateHomePresentation(formData: FormData) {
     mime_type: "application/json",
     metadata: parsed.data,
   });
-  await assertMutation(result, "home");
+  await assertMutation(result, returnSection);
   await writeAuditLog({ actorId: admin.id, action: "home_presentation_update", tableName: "media_assets", recordId: "home-studio-settings", metadata: {} });
   revalidatePortfolio();
-  redirectToStatus("saved-home-presentation", "home");
+  redirectToStatus("saved-home-presentation", returnSection);
 }
 
 export async function updateBioProfile(formData: FormData) {
+  const section = "bio-intro";
   const parsed = bioProfileSchema.safeParse({
     topLabel: formValue(formData, "topLabel"),
     introText: formValue(formData, "introText"),
     caption: formValue(formData, "caption"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid", "bio");
+  if (!parsed.success) redirectToStatus("invalid", section);
 
-  const { admin, supabase } = await getWriteContext("bio");
+  const { admin, supabase } = await getWriteContext(section);
   const result = await supabase.from("bio_profile").upsert({
     id: "main",
     top_label: parsed.data.topLabel,
@@ -862,7 +886,7 @@ export async function updateBioProfile(formData: FormData) {
     caption: parsed.data.caption,
   });
 
-  await assertMutation(result, "bio");
+  await assertMutation(result, section);
   await writeAuditLog({
     actorId: admin.id,
     action: "content_update",
@@ -872,7 +896,7 @@ export async function updateBioProfile(formData: FormData) {
   });
 
   revalidatePortfolio();
-  redirectToStatus("saved-bio", "bio");
+  redirectToStatus("saved-bio", section);
 }
 
 export async function saveHomeUpdate(formData: FormData) {
@@ -923,9 +947,9 @@ export async function saveSocialLink(formData: FormData) {
     isPublished: formChecked(formData, "isPublished"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid", "socials");
+  if (!parsed.success) redirectToStatus("invalid", "socials-links");
 
-  const { admin, supabase } = await getWriteContext("socials");
+  const { admin, supabase } = await getWriteContext("socials-links");
   const iconKey = detectSocialPlatform(
     parsed.data.iconKey,
     parsed.data.platform,
@@ -942,7 +966,7 @@ export async function saveSocialLink(formData: FormData) {
     is_published: parsed.data.isPublished,
   });
 
-  await assertMutation(result, "socials");
+  await assertMutation(result, "socials-links");
   await writeAuditLog({
     actorId: admin.id,
     action: "content_update",
@@ -952,7 +976,7 @@ export async function saveSocialLink(formData: FormData) {
   });
 
   revalidatePortfolio();
-  redirectToStatus("saved-social", "socials");
+  redirectToStatus("saved-social", "socials-links");
 }
 
 export async function saveMusicPlatformLink(formData: FormData) {
@@ -967,9 +991,9 @@ export async function saveMusicPlatformLink(formData: FormData) {
     isPublished: formChecked(formData, "isPublished"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid", "music-links");
+  if (!parsed.success) redirectToStatus("invalid", "music-platforms");
 
-  const { admin, supabase } = await getWriteContext("music-links");
+  const { admin, supabase } = await getWriteContext("music-platforms");
   const result = await supabase.from("music_platform_links").upsert({
     id: parsed.data.id,
     title: parsed.data.title,
@@ -981,7 +1005,7 @@ export async function saveMusicPlatformLink(formData: FormData) {
     is_published: parsed.data.isPublished,
   });
 
-  await assertMutation(result, "music-links");
+  await assertMutation(result, "music-platforms");
   await writeAuditLog({
     actorId: admin.id,
     action: "content_update",
@@ -991,7 +1015,7 @@ export async function saveMusicPlatformLink(formData: FormData) {
   });
 
   revalidatePortfolio();
-  redirectToStatus("saved-music-link", "music-links");
+  redirectToStatus("saved-music-link", "music-platforms");
 }
 
 export async function saveSoundcloudTrack(formData: FormData) {
@@ -1108,9 +1132,9 @@ export async function saveBioParagraph(formData: FormData) {
     isPublished: formChecked(formData, "isPublished"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid", "bio-paragraphs");
+  if (!parsed.success) redirectToStatus("invalid", "bio-paragraphs-panel");
 
-  const { admin, supabase } = await getWriteContext("bio-paragraphs");
+  const { admin, supabase } = await getWriteContext("bio-paragraphs-panel");
   const result = await supabase.from("bio_paragraphs").upsert({
     id: parsed.data.id,
     body: parsed.data.body,
@@ -1119,7 +1143,7 @@ export async function saveBioParagraph(formData: FormData) {
     is_published: parsed.data.isPublished,
   });
 
-  await assertMutation(result, "bio-paragraphs");
+  await assertMutation(result, "bio-paragraphs-panel");
   await writeAuditLog({
     actorId: admin.id,
     action: "content_update",
@@ -1129,7 +1153,7 @@ export async function saveBioParagraph(formData: FormData) {
   });
 
   revalidatePortfolio();
-  redirectToStatus("saved-bio-paragraph", "bio-paragraphs");
+  redirectToStatus("saved-bio-paragraph", "bio-paragraphs-panel");
 }
 
 export async function saveBioParagraphs(formData: FormData) {
@@ -1183,7 +1207,7 @@ export async function saveBioParagraphs(formData: FormData) {
     metadata: { count: rows.length, deleted: removedIds.length },
   });
   revalidatePortfolio();
-  redirectToStatus("saved-bio-paragraphs", "bio");
+  redirectToStatus("saved-bio-paragraphs", "bio-paragraphs-panel");
 }
 
 export async function saveVideo(formData: FormData) {
@@ -1356,11 +1380,11 @@ export async function deleteHomeUpdate(formData: FormData) {
 }
 
 export async function deleteSocialLink(formData: FormData) {
-  await deleteById(formData, "social_links", "socials");
+  await deleteById(formData, "social_links", "socials-links");
 }
 
 export async function deleteMusicPlatformLink(formData: FormData) {
-  await deleteById(formData, "music_platform_links", "music-links");
+  await deleteById(formData, "music_platform_links", "music-platforms");
 }
 
 export async function deleteSoundcloudTrack(formData: FormData) {
@@ -1376,7 +1400,7 @@ export async function deleteGalleryImage(formData: FormData) {
 }
 
 export async function deleteBioParagraph(formData: FormData) {
-  await deleteById(formData, "bio_paragraphs", "bio-paragraphs");
+  await deleteById(formData, "bio_paragraphs", "bio-paragraphs-panel");
 }
 
 export async function deleteVideo(formData: FormData) {
