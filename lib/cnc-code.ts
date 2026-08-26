@@ -1,4 +1,6 @@
-export type CncDialect = "heidenhain" | "iso" | "siemens";
+export const CNC_DIALECTS = ["siemens", "iso", "heidenhain"] as const;
+
+export type CncDialect = (typeof CNC_DIALECTS)[number];
 
 export type CncProgramDefinition = {
   id: string;
@@ -8,6 +10,11 @@ export type CncProgramDefinition = {
   dialect: CncDialect;
   source: string;
   previewLineCount?: number;
+};
+
+export type CncProgramRecord = CncProgramDefinition & {
+  sortOrder: number;
+  isPublished: boolean;
 };
 
 export type CncTokenKind =

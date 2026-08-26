@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ClientPortal from "@/components/ClientPortal";
 import { CncFullCode } from "@/components/CncCodeView";
-import type { ParsedCncProgram } from "@/lib/cnc-code";
+import {
+  parseCncProgram,
+  type CncProgramDefinition,
+} from "@/lib/cnc-code";
 
 const DIALECT_LABELS = {
   heidenhain: "HEIDENHAIN",
@@ -15,7 +18,7 @@ type Props = {
   activeIndex: number;
   onClose: () => void;
   onSelectProgram: (index: number) => void;
-  programs: readonly ParsedCncProgram[];
+  programs: readonly CncProgramDefinition[];
 };
 
 export default function CncProgramDialog({
@@ -28,7 +31,8 @@ export default function CncProgramDialog({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const codeScrollRef = useRef<HTMLPreElement | null>(null);
   const [copyState, setCopyState] = useState<"copied" | "error" | "idle">("idle");
-  const program = programs[activeIndex];
+  const definition = programs[activeIndex];
+  const program = useMemo(() => parseCncProgram(definition), [definition]);
   const viewerPrefix = `cnc-viewer-${program.definition.id}`;
   const dialogTitleId = `${program.definition.id}-dialog-title`;
   const codeLabelId = `${program.definition.id}-code-label`;
@@ -141,14 +145,14 @@ export default function CncProgramDialog({
               <button
                 aria-pressed={index === activeIndex}
                 className={index === activeIndex ? "is-active" : ""}
-                key={item.definition.id}
+                key={item.id}
                 onClick={() => selectProgram(index)}
                 type="button"
               >
                 <span className="cnc-dialog-tab-icon" aria-hidden="true">
                   NC
                 </span>
-                <span>{item.definition.fileName}</span>
+                <span>{item.fileName}</span>
               </button>
             ))}
           </div>

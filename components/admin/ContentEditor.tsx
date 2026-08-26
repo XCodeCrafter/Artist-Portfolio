@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   createContext,
   useCallback,
+  useDeferredValue,
   useEffect,
   useId,
   useContext,
@@ -65,7 +66,27 @@ import type {
   EditableSocialLink,
   EditableSoundcloudTrack,
 } from "@/lib/admin/content";
+import type { EditableCncProgram } from "@/lib/admin/cnc-programs";
 import type { MediaAsset } from "@/lib/admin/media";
+import {
+  CNC_DIALECTS,
+  parseCncProgram,
+  type CncDialect,
+} from "@/lib/cnc-code";
+import {
+  CNC_PROGRAM_LIMIT,
+  CNC_PROGRAM_MAX_LINES,
+  CNC_PROGRAM_MAX_LINE_CHARS,
+  CNC_PROGRAM_MAX_PREVIEW_LINES,
+  CNC_PROGRAM_MAX_SOURCE_BYTES,
+  CNC_PROGRAM_MAX_SOURCE_CHARS,
+  CNC_PROGRAM_MAX_TOTAL_BYTES,
+  CNC_PROGRAM_MIN_PREVIEW_LINES,
+  getCncSourceByteLength,
+  getCncSourceLineCount,
+  getLongestCncLineLength,
+  isValidCncFileName,
+} from "@/lib/cnc-program-input";
 import {
   deleteActorCredit,
   deleteBioGalleryImage,
@@ -75,6 +96,7 @@ import {
   saveActorCredit,
   saveBioGalleryImage,
   saveBioParagraphs,
+  saveCncPrograms,
   saveMusicPlatformLink,
   saveSocialLink,
   saveSoundcloudTrack,
@@ -93,6 +115,10 @@ import {
 
 type ContentEditorProps = {
   assets: MediaAsset[];
+  cncIsConfigured: boolean;
+  cncLoadError?: string;
+  cncMigrationRequired: boolean;
+  cncPrograms: EditableCncProgram[];
   content: EditablePortfolioContent;
   isConfigured: boolean;
   loadError?: string;
@@ -107,12 +133,19 @@ const statusCopy: Record<string, string> = {
     "Server-side Supabase admin key is missing, so content cannot be saved.",
   "save-error": "Save failed. Check Supabase logs and environment variables.",
   "security-error": "Request origin was blocked. Refresh admin and try again.",
+  "cnc-migration-required":
+    "CNC programs need the 0024_cnc_programs database migration before they can be saved.",
+  "cnc-write-conflict":
+    "CNC programs changed in another admin session. Nothing was overwritten; review the latest saved version and apply your edit again.",
+  "invalid-cnc-programs":
+    "Check the CNC program names, preview range, and source-code limits.",
   "saved-actor-credit": "Actor credit saved.",
   "saved-actor-resume": "Actor resume saved.",
   "saved-bio": "Bio profile saved.",
   "saved-bio-gallery": "Bio image saved.",
   "saved-bio-paragraph": "Bio paragraph saved.",
   "saved-bio-paragraphs": "All biography paragraphs saved.",
+  "saved-cnc-programs": "CNC programs saved.",
   "saved-gallery-image": "Gallery image saved.",
   "saved-hero": "Hero saved.",
   "saved-home": "Homepage about block saved.",
@@ -254,8 +287,15 @@ function HeroSnapshot({
   );
 }
 
-function HomeSnapshot({ content }: { content: EditablePortfolioContent }) {
+function HomeSnapshot({
+  cncPrograms,
+  content,
+}: {
+  cncPrograms: EditableCncProgram[];
+  content: EditablePortfolioContent;
+}) {
   const presentation = content.homePresentation;
+  const visibleCncProgram = cncPrograms.find((program) => program.isPublished);
   const legacyStoryImages = content.galleryImages
     .filter((image) => image.isFreelanceStory)
     .sort(
@@ -286,6 +326,28 @@ function HomeSnapshot({ content }: { content: EditablePortfolioContent }) {
           <div className="relative min-h-72"><Image alt={content.aboutHome.imageAlt || "Home about preview"} className="object-cover" fill sizes="50vw" src={content.aboutHome.imageSrc || "/images/about.jpg"} /></div>
           <div className="flex flex-col justify-center p-6 sm:p-8"><p className={labelClass}>About</p><h3 className="heading-ui mt-3 text-3xl text-white">{content.aboutHome.heading}</h3><p className="mt-4 line-clamp-6 text-sm leading-6 text-white/60">{content.aboutHome.body}</p></div>
         </div>
+        {visibleCncProgram ? (
+          <div className="grid overflow-hidden rounded-lg border border-white/10 bg-[#090b0e] lg:grid-cols-[0.72fr_1.28fr]">
+            <div className="flex flex-col justify-center border-b border-white/10 p-6 lg:border-b-0 lg:border-r">
+              <p className={labelClass}>CNC program showcase</p>
+              <h3 className="heading-ui mt-3 text-3xl text-white">
+                {visibleCncProgram.title}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-white/48">
+                {visibleCncProgram.fileName} ·{" "}
+                {getCncSourceLineCount(visibleCncProgram.source)} lines
+              </p>
+            </div>
+            <pre className="max-h-64 overflow-hidden p-6 font-mono text-xs leading-6 text-[#b9c7d5]">
+              <code>
+                {visibleCncProgram.source
+                  .split(/\r\n?|\n/)
+                  .slice(0, 9)
+                  .join("\n")}
+              </code>
+            </pre>
+          </div>
+        ) : null}
         <div className="relative aspect-[16/7] min-h-72 overflow-hidden rounded-lg border border-white/10 bg-black">
           {interludeVideo ? (
             <video autoPlay className="h-full w-full object-cover" loop muted playsInline poster={interludePoster} src={interludeVideo} />
@@ -1829,7 +1891,7 @@ function HomePresentationForm({
         <AdminDisclosure
         collapsible={false}
         description="Full-width video transition between the opening story and gallery."
-        eyebrow="03 · Feature"
+        eyebrow="04 · Feature"
         id="home-interlude"
         title={item.featureTitle || "The Interlude"}
       >
@@ -1859,7 +1921,7 @@ function HomePresentationForm({
           <span className="text-xs tabular-nums text-white/42">4 scenes</span>
         }
         description="Scroll-driven image and text sequence leading into the gallery."
-        eyebrow="04 · Story sequence"
+        eyebrow="05 · Story sequence"
         id="home-freelancer-life"
         title="Artist Freelancer Life"
       >
@@ -1888,6 +1950,549 @@ function HomePresentationForm({
         </AdminDisclosure>
       ) : null}
     </div>
+  );
+}
+
+type CncProgramDraft = EditableCncProgram & { clientKey: string };
+
+const cncDialectLabels: Record<CncDialect, string> = {
+  siemens: "Siemens",
+  iso: "ISO G-code",
+  heidenhain: "Heidenhain",
+};
+
+function getCncSourceValidationMessage(source: string) {
+  if (!source.trim()) return "Paste the complete CNC source.";
+  if (source.includes("\0")) return "Remove the null byte from the source.";
+  if (source.length > CNC_PROGRAM_MAX_SOURCE_CHARS) {
+    return `Source exceeds ${String(CNC_PROGRAM_MAX_SOURCE_CHARS)} characters.`;
+  }
+  if (getCncSourceByteLength(source) > CNC_PROGRAM_MAX_SOURCE_BYTES) {
+    return "Source exceeds the safe upload size.";
+  }
+  if (getCncSourceLineCount(source) > CNC_PROGRAM_MAX_LINES) {
+    return `Source exceeds ${String(CNC_PROGRAM_MAX_LINES)} lines.`;
+  }
+  if (getLongestCncLineLength(source) > CNC_PROGRAM_MAX_LINE_CHARS) {
+    return `One source line exceeds ${String(CNC_PROGRAM_MAX_LINE_CHARS)} characters.`;
+  }
+  return "";
+}
+
+function isCncProgramDraftValid(program: CncProgramDraft) {
+  const previewLines = program.previewLineCount ?? 0;
+  return (
+    Boolean(program.title.trim()) &&
+    isValidCncFileName(program.fileName) &&
+    !getCncSourceValidationMessage(program.source) &&
+    Number.isInteger(previewLines) &&
+    previewLines >= CNC_PROGRAM_MIN_PREVIEW_LINES &&
+    previewLines <= CNC_PROGRAM_MAX_PREVIEW_LINES
+  );
+}
+
+function CncProgramEditorCard({
+  disabled,
+  index,
+  item,
+  onChange,
+  onMove,
+  onRemove,
+  total,
+}: {
+  disabled: boolean;
+  index: number;
+  item: CncProgramDraft;
+  onChange: (patch: Partial<CncProgramDraft>) => void;
+  onMove: (direction: -1 | 1) => void;
+  onRemove: () => boolean;
+  total: number;
+}) {
+  const deferredSource = useDeferredValue(item.source);
+  const parsed = useMemo(
+    () =>
+      parseCncProgram({
+        id: item.id || item.clientKey,
+        fileName: item.fileName,
+        title: item.title,
+        description: item.description,
+        dialect: item.dialect,
+        source: deferredSource,
+        previewLineCount: item.previewLineCount,
+      }),
+    [
+      deferredSource,
+      item.clientKey,
+      item.description,
+      item.dialect,
+      item.fileName,
+      item.id,
+      item.previewLineCount,
+      item.title,
+    ]
+  );
+  const lineCount = useMemo(
+    () => getCncSourceLineCount(deferredSource),
+    [deferredSource]
+  );
+  const sourceValidationMessage = useMemo(
+    () => getCncSourceValidationMessage(deferredSource),
+    [deferredSource]
+  );
+  const fileNameInvalid = !isValidCncFileName(item.fileName);
+
+  return (
+    <AdminDisclosure
+      badge={
+        <span className="flex items-center gap-2">
+          <span
+            className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${
+              item.isPublished
+                ? "border-emerald-300/15 text-emerald-100/65"
+                : "border-white/10 text-white/35"
+            }`}
+          >
+            {item.isPublished ? "Published" : "Draft"}
+          </span>
+          <span className="font-mono text-[10px] text-white/32">
+            {String(index + 1).padStart(2, "0")}
+          </span>
+        </span>
+      }
+      defaultOpen={index === 0 || !item.id}
+      description={`${item.fileName || "File name missing"} · ${lineCount} lines`}
+      id={`cnc-program-${item.clientKey}`}
+      title={item.title || `Program ${String(index + 1).padStart(2, "0")}`}
+      variant="item"
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Display title">
+          <input
+            className={inputClass}
+            data-editor-dirty-input
+            maxLength={220}
+            onChange={(event) => onChange({ title: event.target.value })}
+            required
+            value={item.title}
+          />
+        </Field>
+        <Field label="CNC file name">
+          <input
+            aria-invalid={fileNameInvalid}
+            className={`${inputClass} ${
+              fileNameInvalid && item.fileName ? "border-red-300/40" : ""
+            }`}
+            data-editor-dirty-input
+            maxLength={100}
+            onChange={(event) => onChange({ fileName: event.target.value })}
+            required
+            title="Use a file name, not a path. Slashes and control characters are not allowed."
+            value={item.fileName}
+          />
+        </Field>
+        <Field label="Controller / dialect">
+          <select
+            className={inputClass}
+            data-editor-dirty-input
+            onChange={(event) =>
+              onChange({ dialect: event.target.value as CncDialect })
+            }
+            value={item.dialect}
+          >
+            {CNC_DIALECTS.map((dialect) => (
+              <option key={dialect} value={dialect}>
+                {cncDialectLabels[dialect]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Opening preview lines">
+          <input
+            className={inputClass}
+            data-editor-dirty-input
+            max={CNC_PROGRAM_MAX_PREVIEW_LINES}
+            min={CNC_PROGRAM_MIN_PREVIEW_LINES}
+            onChange={(event) =>
+              onChange({ previewLineCount: Number(event.target.value) || 0 })
+            }
+            required
+            step={1}
+            type="number"
+            value={item.previewLineCount ?? 6}
+          />
+        </Field>
+        <Field label="Description" wide>
+          <textarea
+            className={textareaClass}
+            data-editor-dirty-input
+            maxLength={1000}
+            onChange={(event) => onChange({ description: event.target.value })}
+            rows={3}
+            value={item.description}
+          />
+        </Field>
+        <div className="sm:col-span-2">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className={labelClass}>Complete CNC source</p>
+              <p className="mt-1 text-xs leading-5 text-white/36">
+                The HOME preview also adds M30 and the first label block below it automatically.
+              </p>
+            </div>
+            <span className="font-mono text-[11px] tabular-nums text-white/40">
+              {String(lineCount)} lines · {String(item.source.length)} characters
+            </span>
+          </div>
+          <textarea
+            aria-invalid={Boolean(sourceValidationMessage)}
+            aria-label="Complete CNC source"
+            aria-describedby={`cnc-source-help-${item.clientKey}`}
+            autoCapitalize="off"
+            autoCorrect="off"
+            className={`mt-3 h-[55vh] min-h-[22rem] max-h-[720px] w-full resize-y overflow-auto rounded-2xl border bg-[#07090c] p-4 font-mono text-[13px] leading-6 text-[#c7d2df] caret-[#ff7059] outline-none transition placeholder:text-white/20 focus:bg-black ${
+              sourceValidationMessage
+                ? "border-red-300/30"
+                : "border-white/12 focus:border-white/32"
+            }`}
+            data-editor-dirty-input
+            maxLength={CNC_PROGRAM_MAX_SOURCE_CHARS}
+            onChange={(event) => onChange({ source: event.target.value })}
+            placeholder={"T06 M06\nM3 S1500\nG00 X100 Y-50\n...\nM30\n\nLABEL_1:\nR1=..."}
+            required
+            spellCheck={false}
+            style={{ tabSize: 4 }}
+            value={item.source}
+            wrap="off"
+          />
+          <p
+            className={`mt-2 text-xs ${
+              sourceValidationMessage ? "text-red-100/65" : "text-white/32"
+            }`}
+            id={`cnc-source-help-${item.clientKey}`}
+          >
+            {sourceValidationMessage || "Indentation and intentional blank lines are preserved."}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.1em]">
+            <span
+              className={`rounded-full border px-2.5 py-1 ${
+                parsed.m30Index >= 0
+                  ? "border-emerald-300/15 text-emerald-100/60"
+                  : "border-amber-300/18 text-amber-100/60"
+              }`}
+            >
+              M30 {parsed.m30Index >= 0 ? "found" : "not found"}
+            </span>
+            <span className="rounded-full border border-white/10 px-2.5 py-1 text-white/42">
+              {parsed.stats.labels} labels
+            </span>
+            <span className="rounded-full border border-white/10 px-2.5 py-1 text-white/42">
+              {parsed.stats.variables} R/Q variables
+            </span>
+            {deferredSource !== item.source ? (
+              <span className="rounded-full border border-white/10 px-2.5 py-1 text-white/32">
+                Updating analysis…
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3 border-t border-white/8 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex h-10 items-center gap-3 rounded-xl border border-white/10 bg-black/25 px-3 text-sm text-white/75">
+          <input
+            checked={item.isPublished}
+            className="h-4 w-4 accent-white"
+            data-editor-dirty-input
+            onChange={(event) => onChange({ isPublished: event.target.checked })}
+            type="checkbox"
+          />
+          Published on HOME
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            aria-label={`Move ${item.title || item.fileName || "program"} up`}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/55 hover:bg-white hover:text-black disabled:opacity-30"
+            data-editor-dirty-action
+            disabled={disabled || index === 0}
+            onClick={() => onMove(-1)}
+            type="button"
+          >
+            <FaArrowUp />
+          </button>
+          <button
+            aria-label={`Move ${item.title || item.fileName || "program"} down`}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/55 hover:bg-white hover:text-black disabled:opacity-30"
+            data-editor-dirty-action
+            disabled={disabled || index === total - 1}
+            onClick={() => onMove(1)}
+            type="button"
+          >
+            <FaArrowDown />
+          </button>
+          <button
+            className={dangerButtonClass}
+            data-editor-dirty-action
+            disabled={disabled}
+            onClick={(event) => {
+              if (!onRemove()) event.stopPropagation();
+            }}
+            type="button"
+          >
+            <FaTrash /> Remove
+          </button>
+        </div>
+      </div>
+    </AdminDisclosure>
+  );
+}
+
+function CncProgramsSection({
+  disabled,
+  items,
+  loadError,
+  migrationRequired,
+}: {
+  disabled: boolean;
+  items: EditableCncProgram[];
+  loadError?: string;
+  migrationRequired: boolean;
+}) {
+  const [programs, setPrograms] = useState<CncProgramDraft[]>(() =>
+    [...items]
+      .sort((first, second) => first.sortOrder - second.sortOrder)
+      .map((item) => ({ ...item, clientKey: item.id }))
+  );
+  const expectedVersions = useMemo(
+    () =>
+      Object.fromEntries(
+        items.map((item) => [item.id, item.updatedAt] as const)
+      ),
+    [items]
+  );
+
+  function updateProgram(clientKey: string, patch: Partial<CncProgramDraft>) {
+    setPrograms((current) =>
+      current.map((program) =>
+        program.clientKey === clientKey ? { ...program, ...patch } : program
+      )
+    );
+  }
+
+  function moveProgram(index: number, direction: -1 | 1) {
+    setPrograms((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function removeProgram(item: CncProgramDraft) {
+    const label = item.title || item.fileName || "this program";
+    if (
+      !window.confirm(
+        `Remove “${label}” from this draft? It is not deleted until you save all programs.`
+      )
+    ) {
+      return false;
+    }
+    setPrograms((current) =>
+      current.filter((program) => program.clientKey !== item.clientKey)
+    );
+    return true;
+  }
+
+  function addProgram() {
+    setPrograms((current) => {
+      if (current.length >= CNC_PROGRAM_LIMIT) return current;
+      const position = current.length + 1;
+      const id = `cnc-${crypto.randomUUID()}`;
+      return [
+        ...current,
+        {
+          id,
+          clientKey: id,
+          fileName: `PROGRAM_${String(position).padStart(2, "0")}.NC`,
+          title: "",
+          description: "",
+          dialect: "siemens",
+          source: "",
+          previewLineCount: 6,
+          sortOrder: position * 10,
+          isPublished: false,
+          updatedAt: "",
+        },
+      ];
+    });
+  }
+
+  const deferredPrograms = useDeferredValue(programs);
+  const analysisPending = deferredPrograms !== programs;
+  const submission = useMemo(() => {
+    const submittedPrograms = deferredPrograms.map((program) => ({
+      id: program.id || undefined,
+      fileName: program.fileName,
+      title: program.title,
+      description: program.description,
+      dialect: program.dialect,
+      source: program.source,
+      previewLineCount: program.previewLineCount,
+      isPublished: program.isPublished,
+    }));
+    const invalidPrograms = deferredPrograms.filter(
+      (program) => !isCncProgramDraftValid(program)
+    ).length;
+    const totalSourceBytes = deferredPrograms.reduce(
+      (total, program) => total + getCncSourceByteLength(program.source),
+      0
+    );
+    const serializedPayload = JSON.stringify({
+      expectedVersions,
+      programs: submittedPrograms,
+    });
+
+    return {
+      invalidPrograms,
+      payloadTooLarge:
+        totalSourceBytes > CNC_PROGRAM_MAX_TOTAL_BYTES ||
+        getCncSourceByteLength(serializedPayload) >
+          CNC_PROGRAM_MAX_TOTAL_BYTES + 100_000,
+      serializedPayload,
+    };
+  }, [deferredPrograms, expectedVersions]);
+  const { invalidPrograms, payloadTooLarge, serializedPayload } = submission;
+  const programLimitExceeded = programs.length > CNC_PROGRAM_LIMIT;
+  const atLimit = programs.length >= CNC_PROGRAM_LIMIT;
+
+  return (
+    <AdminDisclosure
+      badge={
+        <span className="text-xs tabular-nums text-white/42">
+          {programs.length}/{CNC_PROGRAM_LIMIT} programs
+        </span>
+      }
+      collapsible={false}
+      description="Paste and manage one to three complete CNC source programs for the HOME viewer."
+      eyebrow="03 · CNC code"
+      id="home-cnc"
+      title="CNC program showcase"
+    >
+      {migrationRequired ? (
+        <div className="mb-4 rounded-2xl border border-amber-300/18 bg-amber-300/[0.055] p-4 text-sm leading-6 text-amber-50/70">
+          Apply <code className="font-mono">0024_cnc_programs.sql</code> to Supabase, then reload this panel. The rest of the site editor remains available.
+        </div>
+      ) : null}
+      {loadError ? (
+        <div className="mb-4 rounded-2xl border border-red-300/18 bg-red-300/[0.05] p-4 text-sm leading-6 text-red-50/70">
+          {loadError}
+        </div>
+      ) : null}
+
+      <form
+        action={saveCncPrograms}
+        onSubmit={(event) => {
+          if (
+            disabled ||
+            analysisPending ||
+            invalidPrograms > 0 ||
+            payloadTooLarge ||
+            programLimitExceeded
+          ) {
+            event.preventDefault();
+          }
+        }}
+      >
+        <input
+          name="programsJson"
+          type="hidden"
+          value={serializedPayload}
+        />
+        <fieldset disabled={disabled}>
+          <div className="grid gap-3">
+            {programs.map((item, index) => (
+              <CncProgramEditorCard
+                disabled={disabled}
+                index={index}
+                item={item}
+                key={item.clientKey}
+                onChange={(programPatch) =>
+                  updateProgram(item.clientKey, programPatch)
+                }
+                onMove={(direction) => moveProgram(index, direction)}
+                onRemove={() => removeProgram(item)}
+                total={programs.length}
+              />
+            ))}
+
+            {!programs.length ? (
+              <div className="rounded-[18px] border border-dashed border-white/12 bg-black/20 px-5 py-10 text-center">
+                <p className="text-sm font-semibold text-white/66">No CNC programs</p>
+                <p className="mt-2 text-sm text-white/38">
+                  Saving an empty list keeps the public CNC section hidden.
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="sticky bottom-3 z-10 mt-4 flex flex-col gap-3 rounded-2xl border border-white/12 bg-[#111114]/95 p-3 shadow-[0_18px_50px_rgba(0,0,0,0.4)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/12 px-4 text-sm font-semibold text-white/75 transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-35"
+                data-editor-dirty-action
+                disabled={disabled || atLimit}
+                onClick={addProgram}
+                type="button"
+              >
+                <FaPlus /> Add program
+              </button>
+              <p className="mt-1.5 text-[10px] text-white/32">
+                {atLimit
+                  ? "Three-program limit reached."
+                  : "New programs start as drafts."}
+              </p>
+            </div>
+            <p
+              aria-live="polite"
+              className={`text-xs ${
+                invalidPrograms || payloadTooLarge || programLimitExceeded
+                  ? "text-amber-100/65"
+                  : "text-white/38"
+              }`}
+            >
+              {analysisPending
+                ? "Updating source analysis…"
+                : programLimitExceeded
+                ? `Remove ${programs.length - CNC_PROGRAM_LIMIT} program${
+                    programs.length - CNC_PROGRAM_LIMIT === 1 ? "" : "s"
+                  } before saving.`
+                : payloadTooLarge
+                ? "Combined source is too large."
+                : invalidPrograms
+                  ? `${invalidPrograms} program${
+                      invalidPrograms === 1 ? "" : "s"
+                    } need attention.`
+                  : `${programs.length} program${
+                      programs.length === 1 ? "" : "s"
+                    } ready to save.`}
+            </p>
+            <ActionButton
+              className={buttonClass}
+              disabled={
+                disabled ||
+                analysisPending ||
+                invalidPrograms > 0 ||
+                payloadTooLarge ||
+                programLimitExceeded
+              }
+              pendingLabel="Saving programs..."
+            >
+              Save all programs
+            </ActionButton>
+          </div>
+        </fieldset>
+      </form>
+    </AdminDisclosure>
   );
 }
 
@@ -2781,6 +3386,10 @@ type ContentWorkspaceSection = {
 
 export default function ContentEditor({
   assets,
+  cncIsConfigured,
+  cncLoadError,
+  cncMigrationRequired,
+  cncPrograms,
   content,
   isConfigured,
   loadError,
@@ -2790,6 +3399,11 @@ export default function ContentEditor({
   const portfolioType = content.settings.portfolioType;
   const musicEnabled = isModuleEnabled(portfolioType, "music");
   const actorEnabled = portfolioType === "actor";
+  const cncDisabled =
+    disabled ||
+    !cncIsConfigured ||
+    cncMigrationRequired ||
+    Boolean(cncLoadError);
   const sections = useMemo<ContentWorkspaceSection[]>(
     () => [
       {
@@ -2797,8 +3411,8 @@ export default function ContentEditor({
         label: "Home",
         kicker: "Public page",
         description:
-          "Hero, About, Interlude, and Freelancer Life in public page order.",
-        count: 4,
+          "Hero, About, CNC programs, Interlude, and Freelancer Life in public page order.",
+        count: 5,
         node: (
           <StudioWorkspace
             description="Live content, rendered as a compact page mirror"
@@ -2832,6 +3446,24 @@ export default function ContentEditor({
                 ),
               },
               {
+                description: "One to three long-form programs shown on Home.",
+                id: "home-cnc",
+                label: "CNC programs",
+                node: (
+                  <CncProgramsSection
+                    disabled={cncDisabled}
+                    items={cncPrograms}
+                    key={
+                      cncPrograms
+                        .map((program) => `${program.id}:${program.updatedAt}`)
+                        .join("|") || "cnc-programs-empty"
+                    }
+                    loadError={cncLoadError}
+                    migrationRequired={cncMigrationRequired}
+                  />
+                ),
+              },
+              {
                 description: "Video transition between story and gallery.",
                 id: "home-interlude",
                 label: "Interlude",
@@ -2858,7 +3490,9 @@ export default function ContentEditor({
                 ),
               },
             ]}
-            preview={<HomeSnapshot content={content} />}
+            preview={
+              <HomeSnapshot cncPrograms={cncPrograms} content={content} />
+            }
             publicHref="/"
             sectionId="home"
           />
@@ -3193,6 +3827,10 @@ export default function ContentEditor({
     [
       actorEnabled,
       assets,
+      cncDisabled,
+      cncLoadError,
+      cncMigrationRequired,
+      cncPrograms,
       content,
       disabled,
       musicEnabled,
@@ -3230,6 +3868,7 @@ export default function ContentEditor({
     heroes: "home",
     "home-hero": "home",
     "home-about": "home",
+    "home-cnc": "home",
     "home-interlude": "home",
     "home-freelancer-life": "home",
     "bio-hero": "bio",
@@ -3477,14 +4116,14 @@ export default function ContentEditor({
             target instanceof HTMLSelectElement ||
             target instanceof HTMLTextAreaElement
           ) ||
-          !target.name
+          !(target.name || target.hasAttribute("data-editor-dirty-input"))
         ) {
           return;
         }
         markDirty();
         rememberDirtyDraft(target);
       }}
-      onClickCapture={(event) => {
+      onClick={(event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
         const button = target.closest("button");

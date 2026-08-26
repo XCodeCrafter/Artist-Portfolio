@@ -19,6 +19,22 @@ import {
 } from "@/lib/content/fonts";
 import { PORTFOLIO_TYPES } from "@/lib/content/profile";
 import { detectSocialPlatform } from "@/lib/content/social-platforms";
+import { CNC_DIALECTS } from "@/lib/cnc-code";
+import {
+  CNC_PROGRAM_LIMIT,
+  CNC_PROGRAM_MAX_LINES,
+  CNC_PROGRAM_MAX_LINE_CHARS,
+  CNC_PROGRAM_MAX_PREVIEW_LINES,
+  CNC_PROGRAM_MAX_SOURCE_BYTES,
+  CNC_PROGRAM_MAX_SOURCE_CHARS,
+  CNC_PROGRAM_MAX_TOTAL_BYTES,
+  CNC_PROGRAM_MIN_PREVIEW_LINES,
+  getCncSourceByteLength,
+  getCncSourceLineCount,
+  getLongestCncLineLength,
+  isValidCncFileName,
+  normalizeCncSource,
+} from "@/lib/cnc-program-input";
 import {
   ACTOR_CREDIT_TYPES,
   FOOTER_EFFECTS,
@@ -361,8 +377,90 @@ const actorCreditSchema = z.object({
   isPublished: z.boolean(),
 });
 
+const cncSourceSchema = z
+  .string()
+  .transform(normalizeCncSource)
+  .superRefine((source, context) => {
+    if (!source.trim()) {
+      context.addIssue({ code: "custom", message: "CNC source is required." });
+    }
+    if (source.includes("\0")) {
+      context.addIssue({ code: "custom", message: "CNC source contains a null byte." });
+    }
+    if (source.length > CNC_PROGRAM_MAX_SOURCE_CHARS) {
+      context.addIssue({ code: "custom", message: "CNC source is too long." });
+    }
+    if (getCncSourceByteLength(source) > CNC_PROGRAM_MAX_SOURCE_BYTES) {
+      context.addIssue({ code: "custom", message: "CNC source is too large." });
+    }
+    if (getCncSourceLineCount(source) > CNC_PROGRAM_MAX_LINES) {
+      context.addIssue({ code: "custom", message: "CNC source has too many lines." });
+    }
+    if (getLongestCncLineLength(source) > CNC_PROGRAM_MAX_LINE_CHARS) {
+      context.addIssue({ code: "custom", message: "A CNC source line is too long." });
+    }
+  });
+
+const cncProgramSchema = z.object({
+  id: z.union([idValue, z.literal("")]).optional(),
+  fileName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .refine(isValidCncFileName),
+  title: shortText.min(1),
+  description: mediumText,
+  dialect: z.enum(CNC_DIALECTS),
+  source: cncSourceSchema,
+  previewLineCount: z.coerce
+    .number()
+    .int()
+    .min(CNC_PROGRAM_MIN_PREVIEW_LINES)
+    .max(CNC_PROGRAM_MAX_PREVIEW_LINES),
+  isPublished: z.boolean(),
+});
+
+const cncProgramsSchema = z
+  .array(cncProgramSchema)
+  .max(CNC_PROGRAM_LIMIT)
+  .superRefine((programs, context) => {
+    const totalBytes = programs.reduce(
+      (total, program) => total + getCncSourceByteLength(program.source),
+      0
+    );
+    if (totalBytes > CNC_PROGRAM_MAX_TOTAL_BYTES) {
+      context.addIssue({
+        code: "custom",
+        message: "The combined CNC source payload is too large.",
+      });
+    }
+
+    const ids = programs
+      .map((program) => program.id)
+      .filter((id): id is string => Boolean(id));
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: "custom", message: "Duplicate CNC program ID." });
+    }
+  });
+
+const cncProgramsSubmissionSchema = z.object({
+  expectedVersions: z
+    .record(
+      idValue,
+      z.string().refine((value) => !Number.isNaN(Date.parse(value)))
+    )
+    .refine((versions) => Object.keys(versions).length <= CNC_PROGRAM_LIMIT),
+  programs: cncProgramsSchema,
+});
+
 function formValue(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
+}
+
+function rawFormValue(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
 }
 
 function formChecked(formData: FormData, key: string) {
@@ -373,6 +471,7 @@ const CONTENT_RETURN_SECTIONS = new Set([
   "home",
   "home-hero",
   "home-about",
+  "home-cnc",
   "home-interlude",
   "home-freelancer-life",
   "bio",
@@ -455,6 +554,30 @@ function isMissingNavigationSchema(error: { message?: string } | null) {
   );
 }
 
+function isMissingCncSchema(
+  error: { code?: string; message?: string } | null
+) {
+  const message = error?.message?.toLowerCase() || "";
+  return (
+    error?.code === "42P01" ||
+    error?.code === "PGRST202" ||
+    error?.code === "PGRST205" ||
+    (/relation .*cnc_programs/.test(message) && message.includes("does not exist")) ||
+    (message.includes("could not find the table") &&
+      message.includes("cnc_programs") &&
+      message.includes("schema cache"))
+  );
+}
+
+function isCncWriteConflict(
+  error: { code?: string; message?: string } | null
+) {
+  return (
+    error?.code === "40001" ||
+    (error?.message?.toLowerCase() || "").includes("cnc_programs_changed")
+  );
+}
+
 async function getWriteContext(section: string) {
   const admin = await requireAdmin();
   if (!(await verifyAdminActionOrigin(admin.id, `content:${section}`))) {
@@ -476,6 +599,25 @@ async function assertMutation(
 ) {
   if (result.error) {
     console.error(result.error);
+    redirectToStatus("save-error", section);
+  }
+}
+
+async function assertCncMutation(
+  result: { error: { code?: string; message?: string } | null },
+  section: string
+) {
+  if (isMissingCncSchema(result.error)) {
+    redirectToStatus("cnc-migration-required", section);
+  }
+  if (isCncWriteConflict(result.error)) {
+    redirectToStatus("cnc-write-conflict", section);
+  }
+  if (result.error) {
+    console.error("CNC program mutation failed.", {
+      code: result.error.code,
+      message: result.error.message,
+    });
     redirectToStatus("save-error", section);
   }
 }
@@ -934,6 +1076,76 @@ export async function saveHomeUpdate(formData: FormData) {
 
   revalidatePortfolio();
   redirectToStatus("saved-update", "updates");
+}
+
+export async function saveCncPrograms(formData: FormData) {
+  const section = "home-cnc";
+  const serialized = rawFormValue(formData, "programsJson");
+  if (
+    !serialized ||
+    getCncSourceByteLength(serialized) > CNC_PROGRAM_MAX_TOTAL_BYTES + 100_000
+  ) {
+    redirectToStatus("invalid-cnc-programs", section);
+  }
+
+  let input: unknown;
+  try {
+    input = JSON.parse(serialized);
+  } catch {
+    redirectToStatus("invalid-cnc-programs", section);
+  }
+
+  const parsed = cncProgramsSubmissionSchema.safeParse(input);
+  if (!parsed.success) {
+    redirectToStatus("invalid-cnc-programs", section);
+  }
+
+  const rows = parsed.data.programs.map((program, index) => ({
+    id: program.id || `cnc-${randomUUID()}`,
+    file_name: program.fileName,
+    title: program.title,
+    description: program.description,
+    dialect: program.dialect,
+    source_code: program.source,
+    preview_line_count: program.previewLineCount,
+    sort_order: (index + 1) * 10,
+    is_published: program.isPublished,
+  }));
+
+  const { admin, supabase } = await getWriteContext(section);
+  const saved = await supabase.rpc("replace_cnc_programs", {
+    p_expected_versions: parsed.data.expectedVersions,
+    p_programs: rows,
+  });
+  await assertCncMutation(saved, section);
+
+  const submittedIds = new Set(rows.map((row) => row.id));
+  const removedIds = Object.keys(parsed.data.expectedVersions).filter(
+    (id) => !submittedIds.has(id)
+  );
+
+  await writeAuditLog({
+    actorId: admin.id,
+    action: "cnc_programs_replace",
+    tableName: "cnc_programs",
+    recordId: "all",
+    metadata: {
+      count: rows.length,
+      deleted: removedIds.length,
+      published: rows.filter((row) => row.is_published).length,
+      sourceCharacters: rows.reduce(
+        (total, row) => total + row.source_code.length,
+        0
+      ),
+      sourceLines: rows.reduce(
+        (total, row) => total + getCncSourceLineCount(row.source_code),
+        0
+      ),
+    },
+  });
+
+  revalidatePortfolio();
+  redirectToStatus("saved-cnc-programs", section);
 }
 
 export async function saveSocialLink(formData: FormData) {

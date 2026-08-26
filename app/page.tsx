@@ -8,6 +8,7 @@ import JsonLd from "@/components/JsonLd";
 import MusicPlatforms from "@/components/MusicPlatforms";
 import NewsletterBlock from "@/components/NewsletterBlock";
 import { getPortfolioContent, type GalleryImage } from "@/lib/content";
+import { getPublishedCncPrograms } from "@/lib/content/cnc-programs.server";
 import { createHomeJsonLd, createPageMetadata } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -17,7 +18,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const content = await getPortfolioContent();
+  const [content, cncPrograms] = await Promise.all([
+    getPortfolioContent(),
+    getPublishedCncPrograms(),
+  ]);
   const hero = content.heroes.home;
   const profileType = content.settings.portfolioType;
   const videoHero = content.heroes.video;
@@ -93,7 +97,9 @@ export default async function HomePage() {
       <main>
         <AdaptiveHero {...hero} />
         <AboutHome content={content.aboutHome} />
-        <CncCodeShowcase />
+        {cncPrograms.length ? (
+          <CncCodeShowcase programs={cncPrograms} />
+        ) : null}
         <GalleryShowcase
           images={homeStoryImages}
           interludeBody={homePresentation.featureBody}

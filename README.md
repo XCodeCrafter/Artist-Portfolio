@@ -239,6 +239,11 @@ transactional last-owner invariant, and replay-safe Resend delivery state for
 booking inquiries. Apply it before enabling Trash, delivery webhooks, or the
 latest readiness checks.
 
+Migration `0024_cnc_programs.sql` adds the admin-managed CNC program showcase.
+The Site editor stores and orders up to three long-form source programs, while
+RLS exposes only published rows. The migration seeds the original short HOME
+demo so it can be replaced directly in the editor.
+
 ## Search and AI discovery
 
 - `/robots.txt` allows public search/discovery crawlers, blocks `/api`, and
@@ -259,7 +264,7 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. Apply all Supabase migrations through `0023_admin_operations_hardening.sql`.
+1. Apply all Supabase migrations through `0024_cnc_programs.sql`.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare

@@ -54,6 +54,7 @@ async function inspectSupabase() {
       mediaResult,
       videosResult,
       presentationResult,
+      cncProgramsResult,
       inquiriesResult,
       recoveryResult,
       rateLimitResult,
@@ -84,6 +85,13 @@ async function inspectSupabase() {
         .limit(1),
       supabase.from("gallery_presentation").select("id").limit(1),
       supabase
+        .from("cnc_programs")
+        .select(
+          "id, file_name, dialect, source_code, preview_line_count, is_published"
+        )
+        .eq("id", "~schema-probe")
+        .limit(1),
+      supabase
         .from("booking_inquiries")
         .select(
           "id, resend_email_id, email_status, email_status_changed_at, email_status_provider_at, email_status_webhook_id"
@@ -106,6 +114,7 @@ async function inspectSupabase() {
       mediaResult,
       videosResult,
       presentationResult,
+      cncProgramsResult,
       inquiriesResult,
       recoveryResult,
     ].every((result) => !result.error);
@@ -194,7 +203,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       critical: true,
       detail: supabase.schemaOk
         ? "Required tables and columns are available."
-        : "Apply all Supabase migrations through 0023.",
+        : "Apply all Supabase migrations through 0024.",
       href: "/admin/security#health",
     },
     {

@@ -1,18 +1,16 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { homeSectionHeadingClass } from "@/components/HomeSectionCta";
 import { CncPreviewCode } from "@/components/CncCodeView";
 import CncProgramDialog from "@/components/CncProgramDialog";
 import {
   buildCncPreviewRows,
   parseCncProgram,
+  type CncPreviewRow,
+  type CncProgramDefinition,
   type ParsedCncProgram,
 } from "@/lib/cnc-code";
-import { CNC_PROGRAMS } from "@/lib/content/cnc-programs";
-
-const PARSED_PROGRAMS = CNC_PROGRAMS.map(parseCncProgram);
-const PROGRAM_PREVIEWS = PARSED_PROGRAMS.map(buildCncPreviewRows);
 
 function FileIcon() {
   return (
@@ -29,7 +27,7 @@ function EditorHeader({
 }: {
   activeIndex: number;
   onSelect: (index: number) => void;
-  programs: readonly ParsedCncProgram[];
+  programs: readonly CncProgramDefinition[];
 }) {
   return (
     <div className="cnc-editor-header">
@@ -45,19 +43,19 @@ function EditorHeader({
             <button
               aria-pressed={activeIndex === index}
               className={`cnc-file-tab${activeIndex === index ? " is-active" : ""}`}
-              key={program.definition.id}
+              key={program.id}
               onClick={() => onSelect(index)}
               type="button"
             >
               <FileIcon />
-              <span>{program.definition.fileName}</span>
+              <span>{program.fileName}</span>
             </button>
           ))}
         </div>
       ) : (
         <span className="cnc-file-tab is-active">
           <FileIcon />
-          <span>{programs[0].definition.fileName}</span>
+          <span>{programs[0].fileName}</span>
         </span>
       )}
 
@@ -70,23 +68,27 @@ function ProgramPreview({
   activeIndex,
   onOpen,
   onSelect,
+  previewRows,
+  program,
+  programs,
 }: {
   activeIndex: number;
   onOpen: () => void;
   onSelect: (index: number) => void;
+  previewRows: readonly CncPreviewRow[];
+  program: ParsedCncProgram;
+  programs: readonly CncProgramDefinition[];
 }) {
-  const program = PARSED_PROGRAMS[activeIndex];
-  const previewRows = PROGRAM_PREVIEWS[activeIndex];
-
   return (
     <div className="cnc-editor" data-reveal="side" data-reveal-from="right">
       <EditorHeader
         activeIndex={activeIndex}
         onSelect={onSelect}
-        programs={PARSED_PROGRAMS}
+        programs={programs}
       />
 
       <button
+        aria-label={`Open full CNC program ${program.definition.title}`}
         aria-haspopup="dialog"
         className="cnc-preview-trigger"
         onClick={onOpen}
@@ -103,7 +105,8 @@ function ProgramPreview({
         <span className="cnc-editor-toggle">
           <span className="cnc-editor-toggle-copy">
             <span className="cnc-toggle-kicker">
-              PROGRAM {String(activeIndex + 1).padStart(2, "0")} / {String(PARSED_PROGRAMS.length).padStart(2, "0")}
+              PROGRAM {String(activeIndex + 1).padStart(2, "0")} /{" "}
+              {String(programs.length).padStart(2, "0")}
             </span>
             <span className="cnc-toggle-title">{program.definition.title}</span>
           </span>
@@ -118,11 +121,32 @@ function ProgramPreview({
   );
 }
 
-export default function CncCodeShowcase() {
+export default function CncCodeShowcase({
+  programs,
+}: {
+  programs: readonly CncProgramDefinition[];
+}) {
+  const visiblePrograms = useMemo(() => programs.slice(0, 3), [programs]);
   const [previewIndex, setPreviewIndex] = useState(0);
-  const [activeProgramIndex, setActiveProgramIndex] = useState<number | null>(null);
-  const previewProgram = PARSED_PROGRAMS[previewIndex];
+  const [activeProgramIndex, setActiveProgramIndex] = useState<number | null>(
+    null
+  );
+  const safePreviewIndex = Math.min(
+    previewIndex,
+    Math.max(0, visiblePrograms.length - 1)
+  );
+  const previewDefinition = visiblePrograms[safePreviewIndex];
+  const previewProgram = useMemo(
+    () => (previewDefinition ? parseCncProgram(previewDefinition) : null),
+    [previewDefinition]
+  );
+  const previewRows = useMemo(
+    () => (previewProgram ? buildCncPreviewRows(previewProgram) : []),
+    [previewProgram]
+  );
   const closeViewer = useCallback(() => setActiveProgramIndex(null), []);
+
+  if (!previewProgram) return null;
 
   return (
     <section id="cnc-code" className="cnc-showcase">
@@ -151,19 +175,23 @@ export default function CncCodeShowcase() {
 
         <div className="cnc-programs">
           <ProgramPreview
-            activeIndex={previewIndex}
-            onOpen={() => setActiveProgramIndex(previewIndex)}
+            activeIndex={safePreviewIndex}
+            onOpen={() => setActiveProgramIndex(safePreviewIndex)}
             onSelect={setPreviewIndex}
+            previewRows={previewRows}
+            program={previewProgram}
+            programs={visiblePrograms}
           />
         </div>
       </div>
 
-      {activeProgramIndex !== null ? (
+      {activeProgramIndex !== null &&
+      activeProgramIndex < visiblePrograms.length ? (
         <CncProgramDialog
           activeIndex={activeProgramIndex}
           onClose={closeViewer}
           onSelectProgram={setActiveProgramIndex}
-          programs={PARSED_PROGRAMS}
+          programs={visiblePrograms}
         />
       ) : null}
     </section>
