@@ -1,5 +1,6 @@
 /*artist-portfolio/styles/globals.css*/
 @import "tailwindcss";
+@import "./cnc-code.css";
 
 :root {
   --background: #0a0a0a;

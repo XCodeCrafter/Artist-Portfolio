@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import AboutHome from "@/components/AboutHome";
 import AdaptiveHero from "@/components/AdaptiveHero";
+import CncCodeShowcase from "@/components/CncCodeShowcase";
 import GalleryShowcase from "@/components/GalleryShowcase";
 import JsonLd from "@/components/JsonLd";
 import MusicPlatforms from "@/components/MusicPlatforms";
@@ -92,6 +93,7 @@ export default async function HomePage() {
       <main>
         <AdaptiveHero {...hero} />
         <AboutHome content={content.aboutHome} />
+        <CncCodeShowcase />
         <GalleryShowcase
           images={homeStoryImages}
           interludeBody={homePresentation.featureBody}
