@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import AdaptiveHero from "@/components/AdaptiveHero";
-import NewsletterBlock from "@/components/NewsletterBlock";
-import ShowreelWorks from "@/components/ShowreelWorks";
+import ShowreelPageView from "@/components/video/ShowreelPageView";
 import { getPortfolioContent } from "@/lib/content";
 import { createPageMetadata } from "@/lib/seo";
 
@@ -13,25 +11,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function VideoPage() {
   const content = await getPortfolioContent();
-  const hero = content.heroes.video;
+  const data = {
+    hero: content.heroes.video,
+    presentation: content.videoPresentation,
+    videos: content.videos,
+    footer: {
+      artistName: content.settings.artistName,
+      contactBlurb: content.settings.contactBlurb,
+      footerEffect: content.settings.footerEffect,
+      location: content.settings.location,
+      socialLinks: content.socialLinks,
+      tagline: content.settings.tagline,
+    },
+  };
 
-  return (
-    <main>
-      <AdaptiveHero {...hero} />
-
-      <ShowreelWorks
-        presentation={content.videoPresentation}
-        videos={content.videos}
-      />
-
-      <NewsletterBlock
-        artistName={content.settings.artistName}
-        contactBlurb={content.settings.contactBlurb}
-        footerEffect={content.settings.footerEffect}
-        location={content.settings.location}
-        socialLinks={content.socialLinks}
-        tagline={content.settings.tagline}
-      />
-    </main>
-  );
+  return <ShowreelPageView data={data} />;
 }

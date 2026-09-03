@@ -637,6 +637,7 @@ async function readSupabaseContent(
       .select("*")
       .eq("is_published", true)
       .order("sort_order", { ascending: true })
+      .order("id", { ascending: true })
       .returns<VideoRow[]>(),
     supabase
       .from("actor_resume")

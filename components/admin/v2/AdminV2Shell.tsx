@@ -22,6 +22,7 @@ import {
   FaMusic,
   FaUserAlt,
   FaTimes,
+  FaVideo,
 } from "react-icons/fa";
 import LogoutButton from "@/components/admin/LogoutButton";
 import {
@@ -68,6 +69,7 @@ function iconFor(key: AdminV2NavigationKey) {
     navigation: <FaListUl />,
     bio: <FaUserAlt />,
     gallery: <FaImages />,
+    showreel: <FaVideo />,
     music: <FaMusic />,
   };
   return icons[key];

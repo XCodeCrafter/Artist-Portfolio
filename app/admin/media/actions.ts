@@ -294,6 +294,34 @@ async function handOffLegacyGalleryWrite(supabase: SupabaseClient) {
   }
 }
 
+function isMissingShowreelV2Snapshot(error: {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+}) {
+  const message = [error.message, error.details, error.hint]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    error.code === "PGRST202" ||
+    (error.code === "42883" && /get_showreel_page_v2_snapshot/i.test(message)) ||
+    /schema cache.*get_showreel_page_v2_snapshot/i.test(message)
+  );
+}
+
+async function handOffLegacyShowreelWrite(supabase: SupabaseClient) {
+  const { error } = await supabase.rpc("get_showreel_page_v2_snapshot", {
+    p_site_id: "main",
+  });
+
+  // Once 0032 exists, every classic write fails closed into the optimistic V2
+  // editor. An ambiguous database failure must not reopen the old delete path.
+  if (!error || !isMissingShowreelV2Snapshot(error)) {
+    redirect("/admin/v2/pages/showreel?from=classic");
+  }
+}
+
 function slugify(value: string, fallback: string) {
   const slug = value
     .normalize("NFKD")
@@ -977,6 +1005,7 @@ export async function saveShowreelHero(formData: FormData) {
   }
 
   const { admin, supabase } = await getWriteContext();
+  await handOffLegacyShowreelWrite(supabase);
   const result = await supabase.from("page_heroes").upsert({
     page_slug: "video",
     title: parsed.data.title,
@@ -1019,6 +1048,7 @@ export async function saveShowreelVideo(formData: FormData) {
   }
 
   const { admin, supabase } = await getWriteContext();
+  await handOffLegacyShowreelWrite(supabase);
   if (parsed.data.platform.toLowerCase() === "upload") {
     const selectedAsset = await supabase
       .from("media_assets")
@@ -1087,6 +1117,7 @@ export async function saveShowreelPresentation(formData: FormData) {
     redirectToStatus("invalid-showreel-copy", "showreel", "showreel-copy");
   }
   const { admin, supabase } = await getWriteContext();
+  await handOffLegacyShowreelWrite(supabase);
   const result = await supabase.from("media_assets").upsert({
     id: "showreel-studio-settings",
     label: "Showreel Studio settings",
@@ -1120,6 +1151,7 @@ export async function deleteShowreelVideo(formData: FormData) {
     redirectToStatus("invalid-showreel-video", "showreel", "showreel-videos");
   }
   const { admin, supabase } = await getWriteContext();
+  await handOffLegacyShowreelWrite(supabase);
   const result = await supabase.from("videos").delete().eq("id", parsed.data);
   if (result.error) {
     redirectToStatus(

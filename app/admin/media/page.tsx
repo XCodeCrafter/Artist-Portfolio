@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getEditablePortfolioContent } from "@/lib/admin/content";
 import { getAdminGalleryEditorData } from "@/lib/admin/gallery";
 import { getMediaAssets } from "@/lib/admin/media";
+import { getAdminShowreelEditorData } from "@/lib/admin/showreel";
 
 export const metadata = {
   title: "Admin Media",
@@ -21,10 +22,11 @@ export default async function AdminMediaPage({
 }) {
   const admin = await requireAdmin();
   const params = await searchParams;
-  const [mediaResult, contentResult, galleryV2] = await Promise.all([
+  const [mediaResult, contentResult, galleryV2, showreelV2] = await Promise.all([
     getMediaAssets({ includeDeleted: true }),
     getEditablePortfolioContent(),
     getAdminGalleryEditorData(),
+    getAdminShowreelEditorData(),
   ]);
   const portfolioType = contentResult.content.settings.portfolioType;
   const requestedMode = ["studio", "showreel", "library"].includes(
@@ -62,6 +64,11 @@ export default async function AdminMediaPage({
         initialMode={initialMode}
         loadError={mediaResult.loadError}
         portfolioType={portfolioType}
+        showreelV2Enabled={
+          showreelV2.isConfigured &&
+          !showreelV2.migrationRequired &&
+          !showreelV2.loadError
+        }
         status={params.status}
       />
     </AdminShell>

@@ -69,6 +69,7 @@ type MediaManagerProps = {
   contentIsConfigured: boolean;
   contentLoadError?: string;
   galleryV2Enabled: boolean;
+  showreelV2Enabled: boolean;
   isConfigured: boolean;
   loadError?: string;
   portfolioType: PortfolioType;
@@ -1900,12 +1901,14 @@ function ShowreelStudio({
   content,
   disabled,
   portfolioType,
+  v2Enabled,
 }: {
   assets: MediaAsset[];
   confirmDiscard: () => boolean;
   content: EditablePortfolioContent;
   disabled: boolean;
   portfolioType: PortfolioType;
+  v2Enabled: boolean;
 }) {
   const videos = [...content.videos].sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured) || a.sortOrder - b.sortOrder);
   const copy = content.videoPresentation;
@@ -1950,6 +1953,23 @@ function ShowreelStudio({
 
   return (
     <div className="grid gap-6">
+      {v2Enabled ? (
+        <div className="rounded-2xl border border-[#ff674f]/20 bg-[#ff3b1f]/[0.075] p-4 text-sm leading-6 text-white/68">
+          <p className="font-semibold text-white">
+            Showreel editing moved to Admin V2
+          </p>
+          <p className="mt-1 text-white/46">
+            This classic view stays available for reference, but its forms are
+            locked so they cannot bypass section history and conflict checks.
+          </p>
+          <Link
+            className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white"
+            href="/admin/v2/pages/showreel"
+          >
+            Open Showreel V2 <FaExternalLinkAlt />
+          </Link>
+        </div>
+      ) : null}
       <div className="sticky top-4 z-30 flex flex-col gap-3 rounded-2xl border border-emerald-300/15 bg-[#101312]/95 p-4 shadow-2xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
         <nav aria-label={`${pageLabel} Studio sections`} className="admin-scrollbar-none flex gap-2 overflow-x-auto" role="tablist">
           {panels.map((panel, index) => (
@@ -2363,6 +2383,7 @@ export default function MediaManager({
   contentIsConfigured,
   contentLoadError,
   galleryV2Enabled,
+  showreelV2Enabled,
   isConfigured,
   loadError,
   portfolioType,
@@ -2582,8 +2603,9 @@ export default function MediaManager({
             assets={availableAssets}
             confirmDiscard={confirmAndDiscardDrafts}
             content={content}
-            disabled={contentDisabled}
+            disabled={contentDisabled || showreelV2Enabled}
             portfolioType={portfolioType}
+            v2Enabled={showreelV2Enabled}
           />
         </div>
       ) : mode === "library" ? (

@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -606,6 +607,31 @@ async function getWriteContext(section: string) {
   return { admin, supabase };
 }
 
+function isMissingShowreelV2Snapshot(error: {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+}) {
+  const message = [error.message, error.details, error.hint]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    error.code === "PGRST202" ||
+    (error.code === "42883" && /get_showreel_page_v2_snapshot/i.test(message)) ||
+    /schema cache.*get_showreel_page_v2_snapshot/i.test(message)
+  );
+}
+
+async function handOffLegacyShowreelWrite(supabase: SupabaseClient) {
+  const { error } = await supabase.rpc("get_showreel_page_v2_snapshot", {
+    p_site_id: "main",
+  });
+  if (!error || !isMissingShowreelV2Snapshot(error)) {
+    redirect("/admin/v2/pages/showreel?from=classic");
+  }
+}
+
 async function assertMutation(
   result: { error: { message?: string } | null },
   section: string
@@ -934,6 +960,9 @@ export async function updatePageHero(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", returnSection);
 
   const { admin, supabase } = await getWriteContext(returnSection);
+  if (parsed.data.pageSlug === "video") {
+    await handOffLegacyShowreelWrite(supabase);
+  }
   const result = await supabase.from("page_heroes").upsert({
     page_slug: parsed.data.pageSlug,
     title: parsed.data.title,
@@ -1481,6 +1510,7 @@ export async function saveVideo(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", "videos");
 
   const { admin, supabase } = await getWriteContext("videos");
+  await handOffLegacyShowreelWrite(supabase);
   if (parsed.data.isFeatured) {
     const featuredResult = await supabase
       .from("videos")
@@ -1614,6 +1644,9 @@ async function deleteById(
   if (!parsed.success) redirectToStatus("invalid", section);
 
   const { admin, supabase } = await getWriteContext(section);
+  if (tableName === "videos") {
+    await handOffLegacyShowreelWrite(supabase);
+  }
   const result = await supabase.from(tableName).delete().eq("id", parsed.data);
 
   await assertMutation(result, section);

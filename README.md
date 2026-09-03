@@ -305,12 +305,30 @@ Introduction save confirmed the write path, canonical normalization, reload,
 and public-page stability. The remote CLI migration history is still empty, so
 do not use `supabase db push`.
 
+Migration `0032_showreel_page_editor.sql` prepares the service-only Showreel
+snapshot and three atomic save boundaries: Hero, Introduction, and Works. The
+Works transaction includes every `videos` row, including hidden and legacy
+`music_video` items, derives visitor order from the submitted catalog, and
+rejects omission instead of deleting data. It also preserves unused legacy
+presentation metadata, keeps the single featured marker atomic, and locks
+Media Library rows while publishing so a concurrent trash action cannot leave
+broken content. Published media accepts only local/Media Library assets or an
+exact allowlisted embed provider; hidden legacy sources remain recoverable.
+It was applied manually to the currently linked project and all four Showreel
+V2 RPCs are live. An authenticated Introduction save with trailing whitespace
+confirmed the complete server-action path, canonical normalization, reload,
+and public `/video` stability while all seven saved videos remained present.
+The remote CLI migration history is still empty, so do not use
+`supabase db push`.
+
 The new dashboard shell lives at `/admin/v2`; its navigation workspace is
 `/admin/v2/navigation`. The 1:1 page editors live at `/admin/v2/pages/music`,
-`/admin/v2/pages/bio`, and `/admin/v2/pages/gallery`; each shares presentation
-components with its public page, provides 1440 px and 390 px preview viewports,
-and saves one visible section at a time. Bio maps directly to Hero, Biography,
-Resume, and Credits; Gallery maps to Hero, Introduction, and recoverable Frames.
+`/admin/v2/pages/bio`, `/admin/v2/pages/gallery`, and
+`/admin/v2/pages/showreel`; each shares presentation components with its public
+page, provides 1440 px and 390 px preview viewports, and saves one visible
+section at a time. Bio maps directly to Hero, Biography, Resume, and Credits;
+Gallery maps to Hero, Introduction, and recoverable Frames; Showreel maps to
+Hero, Introduction, and a recoverable all-types Video catalog.
 The classic `/admin` remains
 available and links to V2. V1 no longer exposes the Actor/Musician switch or its
 profile-only navbar form; it keeps both content groups available and directs

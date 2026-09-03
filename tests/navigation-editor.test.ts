@@ -394,6 +394,7 @@ describe("Admin V2 shell helpers", () => {
       "navigation",
       "bio",
       "gallery",
+      "showreel",
       "music",
     ]);
     expect(getAdminV2ActiveItem("/admin/v2").key).toBe("overview");
@@ -413,6 +414,12 @@ describe("Admin V2 shell helpers", () => {
     expect(getAdminV2ActiveItem("/admin/v2/pages/gallery/history").key).toBe(
       "gallery"
     );
+    expect(getAdminV2ActiveItem("/admin/v2/pages/showreel").key).toBe(
+      "showreel"
+    );
+    expect(
+      getAdminV2ActiveItem("/admin/v2/pages/showreel/history").key
+    ).toBe("showreel");
     expect(getAdminV2ActiveItem("/admin/v2/pages/music").key).toBe("music");
     expect(getAdminV2ActiveItem("/admin/v2/pages/music/history").key).toBe(
       "music"

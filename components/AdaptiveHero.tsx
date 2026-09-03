@@ -2,7 +2,9 @@ import HeroCinematic from "@/components/HeroCinematic";
 import VideoHero from "@/components/VideoHero";
 import type { HeroContent } from "@/lib/content";
 
-type AdaptiveHeroProps = HeroContent;
+type AdaptiveHeroProps = HeroContent & {
+  staticPreview?: boolean;
+};
 
 export default function AdaptiveHero({
   backgroundSrc,
@@ -10,6 +12,7 @@ export default function AdaptiveHero({
   ctaLabel,
   mediaType,
   posterSrc,
+  staticPreview = false,
   subtitle,
   title,
 }: AdaptiveHeroProps) {
@@ -20,6 +23,7 @@ export default function AdaptiveHero({
         ctaHref={ctaHref}
         ctaLabel={ctaLabel}
         poster={posterSrc || undefined}
+        staticPreview={staticPreview}
         subtitle={subtitle}
         title={title}
       />

@@ -27,6 +27,12 @@ export const ADMIN_V2_NAVIGATION = [
     description: "Hero, introduction and frames",
   },
   {
+    key: "showreel",
+    href: "/admin/v2/pages/showreel",
+    label: "Showreel page",
+    description: "Hero, introduction and videos",
+  },
+  {
     key: "music",
     href: "/admin/v2/pages/music",
     label: "Music page",

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 
 function clamp(n: number, min: number, max: number) {
@@ -14,6 +15,7 @@ type Props = {
   backgroundSrc: string; // VIDEO src (e.g. "/media/hero-loop.mp4")
   subtitle?: string;
   poster?: string; // optional fallback poster (e.g. "/images/hero.jpg")
+  staticPreview?: boolean;
 
   /**
    * Optional: override video focal point (object-position).
@@ -32,6 +34,7 @@ export default function VideoHero({
   backgroundSrc,
   subtitle,
   poster,
+  staticPreview = false,
   videoPosMobile = "50% 20%",
   videoPosDesktop = "50% 50%",
 }: Props) {
@@ -102,6 +105,23 @@ export default function VideoHero({
     >
       {/* BG (VIDEO) */}
       <div className="absolute inset-0">
+        {staticPreview ? (
+          poster ? (
+            <Image
+              alt=""
+              aria-hidden="true"
+              className="object-cover"
+              fill
+              priority
+              sizes="100vw"
+              src={poster}
+              style={{ objectPosition: videoPosDesktop }}
+            />
+          ) : (
+            <div className="absolute inset-0 bg-[#120b0b]" />
+          )
+        ) : (
+          <>
         {/* Mobile layer (with mobile object-position) */}
         <video
           className={[
@@ -153,6 +173,8 @@ export default function VideoHero({
           tabIndex={-1}
           aria-hidden="true"
         />
+          </>
+        )}
 
         {/* Overlays */}
         <div className="absolute inset-0 bg-black/35" />

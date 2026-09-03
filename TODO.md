@@ -316,7 +316,7 @@ Acceptance:
 
 ## Batch 6 - Remaining page editors
 
-Status: Batch 6A and Batch 6B deployed; Works/Showreel remains queued
+Status: Batch 6A, Batch 6B, and Batch 6C deployed
 
 - [x] Bio plus Resume/Credits (Batch 6A).
   - [x] Share the exact public Bio presentation with a safe live V2 preview.
@@ -380,7 +380,41 @@ Status: Batch 6A and Batch 6B deployed; Works/Showreel remains queued
         editor remained writable after reload, and the public `/gallery`
         snapshot was identical before and after the write. The classic Gallery
         Studio also correctly switched to its locked V2 handoff state.
-- [ ] Works/Showreel, preserving legacy music-video items during review.
+- [x] Works/Showreel (Batch 6C).
+  - [x] Map the public page to three plain-language edit areas: Hero,
+        Introduction, and Videos.
+  - [x] Share one `ShowreelPageView` between `/video` and the authenticated
+        1440x900 / 390x844 preview.
+  - [x] Keep filters, autoplay, visitor playback, modals, embeds, and footer
+        links inert while section and individual video cards remain selectable
+        in preview mode.
+  - [x] Edit every saved `videos` row in one catalog, including hidden rows and
+        all seven video types; never filter legacy `music_video` content by the
+        former Actor/Musician profile mode.
+  - [x] Add, reorder, hide, and restore videos without hard-deleting a saved
+        row; only a new unsaved draft can be discarded.
+  - [x] Preserve the legacy featured marker and unused presentation metadata
+        while exposing only fields the current public page actually renders.
+  - [x] Prepare `0032_showreel_page_editor.sql` with a service-only consistent
+        snapshot, three optimistic save boundaries, exact collection-version
+        checks, atomic featured handling, canonical ordering, and no deletes.
+  - [x] Restrict published assets to local/Media Library sources or exact
+        allowlisted embed providers, lock referenced assets against concurrent
+        trashing, and keep hidden historical sources recoverable until restore.
+  - [x] Lock all classic Showreel/video writes into the V2 handoff once 0032 is
+        active so old forms cannot bypass conflict checks or hard-delete rows.
+  - [x] Verify the pre-rollout read-only state with 305 automated tests,
+        TypeScript, full ESLint, a production build, and authenticated browser
+        QA at 1440x900 and 390x844. Static video-Hero preview, item-level
+        preview-to-inspector focus, the overview/sidebar entry, and public
+        `/video` all passed without changing content.
+  - [x] Apply `0032_showreel_page_editor.sql` manually and verify all four RPCs.
+        An authenticated Introduction save passed through the real server
+        action, trimmed a temporary trailing space back to the original copy,
+        reloaded as writable, and left public `/video` plus all seven catalog
+        items unchanged. The classic Showreel Studio also switched to its locked
+        V2 handoff state. Do not use `supabase db push` while remote migration
+        history remains empty.
 - [ ] Contact and inquiry context.
 - [x] Reuse the accepted shared-preview/inspector pattern for Bio.
 
@@ -395,6 +429,8 @@ Status: planned
 
 - [ ] Keep Media Library focused on upload, assets, usage, and recoverable trash.
 - [ ] Keep contextual media picking/upload available inside page editors.
+- [ ] Add an explicit archive/purge workflow before a recoverable video catalog
+      reaches the 120-item new-content cap.
 - [ ] Move inquiries out of Analytics into `/admin/v2/inbox`.
 - [ ] Preserve upload progress, reference checks, delivery state, and audit logs.
 
@@ -442,6 +478,9 @@ Status: planned
 - [ ] Test migration/backfill and rollback against representative data.
 - [ ] Run unit, integration, typecheck, lint, and production build checks.
 - [ ] Verify sitemap, metadata, structured data, analytics, contact, and admin auth.
+- [ ] Retire broad authenticated direct-table write policies after the V1
+      editors are removed, so the audited V2 service RPCs become the only
+      supported content-write boundary.
 - [ ] Keep V1 available through an agreed rollback window.
 - [ ] Make V2 the default only after owner acceptance.
 - [ ] Deprecate legacy profile fields in a later migration; retain historical
