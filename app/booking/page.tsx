@@ -19,11 +19,10 @@ export default async function BookingPage() {
     <main>
       <AdaptiveHero {...hero} />
 
-      <section id="form" className="py-24 md:py-32 scroll-mt-24">
+      <section className="public-nav-anchor py-24 md:py-32" id="form">
         <BookingForm
           contactBlurb={content.settings.contactBlurb}
           location={content.settings.location}
-          portfolioType={content.settings.portfolioType}
         />
       </section>
     </main>

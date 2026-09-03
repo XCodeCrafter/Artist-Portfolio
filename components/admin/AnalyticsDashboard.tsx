@@ -28,6 +28,7 @@ import type {
   InquirySummary,
   InquiryStatus,
 } from "@/lib/admin/inquiries";
+import { getStoredInquiryLabel } from "@/lib/inquiries";
 
 type AnalyticsDashboardProps = {
   analytics: AnalyticsSummary;
@@ -449,12 +450,12 @@ function InquiryCard({
   onDirty: (form: HTMLFormElement) => void;
   onSubmit: (form: HTMLFormElement) => boolean;
 }) {
-  const typeLabel = inquiry.inquiryType === "collaboration" ? "Collaboration" : "Booking";
+  const typeLabel = getStoredInquiryLabel(inquiry);
   return (
     <AdminDisclosure badge={<span className="flex flex-wrap items-center gap-1.5"><InquiryStatusBadge status={inquiry.status} /><DeliveryBadge status={inquiry.emailStatus} /></span>} defaultOpen={defaultOpen} description={`${inquiry.email} · ${typeLabel} · ${formatDate(inquiry.createdAt)}`} id={`inquiry-${inquiry.id}`} title={inquiry.name} variant="item">
       <article>
         <a className="block truncate text-sm text-white/52 underline-offset-4 hover:text-white hover:underline" href={`mailto:${inquiry.email}`}>{inquiry.email}</a>
-        <div className="mt-2 flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.14em] text-white/32"><span>{inquiry.portfolioType}</span><span>·</span><span>{typeLabel}</span>{inquiry.emailStatusChangedAt ? <><span>·</span><span>email updated {formatDate(inquiry.emailStatusChangedAt)}</span></> : null}</div>
+        <div className="mt-2 flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.14em] text-white/32"><span>{inquiry.portfolioType || "no legacy profile"}</span><span>·</span><span>{typeLabel}</span>{inquiry.emailStatusChangedAt ? <><span>·</span><span>email updated {formatDate(inquiry.emailStatusChangedAt)}</span></> : null}</div>
         <p className="mt-4 whitespace-pre-wrap rounded-xl border border-white/8 bg-black/24 p-4 text-sm leading-6 text-white/68">{inquiry.message}</p>
         <form
           action={updateInquiry}

@@ -1,16 +1,14 @@
 "use client";
 
 import GalleryFooter from "@/components/GalleryFooter";
-import type { FooterEffect, PortfolioType, SocialLink } from "@/lib/content";
+import type { FooterEffect, SocialLink } from "@/lib/content";
 
 type NewsletterBlockProps = {
   artistName?: string;
   contactBlurb?: string;
   location?: string;
-  portfolioType?: PortfolioType;
   footerEffect?: FooterEffect;
   socialLinks?: SocialLink[];
-  spotifyUrl?: string;
   tagline?: string;
 };
 
@@ -20,10 +18,8 @@ export default function NewsletterBlock({
   artistName = "Franky Fugazi",
   contactBlurb,
   location = "Amsterdam, The Netherlands",
-  portfolioType = "musician",
   footerEffect = "soul",
   socialLinks = [],
-  spotifyUrl,
   tagline,
 }: NewsletterBlockProps) {
   return (
@@ -31,10 +27,8 @@ export default function NewsletterBlock({
       artistName={artistName}
       contactBlurb={contactBlurb}
       location={location}
-      portfolioType={portfolioType}
       footerEffect={footerEffect}
       socialLinks={socialLinks}
-      spotifyUrl={spotifyUrl}
       tagline={tagline}
     />
   );

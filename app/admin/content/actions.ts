@@ -554,6 +554,19 @@ function isMissingNavigationSchema(error: { message?: string } | null) {
   );
 }
 
+function isMissingNavigationConfigVersionSchema(
+  error: { code?: string; message?: string } | null
+) {
+  const message = error?.message?.toLowerCase() || "";
+  return (
+    message.includes("navigation_config_version") &&
+    (error?.code === "42703" ||
+      error?.code === "PGRST204" ||
+      message.includes("schema cache") ||
+      message.includes("does not exist"))
+  );
+}
+
 function isMissingCncSchema(
   error: { code?: string; message?: string } | null
 ) {
@@ -844,18 +857,47 @@ export async function updateNavigationSettings(formData: FormData) {
       : "hidden_nav_page_slugs_musician";
 
   const { admin, supabase } = await getWriteContext(section);
-  const result = await supabase
+  const activation = await supabase
+    .from("site_settings")
+    .select("navigation_config_version")
+    .eq("id", "main")
+    .maybeSingle<{ navigation_config_version: number | null }>();
+
+  if (
+    activation.error &&
+    !isMissingNavigationConfigVersionSchema(activation.error)
+  ) {
+    console.error("Unable to verify the active navigation editor.", {
+      code: activation.error.code,
+      message: activation.error.message,
+    });
+    redirectToStatus("save-error", section);
+  }
+
+  if ((activation.data?.navigation_config_version ?? 0) >= 1) {
+    redirectToStatus("navigation-managed-in-v2", section);
+  }
+
+  let navigationUpdate = supabase
     .from("site_settings")
     .update({ [visibilityColumn]: hiddenNavPageSlugs })
-    .eq("id", "main")
-    .select("id")
-    .single();
+    .eq("id", "main");
+
+  if (!activation.error) {
+    navigationUpdate = navigationUpdate.eq("navigation_config_version", 0);
+  }
+
+  const result = await navigationUpdate.select("id").maybeSingle();
 
   if (isMissingNavigationSchema(result.error)) {
     redirectToStatus("navigation-migration-required", section);
   }
 
-  if (result.error?.code === "PGRST116") {
+  if (!result.error && !result.data && !activation.error) {
+    redirectToStatus("navigation-managed-in-v2", section);
+  }
+
+  if (!result.error && !result.data) {
     redirectToStatus("navigation-settings-required", section);
   }
 

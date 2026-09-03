@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import type { PageSlug, PortfolioContent, PortfolioType } from "@/lib/content";
+import type { PageSlug, PortfolioContent } from "@/lib/content";
+import { isSingleDisciplineCopy } from "@/lib/content/public-copy";
 import {
   getSiteUrl,
   isNonProductionVercelDeployment,
@@ -62,11 +63,9 @@ function joinUnique(parts: string[]) {
     .join(" | ");
 }
 
-function neutralSiteDescription(type: PortfolioType, location: string) {
+function neutralSiteDescription(location: string) {
   const base =
-    type === "actor"
-      ? "Official actor portfolio featuring a biography, headshots, showreel, credits, and contact information."
-      : "Official music portfolio featuring releases, videos, biography, and booking information.";
+    "Official actor and musician portfolio featuring biography, headshots, acting credits, showreel, releases, videos, and contact information.";
 
   return location ? `${base} Based in ${location}.` : base;
 }
@@ -77,12 +76,13 @@ export function getSeoIdentity(content: PortfolioContent) {
   const location = cleanText(content.settings.location);
   const configuredDescription = cleanText(content.settings.description);
   const staleDescription =
-    normalizeIdentity(configuredDescription).includes(STALE_FALLBACK_NAME) &&
-    !normalizeIdentity(brandName).includes(STALE_FALLBACK_NAME) &&
-    !normalizeIdentity(personName).includes(STALE_FALLBACK_NAME);
+    (normalizeIdentity(configuredDescription).includes(STALE_FALLBACK_NAME) &&
+      !normalizeIdentity(brandName).includes(STALE_FALLBACK_NAME) &&
+      !normalizeIdentity(personName).includes(STALE_FALLBACK_NAME)) ||
+    isSingleDisciplineCopy(configuredDescription);
   const description =
     !configuredDescription || staleDescription
-      ? neutralSiteDescription(content.settings.portfolioType, location)
+      ? neutralSiteDescription(location)
       : configuredDescription;
 
   return {
@@ -94,20 +94,20 @@ export function getSeoIdentity(content: PortfolioContent) {
   };
 }
 
-function pageLabel(page: PublicSeoPage, type: PortfolioType) {
+function pageLabel(page: PublicSeoPage) {
   switch (page) {
     case "home":
-      return type === "actor" ? "Actor Portfolio" : "Music Portfolio";
+      return "Actor & Musician Portfolio";
     case "bio":
-      return type === "actor" ? "Biography & Credits" : "Biography";
+      return "Biography, Resume & Credits";
     case "gallery":
-      return type === "actor" ? "Headshots & Gallery" : "Gallery";
+      return "Headshots & Gallery";
     case "music":
       return "Music & Releases";
     case "video":
-      return type === "actor" ? "Showreel" : "Videos";
+      return "Showreel & Videos";
     case "booking":
-      return type === "actor" ? "Contact" : "Booking";
+      return "Contact";
     case "privacy":
       return "Privacy";
     case "terms":
@@ -123,21 +123,15 @@ function pageDescription(content: PortfolioContent, page: PublicSeoPage) {
     case "home":
       return description;
     case "bio":
-      return content.settings.portfolioType === "actor"
-        ? `Biography, acting credits, experience, and professional profile for ${personName}.${place}`
-        : `Biography, creative story, experience, and background of ${personName}.${place}`;
+      return `Biography, acting resume, selected credits, music, and creative background for ${personName}.${place}`;
     case "gallery":
       return `Selected headshots, portraits, and visual portfolio work featuring ${personName}.`;
     case "music":
       return `Official releases, selected tracks, mixes, and listening links from ${personName}.`;
     case "video":
-      return content.settings.portfolioType === "actor"
-        ? `Showreel, selected scenes, self-tapes, and screen work featuring ${personName}.`
-        : `Music videos and selected motion work from ${personName}.`;
+      return `Showreel, selected scenes, self-tapes, music videos, and screen work featuring ${personName}.`;
     case "booking":
-      return content.settings.portfolioType === "actor"
-        ? `Contact ${personName} for casting, representation, productions, and creative collaborations.`
-        : `Contact ${personName} for bookings, collaborations, releases, and projects.`;
+      return `Contact ${personName} for acting, casting, music bookings, releases, productions, and creative collaborations.`;
     case "privacy":
       return `Privacy information for the official ${brandName} portfolio.`;
     case "terms":
@@ -147,7 +141,7 @@ function pageDescription(content: PortfolioContent, page: PublicSeoPage) {
 
 export function getPageSeo(content: PortfolioContent, page: PublicSeoPage) {
   const identity = getSeoIdentity(content);
-  const label = pageLabel(page, content.settings.portfolioType);
+  const label = pageLabel(page);
   const legalPage = page === "privacy" || page === "terms";
   const title = legalPage
     ? joinUnique([label, identity.brandName])
@@ -310,7 +304,11 @@ function personNode(content: PortfolioContent) {
     name: seo.personName,
     url: `${base}/bio`,
     description: seo.description,
-    jobTitle: content.settings.portfolioType === "actor" ? "Actor" : "Musician",
+    jobTitle: ["Actor", "Musician"],
+    hasOccupation: [
+      { "@type": "Occupation", name: "Actor" },
+      { "@type": "Occupation", name: "Musician" },
+    ],
     ...(image ? { image } : {}),
     ...(seo.location
       ? { homeLocation: { "@type": "Place", name: seo.location } }

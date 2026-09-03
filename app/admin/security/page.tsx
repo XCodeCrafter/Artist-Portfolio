@@ -28,6 +28,8 @@ export default async function AdminSecurityPage({
       adminEmail={admin.email}
       description="See whether protection is healthy, what the guards stopped, and who can access the portfolio."
       hiddenNavPageSlugs={content.settings.hiddenNavPageSlugs}
+      navigationConfigVersion={content.settings.navigationConfigVersion}
+      navigationDestinationCount={content.navigation.items.length}
       portfolioType={content.settings.portfolioType}
       title="Security center"
     >

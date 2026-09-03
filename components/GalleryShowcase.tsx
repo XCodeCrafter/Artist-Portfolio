@@ -850,7 +850,7 @@ export default function GalleryShowcase({
   return (
     <section
       className={cx(
-        "relative overflow-x-clip px-5 sm:px-8",
+        "public-nav-anchor relative overflow-x-clip px-5 sm:px-8",
         mode === "gallery" ? "py-16 sm:py-24" : "pb-16 sm:pb-24"
       )}
       id={mode === "gallery" ? "gallery" : "home-stories"}
@@ -861,6 +861,7 @@ export default function GalleryShowcase({
       <div className="relative mx-auto max-w-[1500px]">
         {mode === "gallery" ? (
           <>
+            <div data-gallery-preview-part="introduction">
             <header>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/42">
             {presentation.introEyebrow}
@@ -901,9 +902,10 @@ export default function GalleryShowcase({
             {visibleImages.length} frames - selected archive
           </p>
             </div>
+            </div>
 
             {visibleImages.length ? (
-              <section className="mt-10">
+              <section className="mt-10" data-gallery-preview-part="frames">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:auto-rows-[88px] lg:grid-cols-12 lg:gap-5">
                   {visibleImages.map((image, index) => (
                     <MosaicFrame
@@ -917,7 +919,7 @@ export default function GalleryShowcase({
                 </div>
               </section>
             ) : (
-              <div className="mt-10 border border-white/10 bg-white/[0.045] p-10 text-center text-white/62">
+              <div className="mt-10 border border-white/10 bg-white/[0.045] p-10 text-center text-white/62" data-gallery-preview-part="frames">
                 No images in this collection yet.
               </div>
             )}

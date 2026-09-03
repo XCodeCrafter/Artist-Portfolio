@@ -38,9 +38,8 @@ import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
 import {
   getProfilePublicModules,
-  getVisibleNavigationModules,
-  isModuleEnabled,
 } from "@/lib/content/modules";
+import { PUBLIC_PORTFOLIO_PAGE_DESTINATIONS } from "@/lib/content/navigation";
 import {
   ACTOR_CREDIT_TYPES,
   type FooterEffect,
@@ -152,6 +151,8 @@ const statusCopy: Record<string, string> = {
   "saved-home-presentation": "Homepage section text and media saved.",
   "saved-music-link": "Music link saved.",
   "saved-navigation": "Navigation visibility saved.",
+  "navigation-managed-in-v2":
+    "The public navbar is managed in Admin V2. Nothing was changed here.",
   "saved-brand-settings": "Brand identity and text saved.",
   "saved-contact-settings": "Contact details saved.",
   "saved-footer-effect-settings": "Footer interaction saved.",
@@ -493,6 +494,9 @@ function BookingSnapshot({ content }: { content: EditablePortfolioContent }) {
   );
 }
 
+// Rollback-only V1 renderer. The mounted workspace below always hands navbar
+// management to V2, but keeping this isolated code avoids a destructive V1 rewrite.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function NavigationSnapshot({
   artistName,
   modules,
@@ -562,6 +566,7 @@ function NavigationSnapshot({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function NavigationSettingsForm({
   content,
   disabled,
@@ -736,51 +741,55 @@ function NavigationSettingsForm({
 
 function NavigationWorkspace({
   content,
-  disabled,
 }: {
   content: EditablePortfolioContent;
   disabled: boolean;
 }) {
-  const modules = useMemo(
-    () => getProfilePublicModules(content.settings.portfolioType),
-    [content.settings.portfolioType]
-  );
-  const [visiblePageSlugs, setVisiblePageSlugs] = useState<PageSlug[]>(() => {
-    const hidden = new Set(content.settings.hiddenNavPageSlugs);
-    return modules
-      .map((module) => module.pageSlug)
-      .filter(
-        (pageSlug): pageSlug is PageSlug =>
-          Boolean(pageSlug) && !hidden.has(pageSlug as PageSlug)
-      );
-  });
-
   return (
     <StudioWorkspace
-      description="The same primary menu your visitors see"
+      description="Navbar ordering and visibility have moved to Admin V2"
       label="Main navigation"
       panels={[
         {
-          description: "Choose the pages shown in the public navbar.",
+          description: "Open the complete Actor + Music destination list.",
           id: "navigation-settings",
-          label: "Menu visibility",
+          label: "Managed in V2",
           node: (
-            <NavigationSettingsForm
-              content={content}
-              disabled={disabled}
-              modules={modules}
-              setVisiblePageSlugs={setVisiblePageSlugs}
-              visiblePageSlugs={visiblePageSlugs}
-            />
+            <section className={sectionClass} id="navigation-settings">
+              <SectionHeader
+                kicker="V1 compatibility"
+                title="Navbar is managed in Admin V2"
+              />
+              <div className="mt-4 rounded-[20px] border border-[#ff694f]/18 bg-[#ff3b1f]/7 p-5">
+                <p className="max-w-2xl text-sm leading-6 text-white/58">
+                  The mixed portfolio uses one ordered list for every Actor and
+                  Music destination. The old profile-only form has retired with
+                  dignity before it could overwrite the real menu.
+                </p>
+                <Link
+                  className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white"
+                  href="/admin/v2/navigation"
+                >
+                  Open navbar manager
+                  <FaExternalLinkAlt className="text-[9px]" />
+                </Link>
+              </div>
+            </section>
           ),
         },
       ]}
       preview={
-        <NavigationSnapshot
-          artistName={content.settings.artistName}
-          modules={modules}
-          visiblePageSlugs={visiblePageSlugs}
-        />
+        <section className={sectionClass}>
+          <p className={labelClass}>Live navigation source</p>
+          <p className="mt-3 text-sm leading-6 text-white/48">
+            Admin V2 is the complete-menu editor. Until its first successful
+            save, the public site may still use the legacy compatibility menu;
+            V1 remains available for every other existing content editor.
+          </p>
+          <p className="mt-3 text-[10px] text-white/28">
+            Current navigation format: V{content.settings.navigationConfigVersion}
+          </p>
+        </section>
       }
       publicHref="/"
       sectionId="navigation"
@@ -1424,7 +1433,7 @@ function SiteSettingsForm({
           <AdminDisclosure
           collapsible={false}
           defaultOpen
-          description="Artist name, portfolio mode, tagline, and public site description."
+          description="Artist name, tagline, and public site description."
           eyebrow="01 · Identity"
           id="settings-identity"
           title="Brand identity & text"
@@ -1440,16 +1449,22 @@ function SiteSettingsForm({
                     required
                   />
                 </Field>
-                <Field label="Portfolio mode">
-                  <select
-                    className={inputClass}
-                    defaultValue={content.settings.portfolioType}
-                    name="portfolioType"
-                  >
-                    <option value="musician">Musician</option>
-                    <option value="actor">Actor</option>
-                  </select>
-                </Field>
+                <input
+                  name="portfolioType"
+                  type="hidden"
+                  value={content.settings.portfolioType}
+                />
+                <div className="rounded-[16px] border border-white/9 bg-black/22 px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+                    Portfolio structure
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-white/72">
+                    Actor + Music
+                  </p>
+                  <p className="mt-1 text-[10px] leading-4 text-white/34">
+                    Page visibility now belongs to the V2 navbar manager.
+                  </p>
+                </div>
                 <Field label="Tagline / discipline" wide>
                   <TextInput
                     defaultValue={content.settings.tagline}
@@ -3397,8 +3412,8 @@ export default function ContentEditor({
 }: ContentEditorProps) {
   const disabled = !isConfigured || Boolean(loadError);
   const portfolioType = content.settings.portfolioType;
-  const musicEnabled = isModuleEnabled(portfolioType, "music");
-  const actorEnabled = portfolioType === "actor";
+  const musicEnabled = true;
+  const actorEnabled = true;
   const cncDisabled =
     disabled ||
     !cncIsConfigured ||
@@ -3675,14 +3690,14 @@ export default function ContentEditor({
         : []),
       {
         id: "booking",
-        label: portfolioType === "actor" ? "Contact" : "Booking",
+        label: "Contact",
         kicker: "Public page",
         description:
           "Hero, location, contact introduction, and inquiry form context.",
         node: (
           <StudioWorkspace
             description="Contact introduction and the public inquiry experience"
-            label={portfolioType === "actor" ? "Contact page" : "Booking page"}
+            label="Contact page"
             panels={[
               {
                 description: "Opening title, action, and background media.",
@@ -3723,18 +3738,13 @@ export default function ContentEditor({
         kicker: "Site-wide",
         description:
           "Choose which portfolio pages appear in the desktop and mobile navbar.",
-        count: getVisibleNavigationModules(
-          portfolioType,
-          content.settings.hiddenNavPageSlugs
-        ).length,
-        countLabel: "visible",
+        count: content.navigation.items.filter((item) => item.isVisible).length,
+        countLabel: "selected",
         node: (
           <NavigationWorkspace
             content={content}
             disabled={disabled}
-            key={`${portfolioType}-${content.settings.hiddenNavPageSlugs.join(
-              "-"
-            )}`}
+            key={`navigation-v${content.settings.navigationConfigVersion}`}
           />
         ),
       },
@@ -3743,14 +3753,14 @@ export default function ContentEditor({
         label: "Brand & style",
         kicker: "Site-wide",
         description:
-          "Artist identity, portfolio mode, typography, description, and footer effect.",
+          "Artist identity, typography, description, and footer effect.",
         node: (
           <StudioWorkspace
             description="Global choices that shape every public page"
             label="Brand system"
             panels={[
               {
-                description: "Artist name, portfolio mode, and public copy.",
+                description: "Artist name, tagline, and public copy.",
                 id: "settings-identity",
                 label: "Identity",
                 node: (
@@ -3952,8 +3962,7 @@ export default function ContentEditor({
     });
   }
 
-  const hiddenNavPageSlugs = new Set(content.settings.hiddenNavPageSlugs);
-  const publicPageItems = getProfilePublicModules(portfolioType).map((page) => {
+  const publicPageItems = PUBLIC_PORTFOLIO_PAGE_DESTINATIONS.map((page) => {
     const sectionId =
       page.key === "home"
         ? "home"
@@ -3967,13 +3976,13 @@ export default function ContentEditor({
     const editorHref =
       page.key === "gallery"
         ? "/admin/media?view=studio"
-        : page.key === "video" || page.key === "showreel"
+        : page.key === "works"
           ? "/admin/media?view=showreel"
           : "";
     const icon =
       page.key === "gallery" ? (
         <FaImages />
-      ) : page.key === "video" || page.key === "showreel" ? (
+      ) : page.key === "works" ? (
         <FaPlay />
       ) : (
         <FaGlobe />
@@ -3985,7 +3994,8 @@ export default function ContentEditor({
       editorHref,
       icon,
       isVisible:
-        !page.pageSlug || !hiddenNavPageSlugs.has(page.pageSlug),
+        content.navigation.items.find((item) => item.key === page.key)
+          ?.isVisible ?? false,
     };
   });
   const sharedSections = sections.filter((section) =>
@@ -4011,7 +4021,7 @@ export default function ContentEditor({
             <>
               <span className="text-[11px]">{page.icon}</span>
               <span className="whitespace-nowrap text-xs font-semibold">
-                {page.label}
+                {page.defaultLabel}
               </span>
               <span
                 aria-label={

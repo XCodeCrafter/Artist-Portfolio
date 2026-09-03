@@ -9,6 +9,8 @@ import ScrollReveal from "@/components/ScrollReveal";
 import SmoothScroll from "@/components/SmoothScroll";
 import TopNav from "@/components/TopNav";
 import { getPortfolioContent } from "@/lib/content";
+import { getVisiblePublicPageNavigationItems } from "@/lib/content/navigation";
+import { hasPublishedCncPrograms } from "@/lib/content/cnc-programs.server";
 import {
   getFontFamily,
   getGoogleFontsStylesheetUrl,
@@ -34,7 +36,18 @@ export default async function RootLayout({
 }) {
   // A per-request CSP nonce requires dynamic rendering.
   await connection();
-  const content = await getPortfolioContent();
+  const [content, hasCncPrograms] = await Promise.all([
+    getPortfolioContent(),
+    hasPublishedCncPrograms(),
+  ]);
+  const navigationItems = getVisiblePublicPageNavigationItems(
+    content.navigation.items,
+    {
+      hasPublishedCncPrograms: hasCncPrograms,
+      hasResumeContent:
+        content.hasActorResume || content.actorCredits.length > 0,
+    }
+  );
   const typographyStyle: TypographyStyle = {
     "--font-display": getFontFamily(content.settings.displayFont),
     "--font-body": getFontFamily(content.settings.bodyFont),
@@ -65,8 +78,7 @@ export default async function RootLayout({
         <div className="pointer-events-none fixed inset-0 z-0 opacity-60 noise" />
         <TopNav
           artistName={content.settings.artistName}
-          hiddenNavPageSlugs={content.settings.hiddenNavPageSlugs}
-          portfolioType={content.settings.portfolioType}
+          navigationItems={navigationItems}
           socialLinks={content.socialLinks}
         />
 

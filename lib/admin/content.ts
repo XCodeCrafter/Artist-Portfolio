@@ -10,6 +10,14 @@ import {
 } from "@/lib/content/fonts";
 import { normalizePortfolioType } from "@/lib/content/profile";
 import {
+  normalizeNavigationConfigVersion,
+  resolveNavigationConfig,
+} from "@/lib/content/navigation";
+import type {
+  NavigationConfig,
+  StoredNavigationRow,
+} from "@/lib/content/navigation";
+import {
   ACTOR_CREDIT_TYPES,
   VIDEO_TYPES,
   normalizeFooterEffect,
@@ -27,6 +35,7 @@ import type {
   HomeUpdate,
   HomePresentation,
   MusicPlatformLink,
+  MusicPresentation,
   PageSlug,
   SiteSettings,
   SocialLink,
@@ -77,12 +86,14 @@ export type EditableActorCredit = ActorCredit & PublishableMeta;
 
 export type EditablePortfolioContent = {
   settings: SiteSettings;
+  navigation: NavigationConfig;
   heroes: EditableHeroContent[];
   homeUpdates: EditableHomeUpdate[];
   homePresentation: HomePresentation;
   aboutHome: AboutHomeContent;
   socialLinks: EditableSocialLink[];
   musicPlatforms: EditableMusicPlatformLink[];
+  musicPresentation: MusicPresentation;
   soundcloudTracks: EditableSoundcloudTrack[];
   bio: {
     topLabel: string;
@@ -101,6 +112,7 @@ export type EditablePortfolioContent = {
 
 type SiteSettingsRow = {
   portfolio_type?: string | null;
+  navigation_config_version?: number | null;
   hidden_nav_page_slugs_actor?: unknown;
   hidden_nav_page_slugs_musician?: unknown;
   footer_effect?: string | null;
@@ -286,6 +298,7 @@ function withFallbackMeta<T extends { id: string }>(
 function getFallbackEditableContent(): EditablePortfolioContent {
   return {
     settings: FALLBACK_CONTENT.settings,
+    navigation: FALLBACK_CONTENT.navigation,
     heroes: mapFallbackHeroes(),
     homeUpdates: withFallbackMeta(
       FALLBACK_CONTENT.homeUpdates.map((item) => ({
@@ -298,6 +311,7 @@ function getFallbackEditableContent(): EditablePortfolioContent {
     aboutHome: FALLBACK_CONTENT.aboutHome,
     socialLinks: withFallbackMeta(FALLBACK_CONTENT.socialLinks),
     musicPlatforms: withFallbackMeta(FALLBACK_CONTENT.musicPlatforms),
+    musicPresentation: FALLBACK_CONTENT.musicPresentation,
     soundcloudTracks: withFallbackMeta(
       FALLBACK_CONTENT.soundcloudTracks.map((item) => ({
         ...item,
@@ -327,6 +341,9 @@ function mapSettings(row?: SiteSettingsRow): SiteSettings {
 
   return {
     portfolioType,
+    navigationConfigVersion: normalizeNavigationConfigVersion(
+      row.navigation_config_version
+    ),
     hiddenNavPageSlugs: normalizeHiddenNavPageSlugs(
       portfolioType === "actor"
         ? row.hidden_nav_page_slugs_actor
@@ -646,6 +663,7 @@ export async function getEditablePortfolioContent(): Promise<{
 
   const [
     settings,
+    navigationResult,
     heroes,
     updates,
     about,
@@ -670,6 +688,13 @@ export async function getEditablePortfolioContent(): Promise<{
       .eq("id", "main")
       .limit(1)
       .returns<SiteSettingsRow[]>(),
+    supabase
+      .from("site_navigation_items")
+      .select("destination_key, is_visible, sort_order, updated_at")
+      .eq("site_id", "main")
+      .order("sort_order", { ascending: true })
+      .order("destination_key", { ascending: true })
+      .returns<StoredNavigationRow[]>(),
     supabase
       .from("page_heroes")
       .select("*")
@@ -790,10 +815,19 @@ export async function getEditablePortfolioContent(): Promise<{
   }
 
   const bioProfileContent = mapBioProfile(bioProfile.data?.[0]);
+  const mappedSettings = mapSettings(settings.data?.[0]);
 
   return {
     content: {
-      settings: mapSettings(settings.data?.[0]),
+      settings: mappedSettings,
+      navigation: resolveNavigationConfig({
+        version: mappedSettings.navigationConfigVersion,
+        rows: navigationResult.data ?? [],
+        error: navigationResult.error,
+        portfolioType: mappedSettings.portfolioType,
+        hiddenPageSlugs: mappedSettings.hiddenNavPageSlugs,
+        audience: "admin",
+      }),
       heroes: mapHeroes(heroes.data ?? []),
       homeUpdates: mapHomeUpdates(updates.data ?? []),
       homePresentation: mapHomePresentation(
@@ -802,6 +836,7 @@ export async function getEditablePortfolioContent(): Promise<{
       aboutHome: mapAboutHome(about.data?.[0]),
       socialLinks: mapSocialLinks(socials.data ?? []),
       musicPlatforms: mapMusicPlatforms(platforms.data ?? []),
+      musicPresentation: FALLBACK_CONTENT.musicPresentation,
       soundcloudTracks: mapSoundcloudTracks(tracks.data ?? []),
       bio: {
         ...bioProfileContent,

@@ -45,6 +45,8 @@ export default async function AdminAnalyticsPage({
       adminEmail={admin.email}
       description="Understand visitor trends, page performance, contact activity, and incoming collaboration or booking messages."
       hiddenNavPageSlugs={content.settings.hiddenNavPageSlugs}
+      navigationConfigVersion={content.settings.navigationConfigVersion}
+      navigationDestinationCount={content.navigation.items.length}
       portfolioType={content.settings.portfolioType}
       title="Insights"
     >

@@ -278,7 +278,7 @@ export default function ShowreelWorks({
   }, [activeItem]);
 
   return (
-    <section className="mx-auto max-w-[1500px] px-5 py-16 sm:px-8 sm:py-24" id="videos">
+    <section className="public-nav-anchor mx-auto max-w-[1500px] px-5 py-16 sm:px-8 sm:py-24" id="videos">
       <header className="border-b border-white/10 pb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.26em] text-white/42">
           {presentation.sectionEyebrow}

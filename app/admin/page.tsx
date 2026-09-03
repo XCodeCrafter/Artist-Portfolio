@@ -162,6 +162,10 @@ export default async function AdminDashboardPage() {
   const profileType = content.settings.portfolioType;
   const publicModules = getProfilePublicModules(profileType);
   const hiddenNavPageSlugs = new Set(content.settings.hiddenNavPageSlugs);
+  const v2NavigationActive = content.settings.navigationConfigVersion !== 0;
+  const selectedNavigationCount = content.navigation.items.filter(
+    (item) => item.isVisible
+  ).length;
   const analyticsAvailable = analyticsResult.isConfigured && !analyticsResult.loadError;
   const inquiriesAvailable = inquiriesResult.isConfigured && !inquiriesResult.loadError;
   const securityAvailable = securityResult.isConfigured && !securityResult.loadError;
@@ -179,7 +183,7 @@ export default async function AdminDashboardPage() {
   ];
 
   return (
-    <AdminShell active="dashboard" adminEmail={admin.email} description="See what needs attention, check visitor activity, and jump directly to the public page you want to edit." hiddenNavPageSlugs={content.settings.hiddenNavPageSlugs} portfolioType={profileType} title="Portfolio overview">
+    <AdminShell active="dashboard" adminEmail={admin.email} description="See what needs attention, check visitor activity, and jump directly to the public page you want to edit." hiddenNavPageSlugs={content.settings.hiddenNavPageSlugs} navigationConfigVersion={content.settings.navigationConfigVersion} navigationDestinationCount={content.navigation.items.length} portfolioType={profileType} title="Portfolio overview">
       <div className="grid gap-4">
         <section className={panelClass}>
           <div className="flex items-start justify-between gap-4"><div><p className={labelClass}>Needs attention</p><h2 className="heading-ui mt-2 text-xl font-semibold text-white">{attention.length ? `${attention.length} ${attention.length === 1 ? "item" : "items"} to review` : "Everything important looks calm"}</h2><p className="mt-2 text-sm text-white/42">Only actionable or unverifiable states appear here.</p></div>{attention.length ? <FaExclamationTriangle className="text-lg text-amber-300" /> : <FaCheckCircle className="text-lg text-emerald-300" />}</div>
@@ -194,13 +198,23 @@ export default async function AdminDashboardPage() {
         </section>
 
         <section className={panelClass}>
-          <div><p className={labelClass}>Portfolio status</p><h2 className="heading-ui mt-2 text-xl font-semibold text-white">Pages and navbar visibility</h2><p className="mt-2 text-sm text-white/42">Every profile page stays editable even when its navbar link is hidden.</p></div>
-          <div className="mt-5 divide-y divide-white/7 rounded-[18px] border border-white/8 bg-black/18">
-            {publicModules.map((module, index) => {
-              const visible = !module.pageSlug || !hiddenNavPageSlugs.has(module.pageSlug);
-              return <article className="flex flex-wrap items-center gap-3 px-3.5 py-3" key={`${module.key}-${module.href}`}><span className="font-mono text-[9px] text-white/24">{String(index + 1).padStart(2, "0")}</span><div className="min-w-[130px] flex-1"><p className="text-sm font-semibold text-white/76">{module.label}</p><p className="mt-0.5 truncate text-[10px] text-white/32">{module.description}</p></div><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] ${visible ? "border-emerald-300/14 bg-emerald-400/[0.06] text-emerald-100/68" : "border-white/9 bg-white/[0.035] text-white/38"}`}>{visible ? <FaEye /> : <FaEyeSlash />}{visible ? "In navbar" : "Hidden"}</span><Link className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-white/9 px-3 text-[10px] font-semibold text-white/56 transition hover:bg-white hover:text-black" href={getEditorHref(module.key)}>Edit <FaArrowRight /></Link><Link aria-label={`Open ${module.label} on public site`} className="grid h-9 w-9 place-items-center rounded-xl border border-white/9 text-[10px] text-white/42 transition hover:bg-white hover:text-black" href={module.href} rel="noreferrer" target="_blank"><FaExternalLinkAlt /></Link></article>;
-            })}
-          </div>
+          <div><p className={labelClass}>Portfolio status</p><h2 className="heading-ui mt-2 text-xl font-semibold text-white">Pages and navbar visibility</h2><p className="mt-2 text-sm text-white/42">Hiding a navbar destination never removes its page or content.</p></div>
+          {v2NavigationActive ? (
+            <div className="mt-5 flex flex-wrap items-center gap-4 rounded-[18px] border border-[#ff694f]/16 bg-[#ff3b1f]/7 p-4">
+              <div className="min-w-[220px] flex-1">
+                <p className="text-sm font-semibold text-white/78">Mixed navbar is managed in Admin V2</p>
+                <p className="mt-1 text-xs leading-5 text-white/42">{selectedNavigationCount} of {content.navigation.items.length} destinations are selected. Actor and Music pages are no longer split into separate menus.</p>
+              </div>
+              <Link className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white" href="/admin/v2/navigation">Manage navbar <FaArrowRight /></Link>
+            </div>
+          ) : (
+            <div className="mt-5 divide-y divide-white/7 rounded-[18px] border border-white/8 bg-black/18">
+              {publicModules.map((module, index) => {
+                const visible = !module.pageSlug || !hiddenNavPageSlugs.has(module.pageSlug);
+                return <article className="flex flex-wrap items-center gap-3 px-3.5 py-3" key={`${module.key}-${module.href}`}><span className="font-mono text-[9px] text-white/24">{String(index + 1).padStart(2, "0")}</span><div className="min-w-[130px] flex-1"><p className="text-sm font-semibold text-white/76">{module.label}</p><p className="mt-0.5 truncate text-[10px] text-white/32">{module.description}</p></div><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] ${visible ? "border-emerald-300/14 bg-emerald-400/[0.06] text-emerald-100/68" : "border-white/9 bg-white/[0.035] text-white/38"}`}>{visible ? <FaEye /> : <FaEyeSlash />}{visible ? "In navbar" : "Hidden"}</span><Link className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-white/9 px-3 text-[10px] font-semibold text-white/56 transition hover:bg-white hover:text-black" href={getEditorHref(module.key)}>Edit <FaArrowRight /></Link><Link aria-label={`Open ${module.label} on public site`} className="grid h-9 w-9 place-items-center rounded-xl border border-white/9 text-[10px] text-white/42 transition hover:bg-white hover:text-black" href={module.href} rel="noreferrer" target="_blank"><FaExternalLinkAlt /></Link></article>;
+              })}
+            </div>
+          )}
         </section>
 
         <section className="grid gap-4 2xl:grid-cols-[1.35fr_0.65fr]">

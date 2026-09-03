@@ -13,6 +13,7 @@ type Props = {
   showTitles?: boolean;
   autoPlay?: boolean;
   className?: string;
+  interactionMode?: "public" | "preview";
 };
 
 // --- helpers ---
@@ -46,19 +47,21 @@ function SoundcloudCard({
   mix,
   src,
   showTitles,
+  interactionMode,
 }: {
   mix: Mix;
   src: string;
   showTitles: boolean;
+  interactionMode: "public" | "preview";
 }) {
   const [interactive, setInteractive] = useState<boolean>(false);
 
   // Auto-lock back after a while (prevents “iframe eats scroll forever”)
   useEffect(() => {
-    if (!interactive) return;
+    if (interactionMode === "preview" || !interactive) return;
     const t = window.setTimeout(() => setInteractive(false), 9000);
     return () => window.clearTimeout(t);
-  }, [interactive]);
+  }, [interactionMode, interactive]);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
@@ -73,7 +76,7 @@ function SoundcloudCard({
           className="relative h-[240px] w-full overflow-hidden rounded-xl"
         >
           {/* Shield */}
-          {!interactive ? (
+          {interactionMode === "public" && !interactive ? (
             <button
               type="button"
               className={[
@@ -99,7 +102,11 @@ function SoundcloudCard({
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
             loading="lazy"
             // Key part: while not interactive, iframe can’t steal wheel/touch
-            style={{ pointerEvents: interactive ? "auto" : "none" }}
+            style={{
+              pointerEvents:
+                interactionMode === "public" && interactive ? "auto" : "none",
+            }}
+            tabIndex={interactionMode === "preview" ? -1 : undefined}
           />
         </div>
       </div>
@@ -112,6 +119,7 @@ export default function SoundcloudCarousel({
   showTitles = false,
   autoPlay = false,
   className = "",
+  interactionMode = "public",
 }: Props) {
   const [perView, setPerView] = useState<number>(4);
   const [index, setIndex] = useState<number>(0); // window start index (0..maxIndex)
@@ -161,7 +169,7 @@ export default function SoundcloudCarousel({
   };
 
   const goNext = () => {
-    if (!canNavigate) return;
+    if (interactionMode === "preview" || !canNavigate) return;
 
     if (index >= maxIndex) {
       setAnimating(true);
@@ -175,7 +183,7 @@ export default function SoundcloudCarousel({
   };
 
   const goPrev = () => {
-    if (!canNavigate) return;
+    if (interactionMode === "preview" || !canNavigate) return;
 
     if (index <= 0) {
       setAnimating(true);
@@ -207,7 +215,7 @@ export default function SoundcloudCarousel({
 
   // Keyboard (ArrowLeft/Right)
   useEffect(() => {
-    if (n <= perView) return;
+    if (interactionMode === "preview" || n <= perView) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") goNext();
       if (e.key === "ArrowLeft") goPrev();
@@ -215,7 +223,7 @@ export default function SoundcloudCarousel({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [n, perView, index, animating, maxIndex]);
+  }, [interactionMode, n, perView, index, animating, maxIndex]);
 
   // Translate by one card width each step
   const stepPct = 100 / perView;
@@ -236,6 +244,7 @@ export default function SoundcloudCarousel({
                   mix={mix}
                   src={src}
                   showTitles={showTitles}
+                  interactionMode={interactionMode}
                 />
               );
             })}
@@ -268,6 +277,7 @@ export default function SoundcloudCarousel({
                   mix={mix}
                   src={src}
                   showTitles={showTitles}
+                  interactionMode={interactionMode}
                 />
               </div>
             );

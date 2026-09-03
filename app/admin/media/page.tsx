@@ -4,6 +4,7 @@ import MediaManager, {
 } from "@/components/admin/MediaManager";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEditablePortfolioContent } from "@/lib/admin/content";
+import { getAdminGalleryEditorData } from "@/lib/admin/gallery";
 import { getMediaAssets } from "@/lib/admin/media";
 
 export const metadata = {
@@ -20,9 +21,10 @@ export default async function AdminMediaPage({
 }) {
   const admin = await requireAdmin();
   const params = await searchParams;
-  const [mediaResult, contentResult] = await Promise.all([
+  const [mediaResult, contentResult, galleryV2] = await Promise.all([
     getMediaAssets({ includeDeleted: true }),
     getEditablePortfolioContent(),
+    getAdminGalleryEditorData(),
   ]);
   const portfolioType = contentResult.content.settings.portfolioType;
   const requestedMode = ["studio", "showreel", "library"].includes(
@@ -31,20 +33,18 @@ export default async function AdminMediaPage({
     ? (params.view as MediaMode)
     : undefined;
   const initialMode: MediaMode =
-    requestedMode === "studio" && portfolioType !== "actor"
-      ? "showreel"
-      : requestedMode || (portfolioType === "actor" ? "studio" : "showreel");
+    requestedMode || "studio";
 
   return (
     <AdminShell
       active="media"
       adminEmail={admin.email}
-      description={
-        portfolioType === "actor"
-          ? "Upload and organize photos and video, then shape the public Gallery or Showreel in a dedicated visual studio."
-          : "Upload and organize artwork and video, then shape the public Video page in a dedicated visual studio."
-      }
+      description="Upload and organize photos and video, then shape the public Gallery and Showreel in dedicated visual studios."
       hiddenNavPageSlugs={contentResult.content.settings.hiddenNavPageSlugs}
+      navigationConfigVersion={
+        contentResult.content.settings.navigationConfigVersion
+      }
+      navigationDestinationCount={contentResult.content.navigation.items.length}
       portfolioType={portfolioType}
       title="Media library"
     >
@@ -53,6 +53,11 @@ export default async function AdminMediaPage({
         content={contentResult.content}
         contentIsConfigured={contentResult.isConfigured}
         contentLoadError={contentResult.loadError}
+        galleryV2Enabled={
+          galleryV2.isConfigured &&
+          !galleryV2.migrationRequired &&
+          !galleryV2.loadError
+        }
         isConfigured={mediaResult.isConfigured}
         initialMode={initialMode}
         loadError={mediaResult.loadError}

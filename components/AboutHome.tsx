@@ -17,7 +17,7 @@ export default function AboutHome({
   return (
     <section
       id="home-about"
-      className="relative w-full overflow-hidden py-16 sm:py-20 lg:py-24"
+      className="public-nav-anchor relative w-full overflow-hidden py-16 sm:py-20 lg:py-24"
     >
       <ParallaxShards
         intensity={0.7}

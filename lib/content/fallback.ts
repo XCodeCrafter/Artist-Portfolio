@@ -1,28 +1,32 @@
 import type { PortfolioContent } from "./types";
+import { createMixedReviewNavigationConfig } from "./navigation";
 
 export const FALLBACK_CONTENT: PortfolioContent = {
   settings: {
     portfolioType: "musician",
+    navigationConfigVersion: 1,
     hiddenNavPageSlugs: [],
     footerEffect: "soul",
     artistName: "Franky Fugazi",
     displayFont: "playfair-display",
     bodyFont: "inter",
     uiFont: "manrope",
-    tagline: "Music / Photos / Illustration",
+    tagline: "Actor / Music / Creative Work",
     description:
-      "Official portfolio for Franky Fugazi - music, video, biography, and booking.",
+      "Official actor and musician portfolio featuring biography, headshots, acting credits, showreel, releases, videos, and contact information.",
     location: "Amsterdam, The Netherlands",
     spotifyArtistUrl:
       "https://open.spotify.com/artist/3j6ZTLub4b9G6huqfRDIIM",
     spotifyEmbedUrl:
       "https://open.spotify.com/embed/artist/3j6ZTLub4b9G6huqfRDIIM?theme=0",
-    contactBlurb: "Use the form for direct booking and inquiries.",
+    contactBlurb:
+      "For acting, music, productions, bookings, and creative collaborations.",
   },
+  navigation: createMixedReviewNavigationConfig(),
   heroes: {
     home: {
       title: "FRANKY FUGAZI",
-      subtitle: "MUSIC / PHOTOS / ILLUSTRATION",
+      subtitle: "ACTOR / MUSIC / CREATIVE WORK",
       ctaLabel: "",
       ctaHref: "#home-about",
       backgroundSrc: "/images/hero.jpg",
@@ -57,7 +61,7 @@ export const FALLBACK_CONTENT: PortfolioContent = {
       mediaType: "image",
     },
     video: {
-      title: "VIDEOS",
+      title: "SHOWREEL",
       subtitle: "WATCH",
       ctaLabel: "SCROLL",
       ctaHref: "#videos",
@@ -66,8 +70,8 @@ export const FALLBACK_CONTENT: PortfolioContent = {
       mediaType: "video",
     },
     booking: {
-      title: "BOOKING",
-      subtitle: "CONTACT",
+      title: "CONTACT",
+      subtitle: "LET'S WORK TOGETHER",
       ctaLabel: "WRITE",
       ctaHref: "#form",
       backgroundSrc: "/images/booking-hero.jpg",
@@ -222,6 +226,10 @@ export const FALLBACK_CONTENT: PortfolioContent = {
       imageSrc: "/images/music-4.jpg",
     },
   ],
+  musicPresentation: {
+    releasesHeading: "LATEST RELEASES",
+    mixesHeading: "LATEST MIXES",
+  },
   soundcloudTracks: [
     {
       id: "mix-01",
@@ -383,6 +391,7 @@ export const FALLBACK_CONTENT: PortfolioContent = {
     emptyText: "Showreel and scenes are coming soon.",
   },
   videos: [],
+  hasActorResume: true,
   actorResume: {
     headline: "Screen and stage performer",
     summary:

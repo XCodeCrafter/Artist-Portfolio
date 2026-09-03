@@ -11,6 +11,7 @@ import {
 } from "@/lib/supabase/env";
 import { hasProductionSiteUrl } from "@/lib/site-url";
 import { probeDatabaseRateLimit } from "@/lib/security/rate-limit";
+import { NAVIGATION_DESTINATION_KEYS } from "@/lib/content/navigation";
 
 export type ReadinessCheck = {
   id: string;
@@ -28,6 +29,26 @@ export type ProductionReadiness = {
   criticalFailures: number;
   ready: boolean;
 };
+
+type NavigationSnapshotRow = {
+  destination_key: string;
+  is_visible: boolean;
+};
+
+function getNavigationSnapshotRows(value: unknown): NavigationSnapshotRow[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const items = (value as { items?: unknown }).items;
+  if (!Array.isArray(items)) return [];
+
+  return items.filter((item): item is NavigationSnapshotRow => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+    const row = item as Record<string, unknown>;
+    return (
+      typeof row.destination_key === "string" &&
+      typeof row.is_visible === "boolean"
+    );
+  });
+}
 
 function hasEmailEnv() {
   return Boolean(
@@ -50,6 +71,9 @@ async function inspectSupabase() {
   try {
     const [
       settingsResult,
+      navigationManagerResult,
+      navbarSocialLinksResult,
+      musicEditorResult,
       galleryResult,
       mediaResult,
       videosResult,
@@ -64,9 +88,15 @@ async function inspectSupabase() {
       supabase
         .from("site_settings")
         .select(
-          "id, portfolio_type, footer_effect, display_font, body_font, ui_font, hidden_nav_page_slugs_actor, hidden_nav_page_slugs_musician"
+          "id, portfolio_type, navigation_config_version, footer_effect, display_font, body_font, ui_font, hidden_nav_page_slugs_actor, hidden_nav_page_slugs_musician"
         )
+        .eq("id", "main")
         .limit(1),
+      supabase.rpc("get_site_navigation_v2_snapshot", { p_site_id: "main" }),
+      supabase.rpc("get_navbar_social_links_v2_snapshot", {
+        p_site_id: "main",
+      }),
+      supabase.rpc("get_music_page_v2_snapshot", { p_site_id: "main" }),
       supabase
         .from("gallery_images")
         .select(
@@ -94,7 +124,7 @@ async function inspectSupabase() {
       supabase
         .from("booking_inquiries")
         .select(
-          "id, resend_email_id, email_status, email_status_changed_at, email_status_provider_at, email_status_webhook_id"
+          "id, inquiry_intent, resend_email_id, email_status, email_status_changed_at, email_status_provider_at, email_status_webhook_id"
         )
         .limit(1),
       supabase.from("admin_recovery_challenges").select("id").limit(1),
@@ -108,8 +138,33 @@ async function inspectSupabase() {
       supabase.storage.listBuckets(),
     ]);
 
+    const navigationRows = getNavigationSnapshotRows(
+      navigationManagerResult.data
+    );
+    const navigationKeys = navigationRows.map(
+      (row) => row.destination_key
+    );
+    const knownNavigationKeys = new Set<string>(NAVIGATION_DESTINATION_KEYS);
+    const navigationCatalogOk =
+      !navigationManagerResult.error &&
+      settingsResult.data?.length === 1 &&
+      navigationKeys.length >= NAVIGATION_DESTINATION_KEYS.length &&
+      new Set(navigationKeys).size === navigationKeys.length &&
+      NAVIGATION_DESTINATION_KEYS.every((key) =>
+        navigationKeys.includes(key)
+      ) &&
+      Boolean(
+        navigationRows.some(
+          (row) =>
+            knownNavigationKeys.has(row.destination_key) &&
+            row.is_visible === true
+        )
+      );
     const schemaOk = [
       settingsResult,
+      navigationManagerResult,
+      navbarSocialLinksResult,
+      musicEditorResult,
       galleryResult,
       mediaResult,
       videosResult,
@@ -117,7 +172,7 @@ async function inspectSupabase() {
       cncProgramsResult,
       inquiriesResult,
       recoveryResult,
-    ].every((result) => !result.error);
+    ].every((result) => !result.error) && navigationCatalogOk;
 
     return {
       schemaOk,
@@ -203,7 +258,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       critical: true,
       detail: supabase.schemaOk
         ? "Required tables and columns are available."
-        : "Apply all Supabase migrations through 0024.",
+        : "Apply all Supabase migrations through 0029.",
       href: "/admin/security#health",
     },
     {

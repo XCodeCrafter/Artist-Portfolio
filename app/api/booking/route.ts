@@ -6,6 +6,14 @@ import { writeAuditLog } from "@/lib/admin/audit";
 import { keyedDigest } from "@/lib/admin/security-secret";
 import { createAdminServiceClient } from "@/lib/admin/service";
 import { normalizePortfolioType } from "@/lib/content/profile";
+import {
+  getInquiryIntentLabel,
+  getLegacyInquiryClassification,
+  INQUIRY_INTENTS,
+  resolvePublicInquiryIntent,
+  type InquiryIntent,
+  type LegacyInquiryType,
+} from "@/lib/inquiries";
 import { readJsonBodyWithLimit } from "@/lib/security/json-body";
 import { hasAllowedRequestOrigin } from "@/lib/security/origin";
 import {
@@ -27,11 +35,9 @@ const BookingSchema = z.object({
   message: z.string().trim().min(10).max(4000),
   company: z.string().trim().max(200).optional().default(""),
   website: z.string().trim().max(200).optional().default(""),
-  portfolioType: z.enum(["musician", "actor"]).optional().default("musician"),
-  inquiryType: z
-    .enum(["booking", "collaboration"])
-    .optional()
-    .default("booking"),
+  inquiryIntent: z.enum(INQUIRY_INTENTS).optional(),
+  portfolioType: z.enum(["musician", "actor"]).optional(),
+  inquiryType: z.enum(["booking", "collaboration"]).optional(),
   startedAt: z.number().int().positive(),
 });
 
@@ -83,11 +89,9 @@ async function writeSecurityEvent(
   });
 }
 
-async function getConfiguredPortfolioType(
-  fallback: PortfolioType
-): Promise<PortfolioType> {
+async function getConfiguredPortfolioType(): Promise<PortfolioType> {
   const supabase = createAdminServiceClient();
-  if (!supabase) return fallback;
+  if (!supabase) return "actor";
 
   const { data, error } = await supabase
     .from("site_settings")
@@ -96,7 +100,7 @@ async function getConfiguredPortfolioType(
     .limit(1)
     .maybeSingle<{ portfolio_type?: string | null }>();
 
-  if (error || !data) return fallback;
+  if (error || !data) return "actor";
 
   return normalizePortfolioType(data.portfolio_type);
 }
@@ -106,7 +110,8 @@ async function writeBookingInquiry(input: {
   email: string;
   message: string;
   portfolioType: PortfolioType;
-  inquiryType: "booking" | "collaboration";
+  inquiryType: LegacyInquiryType;
+  inquiryIntent: InquiryIntent;
   ipKey: string;
   userAgent: string;
 }): Promise<
@@ -122,6 +127,7 @@ async function writeBookingInquiry(input: {
     message: input.message,
     portfolio_type: input.portfolioType,
     inquiry_type: input.inquiryType,
+    inquiry_intent: input.inquiryIntent,
     status: "new",
     source_ip: input.ipKey,
     user_agent: input.userAgent,
@@ -134,20 +140,24 @@ async function writeBookingInquiry(input: {
     .limit(1)
     .maybeSingle<{ id: string }>();
 
-  if (
-    result.error?.message.includes("portfolio_type") ||
-    result.error?.message.includes("inquiry_type") ||
-    result.error?.message.includes("email_status")
-  ) {
+  const missingIntentColumn =
+    Boolean(result.error) &&
+    ["42703", "PGRST204"].includes(result.error?.code || "") &&
+    result.error?.message.toLowerCase().includes("inquiry_intent");
+
+  if (missingIntentColumn) {
     const fallbackResult = await supabase
       .from("booking_inquiries")
       .insert({
         name: input.name,
         email: input.email,
         message: input.message,
+        portfolio_type: input.portfolioType,
+        inquiry_type: input.inquiryType,
         status: "new",
         source_ip: input.ipKey,
         user_agent: input.userAgent,
+        email_status: "pending",
       })
       .select("id")
       .limit(1)
@@ -236,7 +246,8 @@ async function updateInquiryEmailTracking(input: {
   inquiryId: string | null;
   email: string;
   portfolioType: PortfolioType;
-  inquiryType: "booking" | "collaboration";
+  inquiryType: LegacyInquiryType;
+  inquiryIntent: InquiryIntent;
   status:
     | "sent"
     | "delivered"
@@ -264,6 +275,7 @@ async function updateInquiryEmailTracking(input: {
       metadata: {
         portfolioType: input.portfolioType,
         inquiryType: input.inquiryType,
+        inquiryIntent: input.inquiryIntent,
         provider: "resend",
         status: input.status,
         reason: trackingResult.reason,
@@ -280,7 +292,8 @@ async function updateInquiryEmailTracking(input: {
 async function writeBookingAnalytics(input: {
   userAgent: string;
   portfolioType: PortfolioType;
-  inquiryType: "booking" | "collaboration";
+  inquiryType: LegacyInquiryType;
+  inquiryIntent: InquiryIntent;
 }) {
   const supabase = createAdminServiceClient();
   if (!supabase) return;
@@ -294,14 +307,12 @@ async function writeBookingAnalytics(input: {
   await supabase.from("analytics_events").insert({
     event_name: "booking_submit",
     page_path: "/booking",
-    target_label:
-      input.inquiryType === "collaboration"
-        ? "Collaboration form"
-        : "Booking form",
+    target_label: `${getInquiryIntentLabel(input.inquiryIntent)} inquiry form`,
     target_url: "",
     metadata: {
       portfolioType: input.portfolioType,
       inquiryType: input.inquiryType,
+      inquiryIntent: input.inquiryIntent,
       deviceCategory,
     },
   });
@@ -376,11 +387,16 @@ export async function POST(req: Request) {
     }
 
     const { name, email, message, company, website, startedAt } = parsed.data;
-    const portfolioType = await getConfiguredPortfolioType(
-      parsed.data.portfolioType
+    const configuredPortfolioType = await getConfiguredPortfolioType();
+    const inquiryIntent = resolvePublicInquiryIntent({
+      inquiryIntent: parsed.data.inquiryIntent,
+      inquiryType: parsed.data.inquiryType,
+      portfolioType: parsed.data.portfolioType,
+    });
+    const { portfolioType, inquiryType } = getLegacyInquiryClassification(
+      inquiryIntent,
+      configuredPortfolioType
     );
-    const inquiryType =
-      portfolioType === "actor" ? "collaboration" : parsed.data.inquiryType;
 
     // Honeypot triggered. Return success so automated clients learn nothing.
     const honeypotFields = [
@@ -393,6 +409,7 @@ export async function POST(req: Request) {
         fields: honeypotFields,
         portfolioType,
         inquiryType,
+        inquiryIntent,
       });
       return NextResponse.json({ ok: true, message: "Thanks!" });
     }
@@ -403,6 +420,7 @@ export async function POST(req: Request) {
         elapsed,
         portfolioType,
         inquiryType,
+        inquiryIntent,
       });
       return NextResponse.json({ ok: true, message: "Thanks!" });
     }
@@ -412,6 +430,7 @@ export async function POST(req: Request) {
       await writeSecurityEvent(req, "security_contact_suspicious_user_agent", {
         portfolioType,
         inquiryType,
+        inquiryIntent,
       });
       return NextResponse.json({ ok: true, message: "Thanks!" });
     }
@@ -447,6 +466,7 @@ export async function POST(req: Request) {
       message,
       portfolioType,
       inquiryType,
+      inquiryIntent,
       ipKey,
       userAgent,
     });
@@ -460,6 +480,7 @@ export async function POST(req: Request) {
         metadata: {
           portfolioType,
           inquiryType,
+          inquiryIntent,
           reason: inquiry.reason,
         },
       });
@@ -475,6 +496,7 @@ export async function POST(req: Request) {
         email,
         portfolioType,
         inquiryType,
+        inquiryIntent,
         status: "failed",
       });
       await writeAuditLog({
@@ -485,6 +507,7 @@ export async function POST(req: Request) {
         metadata: {
           portfolioType,
           inquiryType,
+          inquiryIntent,
           provider: "resend",
           reason: "not-configured",
         },
@@ -497,7 +520,12 @@ export async function POST(req: Request) {
         );
       }
 
-      await writeBookingAnalytics({ userAgent, portfolioType, inquiryType });
+      await writeBookingAnalytics({
+        userAgent,
+        portfolioType,
+        inquiryType,
+        inquiryIntent,
+      });
       return NextResponse.json(
         {
           ok: true,
@@ -510,18 +538,15 @@ export async function POST(req: Request) {
 
     const resend = new Resend(apiKey);
 
-    const isCollaboration = inquiryType === "collaboration";
     const safeName = sanitizeHeaderValue(name) || "Unknown sender";
-    const subject = isCollaboration
-      ? `New collaboration inquiry - ${safeName}`
-      : `New booking inquiry - ${safeName}`;
+    const intentLabel = getInquiryIntentLabel(inquiryIntent);
+    const subject = `New ${intentLabel.toLowerCase()} inquiry - ${safeName}`;
     const text = [
-      isCollaboration
-        ? "New let's-work-together message"
-        : "New booking/inquiry message",
+      `New ${intentLabel.toLowerCase()} inquiry`,
       "",
-      `Portfolio: ${portfolioType}`,
-      `Inquiry type: ${inquiryType}`,
+      `Intent: ${intentLabel}`,
+      `Legacy portfolio snapshot: ${portfolioType}`,
+      `Legacy inquiry type: ${inquiryType}`,
       "",
       `Name: ${name}`,
       `Email: ${email}`,
@@ -548,6 +573,7 @@ export async function POST(req: Request) {
         email,
         portfolioType,
         inquiryType,
+        inquiryIntent,
         status: "failed",
       });
       await writeAuditLog({
@@ -558,6 +584,7 @@ export async function POST(req: Request) {
         metadata: {
           portfolioType,
           inquiryType,
+          inquiryIntent,
           provider: "resend",
           reason: "provider-request-failed",
         },
@@ -577,6 +604,7 @@ export async function POST(req: Request) {
         email,
         portfolioType,
         inquiryType,
+        inquiryIntent,
         status: "failed",
       });
       await writeAuditLog({
@@ -587,6 +615,7 @@ export async function POST(req: Request) {
         metadata: {
           portfolioType,
           inquiryType,
+          inquiryIntent,
           provider: "resend",
           reason: "provider-rejected",
         },
@@ -604,17 +633,21 @@ export async function POST(req: Request) {
       email,
       portfolioType,
       inquiryType,
+      inquiryIntent,
       status: "sent",
       resendEmailId: emailResult.data?.id,
     });
 
-    await writeBookingAnalytics({ userAgent, portfolioType, inquiryType });
+    await writeBookingAnalytics({
+      userAgent,
+      portfolioType,
+      inquiryType,
+      inquiryIntent,
+    });
 
     return NextResponse.json({
       ok: true,
-      message: isCollaboration
-        ? "Message sent. Thanks - I will reply soon."
-        : "Message sent. Thanks - I'll reply soon.",
+      message: "Message sent. Thanks - I will reply soon.",
     });
   } catch {
     return jsonError(500, "Unexpected server error.");

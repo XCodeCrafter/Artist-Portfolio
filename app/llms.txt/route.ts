@@ -1,5 +1,6 @@
 import { getPortfolioContent } from "@/lib/content";
-import { getPublicModules } from "@/lib/content/modules";
+import { PUBLIC_PORTFOLIO_PAGE_DESTINATIONS } from "@/lib/content/navigation";
+import { getMixedPublicCopy } from "@/lib/content/public-copy";
 import { getSeoIdentity } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/site-url";
 
@@ -16,15 +17,18 @@ export async function GET() {
   const artistName = inlineText(seoIdentity.brandName);
   const personName = inlineText(seoIdentity.personName);
   const description = inlineText(seoIdentity.description);
-  const tagline = seoIdentity.staleDescription
-    ? ""
-    : inlineText(content.settings.tagline);
+  const tagline = inlineText(
+    getMixedPublicCopy(
+      content.settings.tagline,
+      "Acting / Music / Creative Work"
+    )
+  );
   const location = inlineText(content.settings.location);
   const publicModules = [
     ...new Map(
-      getPublicModules(content.settings.portfolioType).map((module) => [
-        module.href,
-        module,
+      PUBLIC_PORTFOLIO_PAGE_DESTINATIONS.map((destination) => [
+        destination.href,
+        destination,
       ])
     ).values(),
   ];
@@ -41,7 +45,7 @@ export async function GET() {
     "",
     ...publicModules.map(
       (module) =>
-        `- [${module.label}](${new URL(module.href, `${base}/`).href}): ${module.description}`
+        `- [${module.defaultLabel}](${new URL(module.href, `${base}/`).href}): ${module.description}`
     ),
     "",
     "## Policies",

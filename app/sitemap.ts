@@ -1,7 +1,7 @@
 //artist-portfolio/app/sitemap.ts
 import type { MetadataRoute } from "next";
 import { getPortfolioContent } from "@/lib/content";
-import { getPublicModules } from "@/lib/content/modules";
+import { PUBLIC_PORTFOLIO_PATHS } from "@/lib/content/navigation";
 import { getSiteUrl } from "@/lib/site-url";
 
 export const dynamic = "force-dynamic";
@@ -47,9 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const content = await getPortfolioContent();
   const routes = [
     ...new Set([
-      ...getPublicModules(content.settings.portfolioType).map(
-        (module) => module.href
-      ),
+      ...PUBLIC_PORTFOLIO_PATHS,
       "/privacy",
       "/terms",
     ]),
@@ -84,9 +82,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       content.aboutHome.imageSrc,
       homeInterludePoster,
       ...homeStoryImages,
-      ...(content.settings.portfolioType === "musician"
-        ? content.musicPlatforms.map((platform) => platform.imageSrc)
-        : []),
+      ...content.musicPlatforms.map((platform) => platform.imageSrc),
     ],
     "/bio": [
       heroImage("bio"),

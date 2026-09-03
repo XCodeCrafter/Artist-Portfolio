@@ -9,10 +9,7 @@ export const contentType = "image/png";
 export default async function OpenGraphImage() {
   const content = await getPortfolioContent();
   const { brandName, description, personName } = getSeoIdentity(content);
-  const portfolioLabel =
-    content.settings.portfolioType === "actor"
-      ? "Actor / Gallery / Showreel"
-      : "Music / Video / Booking";
+  const portfolioLabel = "Actor / Music / Gallery / Showreel";
 
   return new ImageResponse(
     (

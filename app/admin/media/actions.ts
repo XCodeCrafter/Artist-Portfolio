@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -262,6 +263,35 @@ function isMissingGalleryStudioSchema(error: { message?: string } | null) {
   return (error?.message?.toLowerCase() || "").includes(
     "gallery_presentation"
   );
+}
+
+function isMissingGalleryV2Snapshot(error: {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+}) {
+  const message = [error.message, error.details, error.hint]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    error.code === "PGRST202" ||
+    (error.code === "42883" && /get_gallery_page_v2_snapshot/i.test(message)) ||
+    /schema cache.*get_gallery_page_v2_snapshot/i.test(message)
+  );
+}
+
+async function handOffLegacyGalleryWrite(supabase: SupabaseClient) {
+  const { error } = await supabase.rpc("get_gallery_page_v2_snapshot", {
+    p_site_id: "main",
+  });
+
+  // A successful snapshot proves 0031 is active. Any other failure except a
+  // definitely missing RPC also fails closed: the V1 form must never become a
+  // back door around V2's version checks.
+  if (!error || !isMissingGalleryV2Snapshot(error)) {
+    redirect("/admin/v2/pages/gallery?from=classic");
+  }
 }
 
 function slugify(value: string, fallback: string) {
@@ -761,6 +791,7 @@ export async function saveMediaGalleryImage(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-gallery-metadata");
 
   const { admin, supabase } = await getWriteContext();
+  await handOffLegacyGalleryWrite(supabase);
   if (parsed.data.isFreelanceStory) {
     const selected = await supabase
       .from("gallery_images")
@@ -837,6 +868,7 @@ export async function saveGalleryPresentation(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-gallery-copy");
 
   const { admin, supabase } = await getWriteContext();
+  await handOffLegacyGalleryWrite(supabase);
   const result = await supabase.from("gallery_presentation").upsert({
     id: "main",
     intro_eyebrow: parsed.data.introEyebrow,
@@ -904,6 +936,7 @@ export async function saveGalleryHero(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-gallery-hero");
 
   const { admin, supabase } = await getWriteContext();
+  await handOffLegacyGalleryWrite(supabase);
   const result = await supabase.from("page_heroes").upsert({
     page_slug: "gallery",
     title: parsed.data.title,
@@ -1110,6 +1143,7 @@ export async function moveGalleryImage(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-gallery-metadata");
 
   const { admin, supabase } = await getWriteContext();
+  await handOffLegacyGalleryWrite(supabase);
   const current = await supabase
     .from("gallery_images")
     .select("id, sort_order")
@@ -1156,6 +1190,7 @@ export async function deleteMediaGalleryImage(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-gallery-metadata");
 
   const { admin, supabase } = await getWriteContext();
+  await handOffLegacyGalleryWrite(supabase);
   const result = await supabase
     .from("gallery_images")
     .delete()

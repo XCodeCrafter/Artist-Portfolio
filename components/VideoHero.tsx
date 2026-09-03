@@ -221,18 +221,20 @@ export default function VideoHero({
           </h1>
 
           {/* CTA */}
-          <motion.a
-            href={ctaHref}
-            className="mx-auto mt-6 sm:mt-8 inline-flex items-center gap-3 text-sm tracking-[0.25em] text-white/80 hover:text-white transition"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <span className="relative">
-              {ctaLabel}
-              <span className="absolute -bottom-2 left-0 h-px w-full bg-[rgba(255,59,31,0.75)]" />
-            </span>
-          </motion.a>
+          {ctaLabel && ctaHref ? (
+            <motion.a
+              href={ctaHref}
+              className="mx-auto mt-6 sm:mt-8 inline-flex items-center gap-3 text-sm tracking-[0.25em] text-white/80 hover:text-white transition"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <span className="relative">
+                {ctaLabel}
+                <span className="absolute -bottom-2 left-0 h-px w-full bg-[rgba(255,59,31,0.75)]" />
+              </span>
+            </motion.a>
+          ) : null}
         </motion.div>
       </div>
     </section>

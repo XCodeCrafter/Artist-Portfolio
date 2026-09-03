@@ -143,13 +143,15 @@ delete admin profiles for existing Supabase Auth users.
 
 Run `supabase/migrations/0004_security_center.sql` to add audit/admin indexes and an owner management policy.
 
-Batch 7 adds portfolio profile modes.
-`site_settings.portfolio_type` can be `musician` or `actor`. The admin content editor exposes this setting, navigation adapts per profile type, actor mode hides the music module from public navigation, and `/music` redirects to `/video` for actor profiles.
+Batch 7 originally added portfolio profile modes. `site_settings.portfolio_type`
+remains `musician` or `actor` for V1 admin and rollback compatibility, but it no
+longer publishes or removes public routes after migration 0026.
 
 Run `supabase/migrations/0005_portfolio_modes.sql` to add the profile mode column.
 
-Batch 8 adds the module registry.
-Public navigation, sitemap routes, admin dashboard links, and content editor sections now derive from active modules for each profile type. Actor profiles use `HOME / BIO / GALLERY / SHOWREEL / CONTACT`, while musician profiles keep `HOME / BIO / MUSIC / VIDEO / BOOKING`.
+Batch 8 adds the legacy module registry. V1 admin views still use its profile
+grouping; the mixed public navbar and discovery endpoints use the curated
+navigation catalog instead.
 
 Run `supabase/migrations/0006_module_registry.sql` to add the default gallery hero row.
 
@@ -168,8 +170,9 @@ Actor mode now shows a resume block on `/bio` with headline, summary, physical/c
 
 Run `supabase/migrations/0009_actor_resume.sql` to add `public.actor_resume`, `public.actor_credits`, RLS policies, indexes, and starter rows.
 
-Batch 12 adds the simple contact workflow.
-The `/booking` page stays a minimal name/email/message form, but actor mode now presents it as "Let's Work Together" instead of a detailed casting form. Submissions are tagged with `portfolio_type` and `inquiry_type`, so the admin inbox and email subject can distinguish musician booking inquiries from actor collaboration messages.
+Batch 12 adds the simple contact workflow. The later mixed form keeps the same
+route and delivery pipeline, while visitors explicitly choose Music, Acting, or
+General intent. Legacy profile/type fields remain as compatibility metadata.
 
 Run `supabase/migrations/0010_simple_contact_workflow.sql` to add the inquiry metadata columns and index.
 
@@ -244,11 +247,81 @@ The Site editor stores and orders up to three long-form source programs, while
 RLS exposes only published rows. The migration seeds the original short HOME
 demo so it can be replaced directly in the editor.
 
+Migration `0025_site_navigation_items.sql` adds the curated, ordered navigation
+catalog used by Admin V2. It backfills all safe destinations without storing
+admin-entered URLs and keeps `navigation_config_version = 0`, so the current
+Actor/Musician navbar remains authoritative during the foundation rollout. A
+future atomic V2 save activates version 1; the legacy settings remain available
+as a rollback path. Pre-0025 installations remain on version 0 and safely fall
+back to the legacy navbar until the additive migration is available.
+
+Migration `0026_mixed_public_portfolio.sql` atomically activates the page-first
+review navbar with every curated destination visible, makes Music, Gallery,
+Resume/Credits, and Showreel coexist publicly, and adds nullable visitor-selected
+inquiry intent without rewriting historical messages. Navbar visibility does
+not publish or unpublish routes. The migration updates only exact untouched
+starter copy; custom artist text is preserved.
+
+Migration `0027_admin_v2_navigation_manager.sql` adds the service-only Admin V2
+navbar snapshot and atomic whole-collection save. Every write takes the same
+advisory lock before checking row versions, retains unknown destinations from a
+newer app build, preserves their visibility, derives order from one submitted
+array, locks their existing positions against older clients, and never deletes
+rows. Browser-side authenticated table writes are
+revoked so the conflict check cannot be bypassed accidentally.
+
+Migration `0028_music_page_editor.sql` adds the presentation headings and
+service-only snapshot/save functions for the Admin V2 Music page editor. Hero,
+Spotify, Platforms, and SoundCloud save independently with optimistic conflict
+checks. Collection saves preserve existing row IDs and icon keys, derive order
+from the submitted list, and never insert or delete content during the review
+phase.
+
+Migration `0029_batch_5a_music_and_nav_links.sql` repairs the Music snapshot
+prerequisite, allows new Music Platform and SoundCloud items, and adds the
+service-only navbar shortcut snapshot/save workflow. The connected project has
+the schema, but its CLI migration history predates tracking; do not run
+`supabase db push` until the parity/backup and migration-history repair recorded
+in `TODO.md` are complete.
+
+Migration `0030_bio_page_editor.sql` adds the service-only Bio snapshot and four
+atomic save boundaries: Hero, Biography, Resume, and Credits. Biography saves
+its profile copy, portraits, and paragraphs in one transaction. Collection
+items can be added, reordered, hidden, or restored, but existing rows are never
+deleted. The migration seeds and republishes nothing. It was applied manually
+to the currently linked project and all five Bio V2 RPCs are live. SQL Editor
+does not record CLI migration versions, so the remote history is still empty:
+do not use `supabase db push` to replay `0001`–`0031` until that history is
+reconciled after a backup.
+
+Migration `0031_gallery_page_editor.sql` adds the service-only Gallery snapshot
+and three atomic save boundaries: Hero, Introduction, and Frames. A one-time,
+transactional ownership split clones historical dual-use mosaic/story rows for
+Gallery while preserving their original HOME story rows and visible ordering.
+Frames can then be added, reordered, hidden, or restored without hard deletes
+or accidental HOME edits. Apply this migration manually on the currently
+linked project; its CLI migration history is still empty, so do not use
+`supabase db push`.
+
+The new dashboard shell lives at `/admin/v2`; its navigation workspace is
+`/admin/v2/navigation`. The 1:1 page editors live at `/admin/v2/pages/music`,
+`/admin/v2/pages/bio`, and `/admin/v2/pages/gallery`; each shares presentation
+components with its public page, provides 1440 px and 390 px preview viewports,
+and saves one visible section at a time. Bio maps directly to Hero, Biography,
+Resume, and Credits; Gallery maps to Hero, Introduction, and recoverable Frames.
+The classic `/admin` remains
+available and links to V2. V1 no longer exposes the Actor/Musician switch or its
+profile-only navbar form; it keeps both content groups available and directs
+navigation changes to V2. The navbar editor exposes only the six main portfolio
+pages; in-page anchors remain in their content, while music/social shortcut
+icons are managed separately.
+
 ## Search and AI discovery
 
 - `/robots.txt` allows public search/discovery crawlers, blocks `/api`, and
   separates search-oriented AI crawlers from selected training-only crawlers.
-- `/sitemap.xml` lists only active public routes and their relevant images.
+- `/sitemap.xml` lists every canonical public route and its relevant images,
+  independently of navbar visibility.
 - `/llms.txt` provides an experimental, human-readable portfolio map. It is not
   a Google ranking signal.
 - `/.well-known/security.txt` publishes the configured security contact.
@@ -264,7 +337,10 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. Apply all Supabase migrations through `0024_cnc_programs.sql`.
+1. Apply all Supabase migrations through `0031_gallery_page_editor.sql`. For the
+   currently linked project, take a full backup and reconcile its pre-existing
+   empty CLI history before using `db push`; deploy `0031` manually or through
+   another controlled forward-only step in the meantime.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare

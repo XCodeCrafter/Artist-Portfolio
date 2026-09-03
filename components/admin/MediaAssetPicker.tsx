@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { MediaAsset } from "@/lib/admin/media";
 
 type PickerKind = "image" | "video" | "media";
@@ -11,14 +11,18 @@ type MediaAssetPickerProps = {
   className?: string;
   defaultMediaType?: "image" | "video";
   defaultValue?: string;
+  error?: string;
   kind: PickerKind;
   label?: string;
+  mediaType?: "image" | "video";
   mediaTypeName?: string;
   name: string;
+  onMediaTypeChange?: (value: "image" | "video") => void;
   onValueChange?: (value: string, asset?: MediaAsset) => void;
   openLibraryByDefault?: boolean;
   required?: boolean;
   showPreview?: boolean;
+  value?: string;
 };
 
 const inputClass =
@@ -35,14 +39,18 @@ export default function MediaAssetPicker({
   className,
   defaultMediaType = "image",
   defaultValue = "",
+  error,
   kind,
   label,
+  mediaType: controlledMediaType,
   mediaTypeName,
   name,
+  onMediaTypeChange,
   onValueChange,
   openLibraryByDefault = false,
   required = false,
   showPreview = true,
+  value: controlledValue,
 }: MediaAssetPickerProps) {
   const options = useMemo(
     () =>
@@ -53,16 +61,24 @@ export default function MediaAssetPicker({
       ),
     [assets, kind]
   );
-  const initialAsset = options.find((asset) => asset.src === defaultValue);
-  const [value, setValue] = useState(defaultValue);
-  const [mediaType, setMediaType] = useState<"image" | "video">(
+  const initialValue = controlledValue ?? defaultValue;
+  const initialAsset = options.find((asset) => asset.src === initialValue);
+  const [uncontrolledValue, setUncontrolledValue] = useState(initialValue);
+  const [uncontrolledMediaType, setUncontrolledMediaType] = useState<
+    "image" | "video"
+  >(
     kind === "video"
       ? "video"
       : initialAsset?.mediaType === "video"
         ? "video"
         : defaultMediaType
   );
+  const value = controlledValue ?? uncontrolledValue;
+  const mediaType = controlledMediaType ?? uncontrolledMediaType;
   const [libraryOpen, setLibraryOpen] = useState(openLibraryByDefault);
+  const sourceDetailsRef = useRef<HTMLDetailsElement | null>(null);
+  const sourceInputId = useId();
+  const sourceErrorId = `${sourceInputId}-error`;
   const [search, setSearch] = useState("");
   const [visibleLimit, setVisibleLimit] = useState(24);
   const selected = options.find((asset) => asset.src === value);
@@ -87,10 +103,17 @@ export default function MediaAssetPicker({
           ? "video"
           : mediaType;
 
+  useEffect(() => {
+    if (error && sourceDetailsRef.current) {
+      sourceDetailsRef.current.open = true;
+    }
+  }, [error]);
+
   function selectAsset(asset: MediaAsset) {
-    setValue(asset.src);
+    setUncontrolledValue(asset.src);
     if (asset.mediaType === "image" || asset.mediaType === "video") {
-      setMediaType(asset.mediaType);
+      setUncontrolledMediaType(asset.mediaType);
+      onMediaTypeChange?.(asset.mediaType);
     }
     onValueChange?.(asset.src, asset);
     setLibraryOpen(false);
@@ -129,24 +152,41 @@ export default function MediaAssetPicker({
       </div>
       ) : null}
 
-      <details className="mt-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-3">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.16em] text-white/42">
+      <details
+        className="mt-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-3"
+        ref={sourceDetailsRef}
+      >
+        <summary
+          aria-label={`${label || "Media"} advanced source URL${error ? " — contains an error" : ""}`}
+          className="cursor-pointer text-xs font-semibold uppercase tracking-[0.16em] text-white/42"
+        >
           Advanced source URL
+          {error ? (
+            <span className="ml-2 rounded-full bg-red-300/12 px-2 py-1 text-[9px] text-red-100">
+              Needs attention
+            </span>
+          ) : null}
         </summary>
-        <label className="mt-3 block">
+        <label className="mt-3 block" htmlFor={sourceInputId}>
           <span className={labelClass}>Source URL</span>
           <input
+            aria-describedby={error ? sourceErrorId : undefined}
+            aria-invalid={error ? true : undefined}
+            aria-label={`${label || "Media"} source URL`}
             className={inputClass}
+            id={sourceInputId}
+            maxLength={2048}
             name={name}
             onChange={(event) => {
               const nextValue = event.target.value;
-              setValue(nextValue);
+              setUncontrolledValue(nextValue);
               const nextAsset = options.find((asset) => asset.src === nextValue);
               if (
                 nextAsset?.mediaType === "image" ||
                 nextAsset?.mediaType === "video"
               ) {
-                setMediaType(nextAsset.mediaType);
+                setUncontrolledMediaType(nextAsset.mediaType);
+                onMediaTypeChange?.(nextAsset.mediaType);
               }
               onValueChange?.(nextValue, nextAsset);
             }}
@@ -154,6 +194,15 @@ export default function MediaAssetPicker({
             type="text"
             value={value}
           />
+          {error ? (
+            <span
+              className="mt-2 block text-xs leading-5 text-red-200"
+              id={sourceErrorId}
+              role="alert"
+            >
+              {error}
+            </span>
+          ) : null}
         </label>
       </details>
 
@@ -163,9 +212,11 @@ export default function MediaAssetPicker({
           <select
             className={inputClass}
             name={mediaTypeName}
-            onChange={(event) =>
-              setMediaType(event.target.value as "image" | "video")
-            }
+            onChange={(event) => {
+              const nextType = event.target.value as "image" | "video";
+              setUncontrolledMediaType(nextType);
+              onMediaTypeChange?.(nextType);
+            }}
             value={activeType}
           >
             <option value="image">Image</option>

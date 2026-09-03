@@ -56,6 +56,40 @@ describe("request origin guard", () => {
       hasAllowedRequestOrigin(headers({ origin: "javascript:alert(1)" }))
     ).toBe(false);
   });
+
+  it("allows an exactly configured loopback origin for a local production preview", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL", "");
+    vi.stubEnv("SITE_URL", "http://localhost:3001");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3001");
+
+    expect(
+      hasAllowedRequestOrigin(
+        headers({ origin: "http://localhost:3001", host: "localhost:3001" })
+      )
+    ).toBe(true);
+    expect(
+      hasAllowedRequestOrigin(
+        headers({ origin: "http://localhost:3001", host: "localhost:3000" })
+      )
+    ).toBe(false);
+    expect(
+      hasAllowedRequestOrigin(headers({ origin: "http://localhost:3001" }))
+    ).toBe(false);
+  });
+
+  it("never enables a loopback production origin on Vercel", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("SITE_URL", "http://localhost:3001");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3001");
+
+    expect(
+      hasAllowedRequestOrigin(
+        headers({ origin: "http://localhost:3001", host: "localhost:3001" })
+      )
+    ).toBe(false);
+  });
 });
 
 describe("privacy-safe request metadata", () => {

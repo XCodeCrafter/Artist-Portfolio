@@ -20,6 +20,10 @@ import type {
   DisplayFontKey,
   UiFontKey,
 } from "./fonts";
+import type {
+  NavigationConfig,
+  NavigationConfigVersion,
+} from "./navigation";
 
 export const VIDEO_TYPES = [
   "showreel",
@@ -57,6 +61,7 @@ export type HeroContent = {
 
 export type SiteSettings = {
   portfolioType: PortfolioType;
+  navigationConfigVersion: NavigationConfigVersion;
   hiddenNavPageSlugs: PageSlug[];
   footerEffect: FooterEffect;
   artistName: string;
@@ -109,6 +114,11 @@ export type SoundcloudTrack = {
   id: string;
   title?: string;
   embedUrl: string;
+};
+
+export type MusicPresentation = {
+  releasesHeading: string;
+  mixesHeading: string;
 };
 
 export type BioGalleryImage = {
@@ -237,18 +247,22 @@ export type HomePresentation = {
 
 export type PortfolioContent = {
   settings: SiteSettings;
+  navigation: NavigationConfig;
   heroes: Record<PageSlug, HeroContent>;
   homeUpdates: HomeUpdate[];
   homePresentation: HomePresentation;
   aboutHome: AboutHomeContent;
   socialLinks: SocialLink[];
   musicPlatforms: MusicPlatformLink[];
+  musicPresentation: MusicPresentation;
   soundcloudTracks: SoundcloudTrack[];
   bio: BioContent;
   galleryPresentation: GalleryPresentation;
   galleryImages: GalleryImage[];
   videoPresentation: VideoPresentation;
   videos: VideoItem[];
+  /** True only when a real resume record exists (or local fallback is active). */
+  hasActorResume: boolean;
   actorResume: ActorResume;
   actorCredits: ActorCredit[];
 };

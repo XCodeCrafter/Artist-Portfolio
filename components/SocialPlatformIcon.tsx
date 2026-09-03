@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import type { IconType } from "react-icons";
 import {
   FaApple,
   FaBandcamp,
@@ -14,6 +15,7 @@ import {
   FaVimeoV,
   FaYoutube,
 } from "react-icons/fa";
+import { SiBeatport } from "react-icons/si";
 import {
   detectSocialPlatform,
   type SocialPlatformKey,
@@ -26,12 +28,13 @@ type SocialPlatformIconProps = Omit<ComponentProps<"span">, "children"> & {
   label?: string;
 };
 
-const iconByPlatform: Record<SocialPlatformKey, typeof FaGlobe> = {
+const iconByPlatform: Record<SocialPlatformKey, IconType> = {
   spotify: FaSpotify,
   soundcloud: FaSoundcloud,
   instagram: FaInstagram,
   youtube: FaYoutube,
   bandcamp: FaBandcamp,
+  beatport: SiBeatport,
   "apple-music": FaApple,
   vimeo: FaVimeoV,
   imdb: FaImdb,

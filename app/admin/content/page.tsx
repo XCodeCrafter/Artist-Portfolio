@@ -31,6 +31,8 @@ export default async function AdminContentPage({
       adminEmail={admin.email}
       description="Edit the portfolio the way visitors experience it: page by page, section by section, with a visual mirror beside every form."
       hiddenNavPageSlugs={content.settings.hiddenNavPageSlugs}
+      navigationConfigVersion={content.settings.navigationConfigVersion}
+      navigationDestinationCount={content.navigation.items.length}
       portfolioType={content.settings.portfolioType}
       title="Site editor"
     >

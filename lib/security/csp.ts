@@ -11,7 +11,10 @@ function getHttpsOrigin(value?: string) {
   }
 }
 
-export function createContentSecurityPolicy(nonce: string) {
+export function createContentSecurityPolicy(
+  nonce: string,
+  options: { allowSameOriginFraming?: boolean } = {}
+) {
   const supabaseOrigin = getHttpsOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const scriptSrc = [
     "'self'",
@@ -58,7 +61,9 @@ export function createContentSecurityPolicy(nonce: string) {
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
-    "frame-ancestors 'none'",
+    `frame-ancestors ${
+      options.allowSameOriginFraming ? "'self'" : "'none'"
+    }`,
     "form-action 'self'",
     `frame-src ${frameSrc}`,
     `child-src ${frameSrc}`,

@@ -14,7 +14,8 @@ function getHistoryState() {
 }
 
 export default function useUnsavedChangesGuard(
-  message = DEFAULT_MESSAGE
+  message = DEFAULT_MESSAGE,
+  guardOtherFormSubmissions = false
 ) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const dirtyRef = useRef(false);
@@ -128,15 +129,32 @@ export default function useUnsavedChangesGuard(
       clearDirty();
     }
 
+    function onDocumentSubmit(event: SubmitEvent) {
+      if (!guardOtherFormSubmissions || !dirtyRef.current) return;
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      if (form.dataset.unsavedGuardBypass === "true") return;
+
+      if (!window.confirm(message)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+
+      clearDirty();
+    }
+
     window.addEventListener("beforeunload", onBeforeUnload);
     window.addEventListener("popstate", onPopState);
     document.addEventListener("click", onDocumentClick, true);
+    document.addEventListener("submit", onDocumentSubmit, true);
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("popstate", onPopState);
       document.removeEventListener("click", onDocumentClick, true);
+      document.removeEventListener("submit", onDocumentSubmit, true);
     };
-  }, [clearDirty, message]);
+  }, [clearDirty, guardOtherFormSubmissions, message]);
 
   return {
     clearDirty,

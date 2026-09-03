@@ -1,88 +1,153 @@
-//artist-portfolio/components/TopNav.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
-import { getProfileNav } from "@/lib/content/profile";
-import type { PageSlug, PortfolioType, SocialLink } from "@/lib/content";
+import {
+  getActiveNavigationKey,
+  type NavigationItem,
+} from "@/lib/content/navigation";
+import type { SocialLink } from "@/lib/content";
 
-const DEFAULT_SOCIAL_LINKS: SocialLink[] = [
-  {
-    id: "spotify",
-    label: "Spotify",
-    platform: "spotify",
-    href: "https://open.spotify.com/artist/3j6ZTLub4b9G6huqfRDIIM",
-    iconKey: "spotify",
-  },
-  {
-    id: "soundcloud",
-    label: "SoundCloud",
-    platform: "soundcloud",
-    href: "https://soundcloud.com",
-    iconKey: "soundcloud",
-  },
-  {
-    id: "instagram",
-    label: "Instagram",
-    platform: "instagram",
-    href: "https://instagram.com",
-    iconKey: "instagram",
-  },
-  {
-    id: "youtube",
-    label: "YouTube",
-    platform: "youtube",
-    href: "https://youtube.com",
-    iconKey: "youtube",
-  },
-];
+type TopNavItem = Pick<
+  NavigationItem,
+  "defaultLabel" | "href" | "key" | "kind" | "sortOrder"
+>;
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function isActivePath(pathname: string, href: string) {
-  const p = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
-  const h = href.length > 1 ? href.replace(/\/$/, "") : href;
-  return p === h;
+function currentValue(item: TopNavItem, active: boolean) {
+  if (!active) return undefined;
+  return item.kind === "section" ? ("location" as const) : ("page" as const);
+}
+
+function navLinkClass(active: boolean) {
+  return cx(
+    "whitespace-nowrap transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/45",
+    active ? "text-[#ff3b1f]" : "text-white/60"
+  );
+}
+
+function DesktopNavigation({
+  className,
+  currentHash,
+  items,
+  onNavigate,
+  pathname,
+}: {
+  className: string;
+  currentHash: string;
+  items: TopNavItem[];
+  onNavigate: () => void;
+  pathname: string;
+}) {
+  const activeKey = getActiveNavigationKey(items, pathname, currentHash);
+
+  return (
+    <nav
+      aria-label="Primary navigation"
+      className={cx(
+        className,
+        "items-center text-[10px] font-medium tracking-[0.16em] 2xl:text-[11px] 2xl:tracking-[0.2em]"
+      )}
+    >
+      {items.map((item) => {
+        const active = item.key === activeKey;
+        return (
+          <Link
+            aria-current={currentValue(item, active)}
+            className={navLinkClass(active)}
+            href={item.href}
+            key={item.key}
+            onClick={onNavigate}
+          >
+            {item.defaultLabel}
+          </Link>
+        );
+      })}
+    </nav>
+  );
 }
 
 export default function TopNav({
   artistName = "Artist Portfolio",
-  hiddenNavPageSlugs = [],
-  portfolioType = "musician",
-  socialLinks = DEFAULT_SOCIAL_LINKS,
+  navigationItems = [],
+  socialLinks = [],
 }: {
   artistName?: string;
-  hiddenNavPageSlugs?: PageSlug[];
-  portfolioType?: PortfolioType;
+  navigationItems?: TopNavItem[];
   socialLinks?: SocialLink[];
 }) {
   const [open, setOpen] = useState(false);
+  const [currentHash, setCurrentHash] = useState("");
   const pathname = usePathname() || "/";
-  const navItems = getProfileNav(portfolioType, hiddenNavPageSlugs);
+  const navItems = useMemo(
+    () =>
+      navigationItems
+        .filter((item) => item.kind === "page")
+        .sort((left, right) =>
+          left.sortOrder === right.sortOrder
+            ? left.key.localeCompare(right.key)
+            : left.sortOrder - right.sortOrder
+        ),
+    [navigationItems]
+  );
   const activeSocialLinks = socialLinks.filter((link) => link.href.trim());
+  const activeKey = getActiveNavigationKey(navItems, pathname, currentHash);
+  const hasDrawerContent = navItems.length > 0 || activeSocialLinks.length > 0;
 
   const close = () => setOpen(false);
 
-  // ESC to close
   useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+    const syncHash = () => {
+      setCurrentHash(window.location.hash);
+      setOpen(false);
+    };
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    window.addEventListener("popstate", syncHash);
+    return () => {
+      window.removeEventListener("hashchange", syncHash);
+      window.removeEventListener("popstate", syncHash);
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Prevent background scroll while menu open
+  useEffect(() => {
+    const wideViewport = window.matchMedia("(min-width: 1280px)");
+    const closeWhenInlineNavigationTakesOver = () => {
+      if (wideViewport.matches) setOpen(false);
+    };
+    closeWhenInlineNavigationTakesOver();
+    wideViewport.addEventListener("change", closeWhenInlineNavigationTakesOver);
+    return () => {
+      wideViewport.removeEventListener(
+        "change",
+        closeWhenInlineNavigationTakesOver
+      );
+    };
+  }, []);
+
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = previousOverflow;
     };
   }, [open]);
 
@@ -96,88 +161,69 @@ export default function TopNav({
   if (pathname.startsWith("/admin")) return null;
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40">
-      <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
-        <div className="mt-3 sm:mt-4 rounded-2xl border border-white/10 bg-black/55 backdrop-blur">
-          <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3">
-            {/* Brand */}
-            <Link
-              href="/"
-              onClick={close}
-              className="group inline-flex items-center gap-2"
-              aria-label="Go to homepage"
-              title="ARTIST PORTFOLIO"
+    <header className="fixed inset-x-0 top-0 z-40 border-b border-[#ff3b1f]/15 bg-[#070505]/88 backdrop-blur-xl">
+      <div className="mx-auto max-w-[1800px] px-4 sm:px-7 lg:px-10">
+        <div className="relative grid min-h-[72px] grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] xl:gap-7 2xl:gap-10">
+          <DesktopNavigation
+            className="hidden min-w-0 justify-self-start gap-4 xl:flex 2xl:gap-7"
+            currentHash={currentHash}
+            items={navItems}
+            onNavigate={close}
+            pathname={pathname}
+          />
+
+          <Link
+            aria-label={`${artistName} — go to homepage`}
+            className="group col-start-2 inline-flex min-w-0 max-w-full items-center justify-self-center"
+            href="/"
+            onClick={close}
+            title={artistName}
+          >
+            <span
+              className="truncate text-center text-[12px] uppercase tracking-[0.22em] text-[#ff3b1f] transition group-hover:text-[#ff705a] sm:text-sm sm:tracking-[0.3em] xl:max-w-[18rem]"
+              style={brandStyle}
             >
-              <span
-                style={brandStyle}
-                className={cx(
-                  "text-[11px] sm:text-xs",
-                  "tracking-[0.35em]",
-                  "uppercase",
-                  "transition",
-                  "bg-gradient-to-r from-white via-white to-[#ffffff]",
-                  "bg-clip-text text-transparent",
-                  "group-hover:opacity-90"
-                )}
-              >
-                {artistName}
-              </span>
-            </Link>
+              {artistName}
+            </span>
+          </Link>
 
-            {/* Desktop nav */}
-            <nav className="hidden md:flex items-center gap-6 text-xs tracking-[0.25em] text-white/60">
-              {navItems.map((i) => (
-                <Link
-                  key={i.label}
-                  href={i.href}
-                  onClick={close}
-                  aria-current={isActivePath(pathname, i.href) ? "page" : undefined}
-                  className={cx(
-                    "transition hover:text-white",
-                    isActivePath(pathname, i.href) ? "text-[#ff3b1f]" : "text-white/60"
-                  )}
-                >
-                  {i.label}
-                </Link>
-              ))}
-            </nav>
-
-            {/* Desktop socials */}
-            <div className="hidden lg:flex items-center gap-2">
-              {activeSocialLinks.map((s) => (
+          <div className="hidden min-w-0 justify-self-stretch overflow-x-auto [scrollbar-width:none] xl:block [&::-webkit-scrollbar]:hidden">
+            <div className="ml-auto flex w-max items-center gap-1.5 2xl:gap-2">
+              {activeSocialLinks.map((link) => (
                 <a
-                  key={s.id}
-                  href={s.href}
-                  target="_blank"
+                  aria-label={link.label}
+                  className="group flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#ff3b1f]/60 bg-black/25 text-[#ff5b43] transition hover:border-[#ff3b1f] hover:bg-[#ff3b1f] hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#ff705a] 2xl:h-9 2xl:w-9"
+                  href={link.href}
+                  key={link.id}
                   rel="noreferrer"
-                  aria-label={s.label}
-                  title={s.label}
-                  className="group flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white"
+                  target="_blank"
+                  title={link.label}
                 >
                   <SocialPlatformIcon
-                    className="text-base transition group-hover:scale-110"
-                    href={s.href}
-                    iconKey={s.iconKey}
-                    label={s.label}
-                    platform={s.platform}
+                    className="text-sm transition group-hover:scale-110 2xl:text-base"
+                    href={link.href}
+                    iconKey={link.iconKey}
+                    label={link.label}
+                    platform={link.platform}
                   />
                 </a>
               ))}
             </div>
+          </div>
 
-            {/* Mobile hamburger */}
+          {hasDrawerContent ? (
             <button
-              type="button"
-              className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/35 text-white/80 backdrop-blur transition hover:bg-white/10 hover:text-white"
-              aria-label={open ? "Close menu" : "Open menu"}
+              aria-controls="portfolio-navigation-drawer"
               aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
+              aria-label={open ? "Close menu" : "Open menu"}
+              className="col-start-3 inline-flex h-10 w-10 shrink-0 items-center justify-center justify-self-end rounded-xl border border-white/15 bg-black/35 text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff705a] xl:hidden"
+              onClick={() => setOpen((value) => !value)}
+              type="button"
             >
               <span className="relative block h-4 w-5">
                 <span
                   className={cx(
-                    "absolute left-0 top-0 h-[2px] w-5 rounded-full bg-white/85 transition-all duration-200",
-                    "shadow-[0_0_14px_rgba(255,59,31,0.35)]",
+                    "absolute left-0 top-0 h-[2px] w-5 rounded-full bg-white/85 shadow-[0_0_14px_rgba(255,59,31,0.35)] transition-all duration-200",
                     open && "top-[7px] rotate-45 bg-white"
                   )}
                 />
@@ -189,78 +235,87 @@ export default function TopNav({
                 />
                 <span
                   className={cx(
-                    "absolute left-0 top-[14px] h-[2px] w-5 rounded-full bg-white/85 transition-all duration-200",
-                    "shadow-[0_0_14px_rgba(255,59,31,0.35)]",
+                    "absolute left-0 top-[14px] h-[2px] w-5 rounded-full bg-white/85 shadow-[0_0_14px_rgba(255,59,31,0.35)] transition-all duration-200",
                     open && "top-[7px] -rotate-45 bg-white"
                   )}
                 />
               </span>
             </button>
-          </div>
+          ) : null}
+        </div>
 
-          {/* Mobile panel */}
-          <div
-            className={cx(
-              "md:hidden overflow-hidden transition-[max-height,opacity] duration-300",
-              open ? "max-h-[520px] opacity-100" : "max-h-0 opacity-0"
-            )}
-          >
-            <div className="border-t border-white/10 px-4 pb-4 pt-4">
-              <nav className="grid gap-2 text-xs tracking-[0.28em] text-white/70">
-                {navItems.map((i, idx) => (
+        <div
+          aria-hidden={!open}
+          className={cx(
+            "overflow-hidden transition-[max-height,opacity] duration-300 xl:hidden",
+            open
+              ? "max-h-[calc(100dvh-4.5rem)] opacity-100"
+              : "max-h-0 opacity-0"
+          )}
+          id="portfolio-navigation-drawer"
+          inert={!open}
+        >
+          <div className="max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-white/10 pb-5 pt-2 overscroll-contain">
+            <nav
+              aria-label="Navigation menu"
+              className="grid text-xs tracking-[0.22em] text-white/70 sm:grid-cols-2"
+            >
+              {navItems.map((item, index) => {
+                const active = item.key === activeKey;
+                return (
                   <Link
-                    key={i.label}
-                    href={i.href}
-                    onClick={close}
-                    aria-current={isActivePath(pathname, i.href) ? "page" : undefined}
+                    aria-current={currentValue(item, active)}
                     className={cx(
-                      "text-left",
-                      "rounded-xl border border-white/10 bg-white/5 px-4 py-3",
-                      "transition hover:bg-white/10 hover:text-white",
-                      isActivePath(pathname, i.href) ? "text-[#ff3b1f]" : "text-white/70",
+                      "border-b border-white/[0.07] px-2 py-3.5 text-left transition hover:text-white sm:px-4",
+                      active ? "text-[#ff3b1f]" : "text-white/70",
                       open && "animate-[fadeInUp_240ms_ease-out_forwards]"
                     )}
-                    style={{ animationDelay: `${idx * 40}ms` }}
+                    href={item.href}
+                    key={item.key}
+                    onClick={close}
+                    style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
                   >
-                    {i.label}
+                    {item.defaultLabel}
                   </Link>
-                ))}
-              </nav>
+                );
+              })}
+            </nav>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {activeSocialLinks.map((s) => (
+            {activeSocialLinks.length > 0 ? (
+              <div className="mt-5 flex flex-wrap items-center gap-2 px-2 sm:px-4">
+                {activeSocialLinks.map((link) => (
                   <a
-                    key={s.id}
-                    href={s.href}
-                    target="_blank"
+                    aria-label={link.label}
+                    className="group flex h-10 w-10 items-center justify-center rounded-full border border-[#ff3b1f]/60 bg-black/35 text-[#ff5b43] transition hover:bg-[#ff3b1f] hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#ff705a]"
+                    href={link.href}
+                    key={link.id}
+                    onClick={close}
                     rel="noreferrer"
-                    aria-label={s.label}
-                    title={s.label}
-                    className="group flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white"
+                    target="_blank"
+                    title={link.label}
                   >
                     <SocialPlatformIcon
                       className="text-base transition group-hover:scale-110"
-                      href={s.href}
-                      iconKey={s.iconKey}
-                      label={s.label}
-                      platform={s.platform}
+                      href={link.href}
+                      iconKey={link.iconKey}
+                      label={link.label}
+                      platform={link.platform}
                     />
                   </a>
                 ))}
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
       </div>
 
-      {/* Mobile backdrop */}
       <div
+        aria-hidden="true"
         className={cx(
-          "md:hidden fixed inset-0 -z-10 transition",
-          open ? "bg-black/60" : "pointer-events-none bg-transparent"
+          "fixed inset-0 -z-10 transition xl:hidden",
+          open ? "bg-black/65" : "pointer-events-none bg-transparent"
         )}
         onClick={close}
-        aria-hidden="true"
       />
 
       <style jsx>{`

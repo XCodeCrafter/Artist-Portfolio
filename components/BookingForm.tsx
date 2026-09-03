@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { PortfolioType } from "@/lib/content";
+import { getMixedPublicCopy } from "@/lib/content/public-copy";
 
 type FormState =
   | { status: "idle" }
@@ -17,40 +17,18 @@ function safeTrim(v: unknown) {
 type Props = {
   contactBlurb?: string;
   location?: string;
-  portfolioType?: PortfolioType;
 };
 
 export default function BookingForm({
-  contactBlurb = "Use the form for direct booking and inquiries.",
+  contactBlurb,
   location = "EU / Worldwide",
-  portfolioType = "musician",
 }: Props) {
   const [state, setState] = useState<FormState>({ status: "idle" });
   const startedAtRef = useRef<number>(0);
-  const isActor = portfolioType === "actor";
-  const copy = isActor
-    ? {
-        eyebrow: "CONTACT",
-        title: "Let's Work Together",
-        formTitle: "Send a message",
-        description:
-          contactBlurb ||
-          "Interested in working together? Send a short message and I will get back to you.",
-        contactLabel: "Collaboration",
-        locationLabel: "Based in",
-        button: "Let's work together",
-        success: "Message sent. Thanks - I will reply soon.",
-      }
-    : {
-        eyebrow: "CONTACT",
-        title: "Booking & inquiries",
-        formTitle: "Quick message",
-        description: contactBlurb,
-        contactLabel: "Contact",
-        locationLabel: "Location",
-        button: "Send",
-        success: "Message sent. Thanks - I'll reply soon.",
-      };
+  const description = getMixedPublicCopy(
+    contactBlurb,
+    "For acting, music, productions, bookings, and creative collaborations."
+  );
 
   const markFormStarted = () => {
     if (startedAtRef.current === 0) {
@@ -80,8 +58,7 @@ export default function BookingForm({
       message: safeTrim(fd.get("message")),
       company: safeTrim(fd.get("company")),
       website: safeTrim(fd.get("website")),
-      portfolioType,
-      inquiryType: isActor ? "collaboration" : "booking",
+      inquiryIntent: safeTrim(fd.get("inquiryIntent")),
       startedAt: startedAtRef.current,
       submittedAt: now,
     };
@@ -115,7 +92,7 @@ export default function BookingForm({
 
       setState({
         status: "success",
-        message: data.message || copy.success,
+        message: data.message || "Message sent. Thanks - I will reply soon.",
       });
 
       form.reset();
@@ -133,19 +110,19 @@ export default function BookingForm({
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
           <div className="text-xs tracking-[0.35em] text-white/55">
-            {copy.eyebrow}
+            CONTACT
           </div>
           <h2 className="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight">
-            {copy.title}
+            Let&apos;s work together
           </h2>
 
           <div className="mt-6 space-y-3 text-white/75">
             <div>
-              <span className="text-white/50">{copy.contactLabel}:</span>{" "}
-              {copy.description}
+              <span className="text-white/50">Collaboration:</span>{" "}
+              {description}
             </div>
             <div>
-              <span className="text-white/50">{copy.locationLabel}:</span>{" "}
+              <span className="text-white/50">Based in:</span>{" "}
               {location}
             </div>
           </div>
@@ -166,7 +143,7 @@ export default function BookingForm({
         >
           <div className="text-xs tracking-[0.35em] text-white/55">FORM</div>
           <h2 className="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight">
-            {copy.formTitle}
+            Send a message
           </h2>
 
           <div className="hidden" aria-hidden="true">
@@ -187,6 +164,31 @@ export default function BookingForm({
           </div>
 
           <div className="mt-6 grid gap-4">
+            <fieldset>
+              <legend className="mb-3 text-xs uppercase tracking-[0.2em] text-white/55">
+                What is this about?
+              </legend>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  ["music", "Music"],
+                  ["acting", "Acting"],
+                  ["general", "General"],
+                ].map(([value, label]) => (
+                  <label className="cursor-pointer" key={value}>
+                    <input
+                      className="peer sr-only"
+                      name="inquiryIntent"
+                      required
+                      type="radio"
+                      value={value}
+                    />
+                    <span className="flex min-h-11 items-center justify-center rounded-xl border border-white/15 bg-black/30 px-3 text-sm text-white/65 transition hover:border-white/30 hover:text-white peer-checked:border-[var(--accent)] peer-checked:bg-[#ff3b1f]/15 peer-checked:text-white peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-white/60">
+                      {label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <input
               name="name"
               className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/80 placeholder:text-white/35 outline-none focus:border-white/30"
@@ -219,7 +221,7 @@ export default function BookingForm({
               type="submit"
               disabled={state.status === "sending"}
             >
-              {state.status === "sending" ? "Sending..." : `${copy.button} ->`}
+              {state.status === "sending" ? "Sending..." : "Send message ->"}
             </button>
 
             {state.status === "success" && (

@@ -11,6 +11,11 @@
   --font-display: "Playfair Display", Georgia, serif;
   --font-body: Inter, system-ui, sans-serif;
   --font-ui: Manrope, system-ui, sans-serif;
+  --public-nav-offset: 7rem;
+}
+
+.public-nav-anchor {
+  scroll-margin-top: var(--public-nav-offset);
 }
 
 /* --- Typography system --- */

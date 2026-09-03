@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type BioScrollGalleryProps = {
   images: { src: string; alt: string }[];
+  hasBody?: boolean;
 
   topLabel?: string; // "BIOGRAPHY"
   introText?: string; // short intro
@@ -25,6 +26,7 @@ type BioScrollGalleryProps = {
 
 export default function BioScrollGallery({
   images,
+  hasBody = true,
   topLabel = "BIOGRAPHY",
   introText = "Emotion first. Genre second. The goal is a cinematic feeling that stays with you after the last kick fades out.",
   caption = "Amsterdam • Producer • Singer",
@@ -47,6 +49,7 @@ export default function BioScrollGallery({
   const driftY = useTransform(scrollYProgress, [0, 1], [-14, 14]);
 
   const steps = useMemo(() => Math.max(1, images.length), [images.length]);
+  const safeIndex = hasImages ? Math.min(index, images.length - 1) : 0;
 
   // Auto-rotate images by time
   useEffect(() => {
@@ -54,13 +57,13 @@ export default function BioScrollGallery({
     if (pauseOnHover && isHovering) return;
 
     const id = window.setInterval(() => {
-      setIndex((prev) => (prev + 1) % steps);
+      setIndex((previous) => (Math.min(previous, steps - 1) + 1) % steps);
     }, Math.max(1200, intervalMs)); // safety floor
 
     return () => window.clearInterval(id);
   }, [hasImages, intervalMs, steps, isHovering, pauseOnHover]);
 
-  const current = hasImages ? images[index] : null;
+  const current = hasImages ? images[safeIndex] : null;
 
   return (
     <section
@@ -76,16 +79,27 @@ export default function BioScrollGallery({
           <p className="mt-4 text-white/65 leading-relaxed">{introText}</p>
         </div>
 
-        <div className="hidden lg:block text-sm tracking-[0.22em] uppercase text-white/45">
+        <div
+          className={`${hasImages ? "hidden lg:block" : "block"} text-sm tracking-[0.22em] uppercase text-white/45`}
+        >
           {caption}
         </div>
       </div>
 
       {/* Gallery + Text */}
-      <div className="grid gap-10 lg:grid-cols-12">
+      <div
+        className={`grid gap-10 ${
+          hasImages && hasBody
+            ? "lg:grid-cols-12"
+            : hasImages
+              ? "lg:grid-cols-[minmax(0,720px)] lg:justify-center"
+              : ""
+        }`}
+      >
         {/* LEFT: sticky timed gallery */}
-        <div className="lg:col-span-5">
-          <div className="lg:sticky lg:top-24">
+        {hasImages ? (
+          <div className={hasBody ? "lg:col-span-5" : "w-full"}>
+            <div className="lg:sticky lg:top-24">
             <motion.div
               style={{ y: driftY }}
               className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5"
@@ -113,8 +127,8 @@ export default function BioScrollGallery({
                         src={current.src}
                         alt={current.alt}
                         fill
-                        loading={index === 0 ? "eager" : "lazy"}
-                        preload={index === 0}
+                        loading={safeIndex === 0 ? "eager" : "lazy"}
+                        preload={safeIndex === 0}
                         sizes="(max-width: 1023px) calc(100vw - 40px), 40vw"
                         className="object-cover"
                       />
@@ -144,19 +158,22 @@ export default function BioScrollGallery({
 
             {/* subtle progress hint */}
             <div className="mt-4 hidden lg:flex items-center gap-3 text-xs tracking-[0.28em] uppercase text-white/40">
-              <span>{String(index + 1).padStart(2, "0")}</span>
+              <span>{String(safeIndex + 1).padStart(2, "0")}</span>
               <span className="h-px flex-1 bg-white/10" />
               <span>{String(steps).padStart(2, "0")}</span>
             </div>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {/* RIGHT: long text */}
-        <div className="lg:col-span-7">
-          <div className="space-y-6 text-white/70 leading-relaxed">
-            {children}
+        {hasBody ? (
+          <div className={hasImages ? "lg:col-span-7" : "max-w-[900px]"}>
+            <div className="space-y-6 text-white/70 leading-relaxed">
+              {children}
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </section>
   );

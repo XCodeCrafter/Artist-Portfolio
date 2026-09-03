@@ -19,10 +19,11 @@ export default function PrivacyPage() {
       <div className="mt-10 space-y-6 text-sm leading-7 text-white/70 sm:text-base">
         <p>
           This portfolio collects only the information needed to respond to
-          booking and inquiry messages submitted through the contact form.
+          contact messages submitted through the inquiry form.
         </p>
         <p>
-          Form submissions may include your name, email address, message, a
+          Form submissions may include your name, email address, message, your
+          selected Music, Acting, or General inquiry area, a
           pseudonymous security identifier derived from your IP address, and
           submission time. The raw IP address is not stored by the application.
           This data is used for spam prevention, rate limiting, and replying to
@@ -33,7 +34,7 @@ export default function PrivacyPage() {
           and link clicks. No payment information is collected on this website.
         </p>
         <p>
-          To request deletion of a submitted message, contact the booking email
+          To request deletion of a submitted message, contact the email address
           configured for this website.
         </p>
       </div>

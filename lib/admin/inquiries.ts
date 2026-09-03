@@ -2,11 +2,17 @@ import {
   createAdminServiceClient,
   hasAdminServiceEnv,
 } from "@/lib/admin/service";
-import { normalizePortfolioType } from "@/lib/content/profile";
 import type { PortfolioType } from "@/lib/content";
+import {
+  isInquiryIntent,
+  type InquiryIntent,
+  type LegacyInquiryType,
+} from "@/lib/inquiries";
 
 export type InquiryStatus = "new" | "read" | "replied" | "archived";
-export type InquiryType = "booking" | "collaboration";
+export type StoredInquiryIntent = InquiryIntent | "unresolved" | null;
+export type StoredLegacyInquiryType = LegacyInquiryType | "unresolved" | null;
+export type StoredLegacyPortfolioType = PortfolioType | "unresolved" | null;
 export type InquiryEmailStatus =
   | "unknown"
   | "pending"
@@ -23,8 +29,9 @@ export type BookingInquiry = {
   name: string;
   email: string;
   message: string;
-  portfolioType: PortfolioType;
-  inquiryType: InquiryType;
+  portfolioType: StoredLegacyPortfolioType;
+  inquiryType: StoredLegacyInquiryType;
+  inquiryIntent: StoredInquiryIntent;
   status: InquiryStatus;
   sourceIp: string;
   userAgent: string;
@@ -61,6 +68,7 @@ type BookingInquiryRow = {
   message: string;
   portfolio_type?: string | null;
   inquiry_type?: string | null;
+  inquiry_intent?: string | null;
   status: InquiryStatus;
   source_ip: string | null;
   user_agent: string | null;
@@ -88,9 +96,9 @@ function mapInquiry(row: BookingInquiryRow): BookingInquiry {
     name: row.name,
     email: row.email,
     message: row.message,
-    portfolioType: normalizePortfolioType(row.portfolio_type),
-    inquiryType:
-      row.inquiry_type === "collaboration" ? "collaboration" : "booking",
+    portfolioType: normalizeStoredPortfolioType(row.portfolio_type),
+    inquiryType: normalizeStoredInquiryType(row.inquiry_type),
+    inquiryIntent: normalizeStoredInquiryIntent(row.inquiry_intent),
     status: row.status,
     sourceIp: row.source_ip || "",
     userAgent: row.user_agent || "",
@@ -103,6 +111,33 @@ function mapInquiry(row: BookingInquiryRow): BookingInquiry {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+export function normalizeStoredPortfolioType(
+  value: unknown
+): StoredLegacyPortfolioType {
+  if (value === "actor" || value === "musician") return value;
+  return value === undefined || value === null || value === ""
+    ? null
+    : "unresolved";
+}
+
+export function normalizeStoredInquiryType(
+  value: unknown
+): StoredLegacyInquiryType {
+  if (value === "booking" || value === "collaboration") return value;
+  return value === undefined || value === null || value === ""
+    ? null
+    : "unresolved";
+}
+
+export function normalizeStoredInquiryIntent(
+  value: unknown
+): StoredInquiryIntent {
+  if (isInquiryIntent(value)) return value;
+  return value === undefined || value === null || value === ""
+    ? null
+    : "unresolved";
 }
 
 function isInquiryEmailStatus(value: unknown): value is InquiryEmailStatus {

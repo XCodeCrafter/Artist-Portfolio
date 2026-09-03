@@ -4,7 +4,18 @@ import { updateSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = createContentSecurityPolicy(nonce);
+  const previewRoutes = new Set([
+    "/admin/v2-preview/bio",
+    "/admin/v2-preview/bio/",
+    "/admin/v2-preview/gallery",
+    "/admin/v2-preview/gallery/",
+    "/admin/v2-preview/music",
+    "/admin/v2-preview/music/",
+  ]);
+  const allowSameOriginFraming = previewRoutes.has(request.nextUrl.pathname);
+  const csp = createContentSecurityPolicy(nonce, {
+    allowSameOriginFraming,
+  });
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
@@ -14,6 +25,10 @@ export async function proxy(request: NextRequest) {
     : NextResponse.next({ request: { headers: requestHeaders } });
 
   response.headers.set("Content-Security-Policy", csp);
+  response.headers.set(
+    "X-Frame-Options",
+    allowSameOriginFraming ? "SAMEORIGIN" : "DENY"
+  );
 
   if (
     request.nextUrl.pathname.startsWith("/admin/forgot-password") ||

@@ -9,6 +9,7 @@ import {
   FaEye,
   FaEyeSlash,
   FaImages,
+  FaRocket,
   FaShieldAlt,
   FaUpload,
   FaUserCircle,
@@ -16,6 +17,7 @@ import {
 import LogoutButton from "@/components/admin/LogoutButton";
 import DesktopAdminSidebar from "@/components/admin/DesktopAdminSidebar";
 import { getProfilePublicModules } from "@/lib/content/modules";
+import type { NavigationConfigVersion } from "@/lib/content/navigation";
 import type { PageSlug, PortfolioType } from "@/lib/content/types";
 
 export type AdminSection =
@@ -32,6 +34,8 @@ type AdminShellProps = {
   description: string;
   eyebrow?: string;
   hiddenNavPageSlugs?: PageSlug[];
+  navigationConfigVersion?: NavigationConfigVersion;
+  navigationDestinationCount?: number;
   portfolioType?: PortfolioType;
   title: string;
 };
@@ -169,13 +173,47 @@ function AdminNav({
 function PublicPageNav({
   hiddenNavPageSlugs = [],
   mobile = false,
+  navigationConfigVersion = 0,
+  navigationDestinationCount = 0,
   portfolioType,
 }: {
   hiddenNavPageSlugs?: PageSlug[];
   mobile?: boolean;
+  navigationConfigVersion?: NavigationConfigVersion;
+  navigationDestinationCount?: number;
   portfolioType?: PortfolioType;
 }) {
   if (!portfolioType) return null;
+
+  if (navigationConfigVersion !== 0) {
+    return (
+      <div
+        className={cx(
+          "sidebar-copy mt-6 min-w-[246px] opacity-100 transition duration-150",
+          !mobile &&
+            "lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100"
+        )}
+      >
+        <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/28">
+          Your website
+        </p>
+        <Link
+          className="mt-2 flex min-h-14 items-center gap-3 rounded-xl border border-[#ff694f]/16 bg-[#ff3b1f]/7 px-3 text-white/68 transition hover:bg-[#ff3b1f] hover:text-white"
+          href="/admin/v2/navigation"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[#ff806b]">
+            <FaRocket />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold">Mixed navbar · V2</span>
+            <span className="mt-0.5 block text-[10px] text-white/36">
+              {navigationDestinationCount} destinations · manage order
+            </span>
+          </span>
+        </Link>
+      </div>
+    );
+  }
 
   const pages = getProfilePublicModules(portfolioType);
   const hiddenSet = new Set(hiddenNavPageSlugs);
@@ -240,11 +278,9 @@ function PublicPageNav({
 function AccountMenu({
   adminEmail,
   mobile = false,
-  portfolioType,
 }: {
   adminEmail: string;
   mobile?: boolean;
-  portfolioType?: PortfolioType;
 }) {
   return (
     <details className="group/account rounded-2xl border border-white/8 bg-black/25 p-2.5">
@@ -263,7 +299,7 @@ function AccountMenu({
             {adminEmail}
           </span>
           <span className="mt-0.5 block text-[10px] uppercase tracking-[0.14em] text-white/30">
-            {portfolioType || "admin session"}
+            mixed portfolio
           </span>
         </span>
         <FaChevronDown
@@ -288,6 +324,8 @@ export default function AdminShell({
   description,
   eyebrow = "Portfolio admin",
   hiddenNavPageSlugs = [],
+  navigationConfigVersion = 0,
+  navigationDestinationCount = 0,
   portfolioType,
   title,
 }: AdminShellProps) {
@@ -306,6 +344,8 @@ export default function AdminShell({
               {active !== "content" ? (
                 <PublicPageNav
                   hiddenNavPageSlugs={hiddenNavPageSlugs}
+                  navigationConfigVersion={navigationConfigVersion}
+                  navigationDestinationCount={navigationDestinationCount}
                   portfolioType={portfolioType}
                 />
               ) : null}
@@ -313,6 +353,16 @@ export default function AdminShell({
           }
           footer={
             <>
+              <Link
+                aria-label="Try Admin V2"
+                className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#ff694f]/18 bg-[#ff3b1f]/8 px-3 text-xs font-semibold text-[#ff8a77] transition hover:bg-[#ff3b1f] hover:text-white group-data-[expanded=true]/sidebar:justify-start"
+                href="/admin/v2"
+              >
+                <FaRocket className="text-[10px]" />
+                <span className="sidebar-copy whitespace-nowrap opacity-100 transition duration-150 lg:opacity-0 lg:group-data-[expanded=true]/sidebar:opacity-100">
+                  Try V2
+                </span>
+              </Link>
               <Link
                 aria-label="Open live site"
                 className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/9 bg-white/[0.045] px-3 text-xs font-semibold text-white/62 transition hover:bg-white hover:text-black group-data-[expanded=true]/sidebar:justify-start"
@@ -327,7 +377,6 @@ export default function AdminShell({
               </Link>
               <AccountMenu
                 adminEmail={adminEmail}
-                portfolioType={portfolioType}
               />
             </>
           }
@@ -357,9 +406,18 @@ export default function AdminShell({
                 <PublicPageNav
                   hiddenNavPageSlugs={hiddenNavPageSlugs}
                   mobile
+                  navigationConfigVersion={navigationConfigVersion}
+                  navigationDestinationCount={navigationDestinationCount}
                   portfolioType={portfolioType}
                 />
               ) : null}
+              <Link
+                className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#ff694f]/18 bg-[#ff3b1f]/8 px-3 text-xs font-semibold text-[#ff8a77] transition hover:bg-[#ff3b1f] hover:text-white"
+                href="/admin/v2"
+              >
+                <FaRocket className="text-[10px]" />
+                Try Admin V2
+              </Link>
               <div className="mt-3 flex gap-2 border-t border-white/8 pt-3">
                 {active === "media" ? (
                   <Link
@@ -384,7 +442,6 @@ export default function AdminShell({
                 <AccountMenu
                   adminEmail={adminEmail}
                   mobile
-                  portfolioType={portfolioType}
                 />
               </div>
             </div>
@@ -419,7 +476,7 @@ export default function AdminShell({
                     <>
                       <span className="h-1 w-1 rounded-full bg-white/18" />
                       <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/34">
-                        {portfolioType}
+                        mixed portfolio
                       </span>
                     </>
                   ) : null}

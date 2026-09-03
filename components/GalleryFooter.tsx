@@ -14,7 +14,8 @@ import {
   FaPlay,
 } from "react-icons/fa";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
-import type { FooterEffect, PortfolioType, SocialLink } from "@/lib/content";
+import type { FooterEffect, SocialLink } from "@/lib/content";
+import { getMixedPublicCopy } from "@/lib/content/public-copy";
 import {
   detectSocialPlatform,
   getSocialPlatformDefinition,
@@ -24,10 +25,8 @@ type GalleryFooterProps = {
   artistName: string;
   contactBlurb?: string;
   location: string;
-  portfolioType: PortfolioType;
   footerEffect?: FooterEffect;
   socialLinks: SocialLink[];
-  spotifyUrl?: string;
   tagline?: string;
 };
 
@@ -46,10 +45,8 @@ export default function GalleryFooter({
   artistName,
   contactBlurb,
   location,
-  portfolioType,
   footerEffect = "soul",
   socialLinks,
-  spotifyUrl,
   tagline,
 }: GalleryFooterProps) {
   const footerRef = useRef<HTMLElement>(null);
@@ -62,21 +59,14 @@ export default function GalleryFooter({
   });
   const socialItems = socialLinks.filter((link) => link.href.trim());
   const currentYear = new Date().getFullYear();
-  const spotifyLink = socialItems.find(
-    (link) =>
-      detectSocialPlatform(
-        link.iconKey,
-        link.platform,
-        link.href,
-        link.label
-      ) === "spotify"
+  const publicTagline = getMixedPublicCopy(
+    tagline,
+    "Film · performance · music · creative collaboration"
   );
-  const secondaryHref =
-    portfolioType === "musician"
-      ? spotifyLink?.href || spotifyUrl || "/music"
-      : "/video";
-  const isExternalSecondary = /^https?:\/\//i.test(secondaryHref);
-  const isActor = portfolioType === "actor";
+  const publicContactBlurb = getMixedPublicCopy(
+    contactBlurb,
+    "For acting, music, productions, bookings, and creative collaborations."
+  );
   const isSoulEffect = footerEffect === "soul";
   const touchAmbientBackground = isSoulEffect
     ? "radial-gradient(520px circle at 18% 32%, rgba(255, 243, 202, 0.11), transparent 68%), radial-gradient(460px circle at 84% 74%, rgba(255, 58, 37, 0.05), transparent 72%)"
@@ -242,10 +232,7 @@ export default function GalleryFooter({
             </span>
           </div>
           <span className="border-white/10 font-medium uppercase tracking-[0.17em] text-white/48 sm:border-l sm:pl-7">
-            {tagline ||
-              (isActor
-                ? "Film · performance · creative collaboration"
-                : "Music · live · creative collaboration")}
+            {publicTagline}
           </span>
         </div>
 
@@ -255,14 +242,11 @@ export default function GalleryFooter({
               Let&apos;s make something
             </p>
             <h2 className="heading-ui mt-7 max-w-[670px] text-[3.45rem] font-medium leading-[0.98] tracking-[-0.045em] text-white sm:text-7xl xl:text-[5.5rem]">
-              Ready for the next {isActor ? "story" : "chapter"}
+              Ready for the next story
               <span className="text-[#ff3c28]">.</span>
             </h2>
             <p className="mt-8 max-w-[510px] text-base leading-7 text-white/52 sm:text-lg">
-              {contactBlurb ||
-                (isActor
-                  ? "For productions, casting, representation, and creative collaboration."
-                  : "For bookings, collaborations, releases, and the next creative chapter.")}
+              {publicContactBlurb}
             </p>
 
             <div className="mt-11 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
@@ -279,29 +263,13 @@ export default function GalleryFooter({
                 />
               </Link>
 
-              {isExternalSecondary ? (
-                <a
-                  className={secondaryButtonClass}
-                  href={secondaryHref}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <SocialPlatformIcon platform="spotify" />
-                  Listen
-                  <FaExternalLinkAlt
-                    aria-hidden="true"
-                    className="text-[10px] transition-transform duration-500 ease-out group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transform-none"
-                  />
-                </a>
-              ) : (
-                <Link className={secondaryButtonClass} href={secondaryHref}>
-                  <FaPlay
-                    aria-hidden="true"
-                    className="text-xs transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transform-none"
-                  />
-                  {isActor ? "Showreel" : "Music"}
-                </Link>
-              )}
+              <Link className={secondaryButtonClass} href="/video">
+                <FaPlay
+                  aria-hidden="true"
+                  className="text-xs transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transform-none"
+                />
+                Showreel
+              </Link>
             </div>
           </div>
 
@@ -313,7 +281,7 @@ export default function GalleryFooter({
                 </p>
                 <span className="mt-3 block h-px w-8 bg-[#ff3f2c]" />
                 <h3 className="heading-ui mt-6 text-3xl font-medium tracking-[-0.03em] text-white sm:text-4xl">
-                  {isActor ? "Watch & connect" : "Listen & follow"}
+                  Watch, listen &amp; connect
                 </h3>
               </div>
               {socialItems.length ? (

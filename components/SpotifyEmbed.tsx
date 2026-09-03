@@ -35,7 +35,7 @@ export default function SpotifyEmbed({
 
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5">
-      {isIOS ? (
+      {isIOS || !embedUrl ? (
         // ✅ iOS fallback (reliable)
         <div className="flex items-center justify-center" style={{ height: heightMobile }}>
           <div className="mx-auto max-w-[560px] px-6 text-center">
@@ -44,23 +44,27 @@ export default function SpotifyEmbed({
             </div>
 
             <div className="mt-3 text-lg sm:text-xl font-semibold tracking-tight text-white">
-              Listen on Spotify
+              {openUrl ? "Listen on Spotify" : "Spotify releases"}
             </div>
 
             <p className="mt-2 text-sm text-white/65">
-              iOS Safari sometimes blocks embedded players. Open it directly in Spotify for the best experience.
+              {openUrl
+                ? "Open Spotify directly for the most reliable listening experience."
+                : "Releases will appear here when the Spotify player is connected."}
             </p>
 
-            <div className="mt-5 flex justify-center">
-              <a
-                href={openUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-black/35 px-5 h-12 text-xs tracking-[0.22em] uppercase text-white/85 hover:text-white hover:border-white/20 hover:bg-black/45 transition"
-              >
-                Open in Spotify <span aria-hidden="true" className="ml-2">↗</span>
-              </a>
-            </div>
+            {openUrl ? (
+              <div className="mt-5 flex justify-center">
+                <a
+                  href={openUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-black/35 px-5 h-12 text-xs tracking-[0.22em] uppercase text-white/85 hover:text-white hover:border-white/20 hover:bg-black/45 transition"
+                >
+                  Open in Spotify <span aria-hidden="true" className="ml-2">↗</span>
+                </a>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (

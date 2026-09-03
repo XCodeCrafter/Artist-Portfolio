@@ -1,6 +1,7 @@
 insert into public.site_settings (
   id,
   portfolio_type,
+  navigation_config_version,
   artist_name,
   tagline,
   description,
@@ -11,13 +12,14 @@ insert into public.site_settings (
 ) values (
   'main',
   'musician',
+  1,
   'Franky Fugazi',
-  'Music / Photos / Illustration',
-  'Official portfolio for Franky Fugazi - music, video, biography, and booking.',
+  'Actor / Music / Creative Work',
+  'Official actor and musician portfolio featuring biography, headshots, acting credits, showreel, releases, videos, and contact information.',
   'Amsterdam, The Netherlands',
   'https://open.spotify.com/artist/3j6ZTLub4b9G6huqfRDIIM',
   'https://open.spotify.com/embed/artist/3j6ZTLub4b9G6huqfRDIIM?theme=0',
-  'Use the form for direct booking and inquiries.'
+  'For acting, music, productions, bookings, and creative collaborations.'
 ) on conflict (id) do update set
   portfolio_type = excluded.portfolio_type,
   artist_name = excluded.artist_name,
@@ -27,6 +29,40 @@ insert into public.site_settings (
   spotify_artist_url = excluded.spotify_artist_url,
   spotify_embed_url = excluded.spotify_embed_url,
   contact_blurb = excluded.contact_blurb;
+
+insert into public.music_presentation (
+  id,
+  releases_heading,
+  mixes_heading
+) values (
+  'main',
+  'LATEST RELEASES',
+  'LATEST MIXES'
+) on conflict (id) do nothing;
+
+-- Migrations run before this seed on a fresh reset, so the migration backfill
+-- has no site_settings row to copy yet. Seed every curated destination without
+-- overwriting a navbar that was already customized.
+insert into public.site_navigation_items (
+  site_id,
+  destination_key,
+  is_visible,
+  sort_order
+) values
+  ('main', 'home', true, 10),
+  ('main', 'bio', true, 20),
+  ('main', 'gallery', true, 30),
+  ('main', 'music', true, 40),
+  ('main', 'works', true, 50),
+  ('main', 'contact', true, 60),
+  ('main', 'home.about', true, 70),
+  ('main', 'home.cnc', true, 80),
+  ('main', 'home.stories', true, 90),
+  ('main', 'bio.resume', true, 100),
+  ('main', 'music.platforms', true, 110),
+  ('main', 'music.spotify', true, 120),
+  ('main', 'music.soundcloud', true, 130)
+on conflict (site_id, destination_key) do nothing;
 
 insert into public.page_heroes (
   page_slug,
@@ -39,12 +75,12 @@ insert into public.page_heroes (
   media_type,
   sort_order
 ) values
-  ('home', 'FRANKY FUGAZI', 'MUSIC / PHOTOS / ILLUSTRATION', '', '#home-about', '/images/hero.jpg', '', 'image', 10),
+  ('home', 'FRANKY FUGAZI', 'ACTOR / MUSIC / CREATIVE WORK', '', '#home-about', '/images/hero.jpg', '', 'image', 10),
   ('bio', 'BIOGRAPHY', 'BIO', 'READ', '#bio', '/images/bio-hero.jpg', '', 'image', 20),
   ('gallery', 'GALLERY', 'HEADSHOTS', 'VIEW', '#gallery', '/images/bio-music.jpg', '', 'image', 30),
   ('music', 'MUSIC', 'LISTEN', 'SCROLL', '#music', '/images/music-hero.jpg', '', 'image', 40),
-  ('video', 'VIDEOS', 'WATCH', 'SCROLL', '#videos', '/media/hero-loop.mp4', '', 'video', 50),
-  ('booking', 'BOOKING', 'CONTACT', 'WRITE', '#form', '/images/booking-hero.jpg', '', 'image', 60)
+  ('video', 'SHOWREEL', 'WATCH', 'SCROLL', '#videos', '/media/hero-loop.mp4', '', 'video', 50),
+  ('booking', 'CONTACT', 'LET''S WORK TOGETHER', 'WRITE', '#form', '/images/booking-hero.jpg', '', 'image', 60)
 on conflict (page_slug) do update set
   title = excluded.title,
   subtitle = excluded.subtitle,

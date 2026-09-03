@@ -44,8 +44,36 @@ function parseConfiguredOrigin(value?: string | null) {
   if (!origin || process.env.NODE_ENV !== "production") return origin;
 
   const url = new URL(origin);
-  if (url.protocol !== "https:" || isLoopbackHostname(url.hostname)) return "";
+  if (isLoopbackHostname(url.hostname)) {
+    // `next start` also sets NODE_ENV=production. Keep local production-build
+    // previews usable, but never honor a loopback allowlist on Vercel.
+    if (process.env.VERCEL === "1") return "";
+    return origin;
+  }
+
+  if (url.protocol !== "https:") return "";
   return origin;
+}
+
+function hasMatchingLoopbackHost(
+  headerStore: HeaderReader,
+  candidate: string
+) {
+  const candidateUrl = new URL(candidate);
+  if (!isLoopbackHostname(candidateUrl.hostname)) return true;
+
+  const rawHost = headerStore.get("host")?.trim();
+  if (!rawHost || /[\s\\/?#@]/.test(rawHost)) return false;
+
+  try {
+    const requestUrl = new URL(`${candidateUrl.protocol}//${rawHost}`);
+    return (
+      isLoopbackHostname(requestUrl.hostname) &&
+      requestUrl.origin === candidateUrl.origin
+    );
+  } catch {
+    return false;
+  }
 }
 
 function getConfiguredOrigins() {
@@ -95,5 +123,8 @@ export function hasAllowedRequestOrigin(headerStore: HeaderReader) {
   if (!candidate) return false;
   if (isDevelopmentLoopback(candidate)) return true;
 
-  return getConfiguredOrigins().has(candidate);
+  return (
+    getConfiguredOrigins().has(candidate) &&
+    hasMatchingLoopbackHost(headerStore, candidate)
+  );
 }

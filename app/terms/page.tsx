@@ -19,7 +19,8 @@ export default function TermsPage() {
       <div className="mt-10 space-y-6 text-sm leading-7 text-white/70 sm:text-base">
         <p>
           This website is provided as an official artist portfolio for browsing
-          music, video, biography, press material, and booking information.
+          acting work, headshots, showreels, music, video, biography, credits,
+          press material, and contact information.
         </p>
         <p>
           All images, audio references, videos, names, and brand materials remain
@@ -27,8 +28,9 @@ export default function TermsPage() {
           without permission.
         </p>
         <p>
-          Sending a contact inquiry does not create a contract or guarantee
-          availability. Confirmed work requires direct written agreement.
+          Sending an acting, music, or general contact inquiry does not create a
+          contract or guarantee availability. Confirmed work requires direct
+          written agreement.
         </p>
       </div>
     </main>

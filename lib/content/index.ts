@@ -8,6 +8,11 @@ import {
   normalizeUiFont,
 } from "./fonts";
 import { normalizePortfolioType } from "./profile";
+import {
+  normalizeNavigationConfigVersion,
+  resolveNavigationConfig,
+} from "./navigation";
+import type { StoredNavigationRow } from "./navigation";
 import { createPublicContentClient } from "./supabase";
 import {
   ACTOR_CREDIT_TYPES,
@@ -28,6 +33,7 @@ import type {
   HomeUpdate,
   HomePresentation,
   MusicPlatformLink,
+  MusicPresentation,
   PageSlug,
   PortfolioContent,
   PortfolioType,
@@ -41,6 +47,7 @@ import type {
 
 type SiteSettingsRow = {
   portfolio_type?: string | null;
+  navigation_config_version?: number | null;
   hidden_nav_page_slugs_actor?: unknown;
   hidden_nav_page_slugs_musician?: unknown;
   footer_effect?: string | null;
@@ -105,6 +112,11 @@ type SoundcloudTrackRow = {
   id: string;
   title: string;
   embed_url: string;
+};
+
+type MusicPresentationRow = {
+  releases_heading: string;
+  mixes_heading: string;
 };
 
 type BioGalleryImageRow = {
@@ -195,6 +207,9 @@ function mapSettings(row?: SiteSettingsRow): SiteSettings {
 
   return {
     portfolioType,
+    navigationConfigVersion: normalizeNavigationConfigVersion(
+      row.navigation_config_version
+    ),
     hiddenNavPageSlugs: normalizeHiddenNavPageSlugs(
       portfolioType === "actor"
         ? row.hidden_nav_page_slugs_actor
@@ -262,11 +277,8 @@ function mapAboutHome(row?: AboutHomeRow): AboutHomeContent {
   };
 }
 
-function mapSocialLinks(
-  rows: SocialLinkRow[],
-  allowFallback = true
-): SocialLink[] {
-  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.socialLinks : [];
+function mapSocialLinks(rows: SocialLinkRow[]): SocialLink[] {
+  if (!rows.length) return [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -277,11 +289,8 @@ function mapSocialLinks(
   }));
 }
 
-function mapMusicPlatforms(
-  rows: MusicPlatformRow[],
-  allowFallback = true
-): MusicPlatformLink[] {
-  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.musicPlatforms : [];
+function mapMusicPlatforms(rows: MusicPlatformRow[]): MusicPlatformLink[] {
+  if (!rows.length) return [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -293,11 +302,8 @@ function mapMusicPlatforms(
   }));
 }
 
-function mapSoundcloudTracks(
-  rows: SoundcloudTrackRow[],
-  allowFallback = true
-): SoundcloudTrack[] {
-  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.soundcloudTracks : [];
+function mapSoundcloudTracks(rows: SoundcloudTrackRow[]): SoundcloudTrack[] {
+  if (!rows.length) return [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -306,13 +312,20 @@ function mapSoundcloudTracks(
   }));
 }
 
-function mapBioGalleryImages(
-  rows: BioGalleryImageRow[],
-  allowFallback = true
-): BioGalleryImage[] {
-  if (!rows.length) {
-    return allowFallback ? FALLBACK_CONTENT.bio.galleryImages : [];
-  }
+function mapMusicPresentation(row?: MusicPresentationRow): MusicPresentation {
+  if (!row) return FALLBACK_CONTENT.musicPresentation;
+
+  return {
+    releasesHeading:
+      row.releases_heading.trim() ||
+      FALLBACK_CONTENT.musicPresentation.releasesHeading,
+    mixesHeading:
+      row.mixes_heading.trim() || FALLBACK_CONTENT.musicPresentation.mixesHeading,
+  };
+}
+
+function mapBioGalleryImages(rows: BioGalleryImageRow[]): BioGalleryImage[] {
+  if (!rows.length) return [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -321,11 +334,8 @@ function mapBioGalleryImages(
   }));
 }
 
-function mapGalleryImages(
-  rows: GalleryImageRow[],
-  allowFallback = true
-): GalleryImage[] {
-  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.galleryImages : [];
+function mapGalleryImages(rows: GalleryImageRow[]): GalleryImage[] {
+  if (!rows.length) return [];
 
   return rows.map((row, index) => ({
     id: row.id,
@@ -423,11 +433,8 @@ function mapBioProfile(row?: BioProfileRow) {
   };
 }
 
-function mapBioParagraphs(
-  rows: BioParagraphRow[],
-  allowFallback = true
-): BioParagraph[] {
-  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.bio.paragraphs : [];
+function mapBioParagraphs(rows: BioParagraphRow[]): BioParagraph[] {
+  if (!rows.length) return [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -475,11 +482,8 @@ function mapActorResume(row?: ActorResumeRow): ActorResume {
   };
 }
 
-function mapActorCredits(
-  rows: ActorCreditRow[],
-  allowFallback = true
-): ActorCredit[] {
-  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.actorCredits : [];
+function mapActorCredits(rows: ActorCreditRow[]): ActorCredit[] {
+  if (!rows.length) return [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -505,12 +509,14 @@ async function readSupabaseContent(
 ): Promise<PortfolioContent> {
   const [
     settings,
+    navigationResult,
     heroes,
     updates,
     about,
     socials,
     platforms,
     tracks,
+    musicPresentation,
     gallery,
     galleryImages,
     galleryPresentation,
@@ -529,6 +535,13 @@ async function readSupabaseContent(
       .eq("id", "main")
       .limit(1)
       .returns<SiteSettingsRow[]>(),
+    supabase
+      .from("site_navigation_items")
+      .select("destination_key, is_visible, sort_order, updated_at")
+      .eq("site_id", "main")
+      .order("sort_order", { ascending: true })
+      .order("destination_key", { ascending: true })
+      .returns<StoredNavigationRow[]>(),
     supabase
       .from("page_heroes")
       .select("*")
@@ -565,6 +578,12 @@ async function readSupabaseContent(
       .order("sort_order", { ascending: true })
       .returns<SoundcloudTrackRow[]>(),
     supabase
+      .from("music_presentation")
+      .select("releases_heading, mixes_heading")
+      .eq("id", "main")
+      .limit(1)
+      .returns<MusicPresentationRow[]>(),
+    supabase
       .from("bio_gallery_images")
       .select("*")
       .eq("is_published", true)
@@ -575,6 +594,7 @@ async function readSupabaseContent(
       .select("*")
       .eq("is_published", true)
       .order("sort_order", { ascending: true })
+      .order("id", { ascending: true })
       .returns<GalleryImageRow[]>(),
     supabase
       .from("gallery_presentation")
@@ -660,14 +680,12 @@ async function readSupabaseContent(
   const heroRows = heroes.data ?? [];
 
   if (!allowFallback) {
-    const portfolioType = normalizePortfolioType(settingsRow?.portfolio_type);
     const identityMissing =
       !settingsRow?.artist_name.trim() ||
       !heroRows.find((row) => row.page_slug === "home")?.title.trim();
     const requiredProfileMissing =
       !about.data?.[0] ||
-      !bioProfile.data?.[0] ||
-      (portfolioType === "actor" && !actorResume.data?.[0]);
+      !bioProfile.data?.[0];
 
     if (identityMissing || requiredProfileMissing) {
       throw new Error("Required published portfolio content is incomplete.");
@@ -675,24 +693,37 @@ async function readSupabaseContent(
   }
 
   const bioProfileContent = mapBioProfile(bioProfile.data?.[0]);
+  const mappedSettings = mapSettings(settingsRow);
 
   return {
-    settings: mapSettings(settingsRow),
+    settings: mappedSettings,
+    navigation: resolveNavigationConfig({
+      version: mappedSettings.navigationConfigVersion,
+      rows: navigationResult.data ?? [],
+      error: navigationResult.error,
+      portfolioType: mappedSettings.portfolioType,
+      hiddenPageSlugs: mappedSettings.hiddenNavPageSlugs,
+      audience: "public",
+    }),
     heroes: mapHeroes(heroRows),
     homeUpdates: mapHomeUpdates(updates.data ?? [], allowFallback),
     homePresentation: mapHomePresentation(
       homePresentationAsset.data?.[0]?.metadata
     ),
     aboutHome: mapAboutHome(about.data?.[0]),
-    socialLinks: mapSocialLinks(socials.data ?? [], allowFallback),
-    musicPlatforms: mapMusicPlatforms(platforms.data ?? [], allowFallback),
-    soundcloudTracks: mapSoundcloudTracks(tracks.data ?? [], allowFallback),
+    socialLinks: mapSocialLinks(socials.data ?? []),
+    musicPlatforms: mapMusicPlatforms(platforms.data ?? []),
+    // Migration 0028 is additive. A deploy may briefly run this reader before
+    // the table exists, so headings fail soft while the rest of /music stays
+    // available. Writes remain disabled in Admin V2 until the migration lands.
+    musicPresentation: mapMusicPresentation(musicPresentation.data?.[0]),
+    soundcloudTracks: mapSoundcloudTracks(tracks.data ?? []),
     bio: {
       ...bioProfileContent,
-      galleryImages: mapBioGalleryImages(gallery.data ?? [], allowFallback),
-      paragraphs: mapBioParagraphs(paragraphs.data ?? [], allowFallback),
+      galleryImages: mapBioGalleryImages(gallery.data ?? []),
+      paragraphs: mapBioParagraphs(paragraphs.data ?? []),
     },
-    galleryImages: mapGalleryImages(galleryImages.data ?? [], allowFallback),
+    galleryImages: mapGalleryImages(galleryImages.data ?? []),
     galleryPresentation: mapGalleryPresentation(
       galleryPresentation.data?.[0],
       galleryPresentationAsset.data?.[0]?.metadata
@@ -701,8 +732,9 @@ async function readSupabaseContent(
       videoPresentationAsset.data?.[0]?.metadata
     ),
     videos: mapVideos(videos.data ?? [], allowFallback),
+    hasActorResume: Boolean(actorResume.data?.[0]),
     actorResume: mapActorResume(actorResume.data?.[0]),
-    actorCredits: mapActorCredits(actorCredits.data ?? [], allowFallback),
+    actorCredits: mapActorCredits(actorCredits.data ?? []),
   };
 }
 

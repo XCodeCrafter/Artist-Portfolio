@@ -89,3 +89,24 @@ export const getPublishedCncPrograms = cache(
     return (result.data ?? []).map(mapProgram);
   }
 );
+
+/** Lightweight availability probe for the shared navbar. */
+export const hasPublishedCncPrograms = cache(async (): Promise<boolean> => {
+  const supabase = createPublicContentClient();
+  if (!supabase) return developmentFallback().length > 0;
+
+  const result = await supabase
+    .from("cnc_programs")
+    .select("id")
+    .eq("is_published", true)
+    .limit(1);
+
+  if (result.error) {
+    if (isMissingCncSchema(result.error)) return clonedFallback().length > 0;
+
+    console.error("Unable to check published CNC programs.", result.error);
+    return false;
+  }
+
+  return Boolean(result.data?.length);
+});

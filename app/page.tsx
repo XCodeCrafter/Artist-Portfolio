@@ -5,7 +5,6 @@ import AdaptiveHero from "@/components/AdaptiveHero";
 import CncCodeShowcase from "@/components/CncCodeShowcase";
 import GalleryShowcase from "@/components/GalleryShowcase";
 import JsonLd from "@/components/JsonLd";
-import MusicPlatforms from "@/components/MusicPlatforms";
 import NewsletterBlock from "@/components/NewsletterBlock";
 import { getPortfolioContent, type GalleryImage } from "@/lib/content";
 import { getPublishedCncPrograms } from "@/lib/content/cnc-programs.server";
@@ -23,7 +22,6 @@ export default async function HomePage() {
     getPublishedCncPrograms(),
   ]);
   const hero = content.heroes.home;
-  const profileType = content.settings.portfolioType;
   const videoHero = content.heroes.video;
   const homePresentation = content.homePresentation;
   const interludeVideoSrc =
@@ -119,18 +117,13 @@ export default async function HomePage() {
           }
           storyTitle={homePresentation.storyTitle}
         />
-        {profileType === "musician" ? (
-          <MusicPlatforms cards={content.musicPlatforms} />
-        ) : null}
       </main>
       <NewsletterBlock
         artistName={content.settings.artistName}
         contactBlurb={content.settings.contactBlurb}
         footerEffect={content.settings.footerEffect}
         location={content.settings.location}
-        portfolioType={profileType}
         socialLinks={content.socialLinks}
-        spotifyUrl={content.settings.spotifyArtistUrl}
         tagline={content.settings.tagline}
       />
     </>

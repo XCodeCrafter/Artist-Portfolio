@@ -29,9 +29,7 @@ export default async function VideoPage() {
         contactBlurb={content.settings.contactBlurb}
         footerEffect={content.settings.footerEffect}
         location={content.settings.location}
-        portfolioType={content.settings.portfolioType}
         socialLinks={content.socialLinks}
-        spotifyUrl={content.settings.spotifyArtistUrl}
         tagline={content.settings.tagline}
       />
     </main>

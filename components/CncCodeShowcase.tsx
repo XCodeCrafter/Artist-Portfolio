@@ -149,7 +149,7 @@ export default function CncCodeShowcase({
   if (!previewProgram) return null;
 
   return (
-    <section id="cnc-code" className="cnc-showcase">
+    <section id="cnc-code" className="cnc-showcase public-nav-anchor">
       <div aria-hidden="true" className="cnc-showcase-glow" />
       <div aria-hidden="true" className="cnc-showcase-grid" />
 

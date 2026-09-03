@@ -68,6 +68,7 @@ type MediaManagerProps = {
   content: EditablePortfolioContent;
   contentIsConfigured: boolean;
   contentLoadError?: string;
+  galleryV2Enabled: boolean;
   isConfigured: boolean;
   loadError?: string;
   portfolioType: PortfolioType;
@@ -937,30 +938,21 @@ function ModeTabs({
   hasUnsavedChanges,
   mode,
   onChange,
-  portfolioType,
 }: {
   hasUnsavedChanges: boolean;
   mode: MediaMode;
   onChange: (mode: MediaMode) => boolean;
-  portfolioType: PortfolioType;
 }) {
   const items: Array<{ key: MediaMode; label: string; detail: string }> = [
-    ...(portfolioType === "actor"
-      ? [
-          {
-            key: "studio" as const,
-            label: "Gallery Studio",
-            detail: "Hero, introduction, and public mosaic",
-          },
-        ]
-      : []),
+    {
+      key: "studio",
+      label: "Gallery Studio",
+      detail: "Hero, introduction, and public mosaic",
+    },
     {
       key: "showreel",
-      label: portfolioType === "actor" ? "Showreel Studio" : "Video Studio",
-      detail:
-        portfolioType === "actor"
-          ? "Hero, featured reel, scenes, and clips"
-          : "Hero, featured video, music videos, and clips",
+      label: "Showreel & Video Studio",
+      detail: "Hero, featured reel, music videos, scenes, and clips",
     },
     {
       key: "library",
@@ -2086,6 +2078,7 @@ function GalleryStudio({
   confirmDiscard,
   content,
   disabled,
+  v2Enabled,
   portfolioType,
 }: {
   assetListId: string;
@@ -2093,6 +2086,7 @@ function GalleryStudio({
   confirmDiscard: () => boolean;
   content: EditablePortfolioContent;
   disabled: boolean;
+  v2Enabled: boolean;
   portfolioType: PortfolioType;
 }) {
   const presentation = content.galleryPresentation;
@@ -2141,6 +2135,21 @@ function GalleryStudio({
 
   return (
     <div className="grid gap-6">
+      {v2Enabled ? (
+        <div className="rounded-2xl border border-[#ff674f]/20 bg-[#ff3b1f]/[0.075] p-4 text-sm leading-6 text-white/68">
+          <p className="font-semibold text-white">Gallery editing moved to Admin V2</p>
+          <p className="mt-1 text-white/46">
+            This classic view stays available for reference, but its forms are
+            locked so they cannot bypass the new conflict protection.
+          </p>
+          <Link
+            className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white"
+            href="/admin/v2/pages/gallery"
+          >
+            Open Gallery V2 <FaExternalLinkAlt />
+          </Link>
+        </div>
+      ) : null}
       <div className="sticky top-4 z-30 flex flex-col gap-3 rounded-2xl border border-emerald-300/15 bg-[#101312]/95 p-4 shadow-2xl backdrop-blur sm:flex-row sm:items-center sm:justify-between">
         <nav aria-label="Gallery Studio sections" className="flex gap-2" role="tablist">
           {panels.map((panel, index) => (
@@ -2353,6 +2362,7 @@ export default function MediaManager({
   content,
   contentIsConfigured,
   contentLoadError,
+  galleryV2Enabled,
   isConfigured,
   loadError,
   portfolioType,
@@ -2533,7 +2543,6 @@ export default function MediaManager({
         hasUnsavedChanges={hasUnsavedChanges}
         mode={mode}
         onChange={changeMode}
-        portfolioType={portfolioType}
       />
       <datalist id={assetListId}>
         {availableAssets
@@ -2544,11 +2553,7 @@ export default function MediaManager({
       </datalist>
 
       {(["studio", "showreel", "library"] as const)
-        .filter(
-          (panelMode) =>
-            panelMode !== mode &&
-            (portfolioType === "actor" || panelMode !== "studio")
-        )
+        .filter((panelMode) => panelMode !== mode)
         .map((panelMode) => (
           <div
             aria-labelledby={`media-${panelMode}-tab`}
@@ -2566,7 +2571,8 @@ export default function MediaManager({
             assets={availableAssets}
             confirmDiscard={confirmAndDiscardDrafts}
             content={content}
-            disabled={contentDisabled}
+            disabled={contentDisabled || galleryV2Enabled}
+            v2Enabled={galleryV2Enabled}
             portfolioType={portfolioType}
           />
         </div>

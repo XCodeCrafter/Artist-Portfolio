@@ -101,9 +101,11 @@ function CreditRow({ credit }: { credit: ActorCredit }) {
 export default function ActorResumeBlock({
   resume,
   credits,
+  hasResumeDetails = true,
 }: {
   resume: ActorResume;
   credits: ActorCredit[];
+  hasResumeDetails?: boolean;
 }) {
   const groupedCredits = creditTypeOrder
     .map((type) => ({
@@ -114,52 +116,63 @@ export default function ActorResumeBlock({
 
   return (
     <section
-      className="mx-auto max-w-[1400px] px-5 py-14 sm:px-8 sm:py-18"
+      className="public-nav-anchor mx-auto max-w-[1400px] px-5 py-14 sm:px-8 sm:py-18"
       id="resume"
     >
       <div className="grid gap-10 lg:grid-cols-[0.9fr_1.4fr]">
-        <div>
-          <p className="text-xs uppercase tracking-[0.32em] text-white/45">
-            Resume
-          </p>
-          <h2
-            className="heading-ui mt-3 text-3xl text-white sm:text-4xl"
-            data-reveal="up"
-          >
-            {resume.headline || "Actor Resume"}
-          </h2>
-          {resume.summary ? (
-            <p
-              className="mt-5 text-sm leading-7 text-white/65"
-              data-reveal="up"
-              data-reveal-delay="80"
-            >
-              {resume.summary}
+        {hasResumeDetails ? (
+          <div>
+            <p className="text-xs uppercase tracking-[0.32em] text-white/45">
+              Resume
             </p>
-          ) : null}
-          {resume.resumeUrl ? (
-            <a
-              className="mt-6 inline-flex h-11 items-center rounded-md bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/85"
-              href={resume.resumeUrl}
+            <h2
+              className="heading-ui mt-3 text-3xl text-white sm:text-4xl"
+              data-reveal="up"
             >
-              Download Resume
-            </a>
-          ) : null}
+              {resume.headline || "Actor Resume"}
+            </h2>
+            {resume.summary ? (
+              <p
+                className="mt-5 text-sm leading-7 text-white/65"
+                data-reveal="up"
+                data-reveal-delay="80"
+              >
+                {resume.summary}
+              </p>
+            ) : null}
+            {resume.resumeUrl ? (
+              <a
+                className="mt-6 inline-flex h-11 items-center rounded-md bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/85"
+                href={resume.resumeUrl}
+              >
+                Download Resume
+              </a>
+            ) : null}
 
-          <dl className="mt-8">
-            <Detail label="Location" value={resume.location} />
-            <Detail label="Playing age" value={resume.playingAge} />
-            <Detail label="Height" value={resume.height} />
-            <Detail label="Eyes" value={resume.eyes} />
-            <Detail label="Hair" value={resume.hair} />
-            <Detail label="Representation" value={resume.representation} />
-          </dl>
+            <dl className="mt-8">
+              <Detail label="Location" value={resume.location} />
+              <Detail label="Playing age" value={resume.playingAge} />
+              <Detail label="Height" value={resume.height} />
+              <Detail label="Eyes" value={resume.eyes} />
+              <Detail label="Hair" value={resume.hair} />
+              <Detail label="Representation" value={resume.representation} />
+            </dl>
 
-          <div className="mt-8 grid gap-6">
-            <TagList label="Languages" value={resume.languages} />
-            <TagList label="Skills" value={resume.skills} />
+            <div className="mt-8 grid gap-6">
+              <TagList label="Languages" value={resume.languages} />
+              <TagList label="Skills" value={resume.skills} />
+            </div>
           </div>
-        </div>
+        ) : (
+          <div>
+            <p className="text-xs uppercase tracking-[0.32em] text-white/45">
+              Resume &amp; Credits
+            </p>
+            <h2 className="heading-ui mt-3 text-3xl text-white sm:text-4xl">
+              Selected acting work
+            </h2>
+          </div>
+        )}
 
         <div>
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
