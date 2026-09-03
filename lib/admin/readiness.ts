@@ -52,9 +52,9 @@ function getNavigationSnapshotRows(value: unknown): NavigationSnapshotRow[] {
 
 function hasEmailEnv() {
   return Boolean(
-    process.env.RESEND_API_KEY &&
-      process.env.BOOKING_TO_EMAIL &&
-      process.env.BOOKING_FROM_EMAIL
+    process.env.RESEND_API_KEY?.trim() &&
+      process.env.BOOKING_TO_EMAIL?.trim() &&
+      process.env.BOOKING_FROM_EMAIL?.trim()
   );
 }
 
@@ -74,6 +74,12 @@ async function inspectSupabase() {
       navigationManagerResult,
       navbarSocialLinksResult,
       musicEditorResult,
+      bioEditorResult,
+      galleryEditorResult,
+      showreelEditorResult,
+      contactEditorResult,
+      contactHeroSaveProbeResult,
+      contactDetailsSaveProbeResult,
       galleryResult,
       mediaResult,
       videosResult,
@@ -97,6 +103,20 @@ async function inspectSupabase() {
         p_site_id: "main",
       }),
       supabase.rpc("get_music_page_v2_snapshot", { p_site_id: "main" }),
+      supabase.rpc("get_bio_page_v2_snapshot", { p_site_id: "main" }),
+      supabase.rpc("get_gallery_page_v2_snapshot", { p_site_id: "main" }),
+      supabase.rpc("get_showreel_page_v2_snapshot", { p_site_id: "main" }),
+      supabase.rpc("get_contact_page_v2_snapshot", { p_site_id: "main" }),
+      supabase.rpc("save_contact_hero_v2", {
+        p_site_id: "~schema-probe",
+        p_expected_updated_at: "1970-01-01T00:00:00.000Z",
+        p_payload: {},
+      }),
+      supabase.rpc("save_contact_details_v2", {
+        p_site_id: "~schema-probe",
+        p_expected_updated_at: "1970-01-01T00:00:00.000Z",
+        p_payload: {},
+      }),
       supabase
         .from("gallery_images")
         .select(
@@ -160,11 +180,19 @@ async function inspectSupabase() {
             row.is_visible === true
         )
       );
+    const contactSaveRpcsOk = [
+      contactHeroSaveProbeResult,
+      contactDetailsSaveProbeResult,
+    ].every((result) => result.error?.code === "22023");
     const schemaOk = [
       settingsResult,
       navigationManagerResult,
       navbarSocialLinksResult,
       musicEditorResult,
+      bioEditorResult,
+      galleryEditorResult,
+      showreelEditorResult,
+      contactEditorResult,
       galleryResult,
       mediaResult,
       videosResult,
@@ -172,7 +200,9 @@ async function inspectSupabase() {
       cncProgramsResult,
       inquiriesResult,
       recoveryResult,
-    ].every((result) => !result.error) && navigationCatalogOk;
+    ].every((result) => !result.error) &&
+      navigationCatalogOk &&
+      contactSaveRpcsOk;
 
     return {
       schemaOk,
@@ -258,7 +288,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       critical: true,
       detail: supabase.schemaOk
         ? "Required tables and columns are available."
-        : "Apply all Supabase migrations through 0029.",
+        : "Apply all current Supabase migrations through 0033.",
       href: "/admin/security#health",
     },
     {

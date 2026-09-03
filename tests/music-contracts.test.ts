@@ -126,7 +126,7 @@ describe("Music visual editor presentation contract", () => {
       'supabase.rpc("get_music_page_v2_snapshot", { p_site_id: "main" })'
     );
     expect(readiness).toContain(
-      '"Apply all Supabase migrations through 0029."'
+      '"Apply all current Supabase migrations through 0033."'
     );
   });
 

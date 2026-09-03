@@ -119,6 +119,7 @@ type ContentEditorProps = {
   cncMigrationRequired: boolean;
   cncPrograms: EditableCncProgram[];
   content: EditablePortfolioContent;
+  contactV2Enabled: boolean;
   isConfigured: boolean;
   loadError?: string;
   status?: string;
@@ -3406,6 +3407,7 @@ export default function ContentEditor({
   cncMigrationRequired,
   cncPrograms,
   content,
+  contactV2Enabled,
   isConfigured,
   loadError,
   status,
@@ -3694,7 +3696,27 @@ export default function ContentEditor({
         kicker: "Public page",
         description:
           "Hero, location, contact introduction, and inquiry form context.",
-        node: (
+        node: contactV2Enabled ? (
+          <section className="rounded-[24px] border border-[#ff5a42]/22 bg-[radial-gradient(circle_at_85%_10%,rgba(255,59,31,0.16),transparent_42%),#111113] p-6 shadow-[0_22px_80px_rgba(0,0,0,0.3)] sm:p-8">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ff715b]">
+              Contact moved to V2
+            </p>
+            <h2 className="heading-ui mt-3 text-2xl font-semibold text-white">
+              Edit the real Contact page in one place
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/46">
+              The V2 editor now owns the Hero and contact details with a live
+              desktop/mobile preview and conflict-safe saves. Classic fields
+              are locked so two editors cannot quietly overwrite each other.
+            </p>
+            <Link
+              className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white"
+              href="/admin/v2/pages/contact"
+            >
+              Open Contact V2 <FaExternalLinkAlt />
+            </Link>
+          </section>
+        ) : (
           <StudioWorkspace
             description="Contact introduction and the public inquiry experience"
             label="Contact page"
@@ -3842,6 +3864,7 @@ export default function ContentEditor({
       cncMigrationRequired,
       cncPrograms,
       content,
+      contactV2Enabled,
       disabled,
       musicEnabled,
       portfolioType,

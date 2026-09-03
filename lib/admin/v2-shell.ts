@@ -38,6 +38,12 @@ export const ADMIN_V2_NAVIGATION = [
     label: "Music page",
     description: "Visual section editor",
   },
+  {
+    key: "contact",
+    href: "/admin/v2/pages/contact",
+    label: "Contact page",
+    description: "Page and inquiry delivery",
+  },
 ] as const;
 
 export type AdminV2NavigationKey =

@@ -15,6 +15,7 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaExternalLinkAlt,
+  FaEnvelope,
   FaImages,
   FaHome,
   FaListUl,
@@ -71,6 +72,7 @@ function iconFor(key: AdminV2NavigationKey) {
     gallery: <FaImages />,
     showreel: <FaVideo />,
     music: <FaMusic />,
+    contact: <FaEnvelope />,
   };
   return icons[key];
 }
@@ -101,6 +103,7 @@ function V2NavLinks({
             href={item.href}
             key={item.key}
             onClick={onNavigate}
+            title={collapsed ? item.label : undefined}
           >
             <span
               className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border text-sm transition ${
@@ -404,7 +407,7 @@ export default function AdminV2Shell({
             </button>
           ) : null}
 
-          <div className="mt-5 min-h-0 flex-1">
+          <div className="admin-scrollbar-none mt-5 min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
             <V2NavLinks collapsed={collapsed} />
           </div>
 

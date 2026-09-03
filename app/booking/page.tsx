@@ -1,7 +1,8 @@
 // artist-portfolio/app/booking/page.tsx
 import type { Metadata } from "next";
-import AdaptiveHero from "@/components/AdaptiveHero";
-import BookingForm from "@/components/BookingForm";
+import ContactPageView, {
+  type ContactPageViewData,
+} from "@/components/contact/ContactPageView";
 import { getPortfolioContent } from "@/lib/content";
 import { createPageMetadata } from "@/lib/seo";
 
@@ -13,18 +14,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function BookingPage() {
   const content = await getPortfolioContent();
-  const hero = content.heroes.booking;
+  const data: ContactPageViewData = {
+    hero: content.heroes.booking,
+    details: {
+      contactBlurb: content.settings.contactBlurb,
+      location: content.settings.location,
+    },
+  };
 
-  return (
-    <main>
-      <AdaptiveHero {...hero} />
-
-      <section className="public-nav-anchor py-24 md:py-32" id="form">
-        <BookingForm
-          contactBlurb={content.settings.contactBlurb}
-          location={content.settings.location}
-        />
-      </section>
-    </main>
-  );
+  return <ContactPageView data={data} />;
 }

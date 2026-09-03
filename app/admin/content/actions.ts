@@ -623,12 +623,37 @@ function isMissingShowreelV2Snapshot(error: {
   );
 }
 
+function isMissingContactV2Snapshot(error: {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+}) {
+  const message = [error.message, error.details, error.hint]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    error.code === "PGRST202" ||
+    (error.code === "42883" && /get_contact_page_v2_snapshot/i.test(message)) ||
+    /schema cache.*get_contact_page_v2_snapshot/i.test(message)
+  );
+}
+
 async function handOffLegacyShowreelWrite(supabase: SupabaseClient) {
   const { error } = await supabase.rpc("get_showreel_page_v2_snapshot", {
     p_site_id: "main",
   });
   if (!error || !isMissingShowreelV2Snapshot(error)) {
     redirect("/admin/v2/pages/showreel?from=classic");
+  }
+}
+
+async function handOffLegacyContactWrite(supabase: SupabaseClient) {
+  const { error } = await supabase.rpc("get_contact_page_v2_snapshot", {
+    p_site_id: "main",
+  });
+  if (!error || !isMissingContactV2Snapshot(error)) {
+    redirect("/admin/v2/pages/contact?from=classic");
   }
 }
 
@@ -783,6 +808,7 @@ export async function updateContactSettings(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-contact-settings", section);
 
   const { admin, supabase } = await getWriteContext(section);
+  await handOffLegacyContactWrite(supabase);
   const result = await supabase
     .from("site_settings")
     .update({
@@ -962,6 +988,9 @@ export async function updatePageHero(formData: FormData) {
   const { admin, supabase } = await getWriteContext(returnSection);
   if (parsed.data.pageSlug === "video") {
     await handOffLegacyShowreelWrite(supabase);
+  }
+  if (parsed.data.pageSlug === "booking") {
+    await handOffLegacyContactWrite(supabase);
   }
   const result = await supabase.from("page_heroes").upsert({
     page_slug: parsed.data.pageSlug,

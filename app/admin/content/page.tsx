@@ -2,6 +2,7 @@ import AdminShell from "@/components/admin/AdminShell";
 import ContentEditor from "@/components/admin/ContentEditor";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getEditableCncPrograms } from "@/lib/admin/cnc-programs";
+import { getAdminContactEditorData } from "@/lib/admin/contact";
 import { getEditablePortfolioContent } from "@/lib/admin/content";
 import { getMediaAssets } from "@/lib/admin/media";
 
@@ -18,10 +19,11 @@ export default async function AdminContentPage({
 }) {
   const admin = await requireAdmin();
   const params = await searchParams;
-  const [contentResult, mediaResult, cncResult] = await Promise.all([
+  const [contentResult, mediaResult, cncResult, contactResult] = await Promise.all([
     getEditablePortfolioContent(),
     getMediaAssets(),
     getEditableCncPrograms(),
+    getAdminContactEditorData(),
   ]);
   const { content, isConfigured, loadError } = contentResult;
 
@@ -38,6 +40,9 @@ export default async function AdminContentPage({
     >
       <ContentEditor
         content={content}
+        contactV2Enabled={
+          contactResult.isConfigured && !contactResult.migrationRequired
+        }
         assets={mediaResult.assets}
         cncIsConfigured={cncResult.isConfigured}
         cncLoadError={cncResult.loadError}

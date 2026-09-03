@@ -4,6 +4,7 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
   FaEye,
+  FaEnvelope,
   FaImages,
   FaListUl,
   FaMusic,
@@ -11,6 +12,7 @@ import {
   FaVideo,
 } from "react-icons/fa";
 import { getAdminBioEditorData } from "@/lib/admin/bio";
+import { getAdminContactEditorData } from "@/lib/admin/contact";
 import { getAdminGalleryEditorData } from "@/lib/admin/gallery";
 import { getAdminNavigationData } from "@/lib/admin/navigation";
 import { getAdminShowreelEditorData } from "@/lib/admin/showreel";
@@ -24,11 +26,12 @@ export const metadata = { title: "Admin V2" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminV2OverviewPage() {
-  const [data, bio, gallery, showreel] = await Promise.all([
+  const [data, bio, gallery, showreel, contact] = await Promise.all([
     getAdminNavigationData(),
     getAdminBioEditorData(),
     getAdminGalleryEditorData(),
     getAdminShowreelEditorData(),
+    getAdminContactEditorData(),
   ]);
   const model = createNavigationEditorModel(data.navigation);
   const selectedCount = model.items.filter(
@@ -56,7 +59,12 @@ export default async function AdminV2OverviewPage() {
     Boolean(gallery.loadError) ||
     !showreel.isConfigured ||
     showreel.migrationRequired ||
-    Boolean(showreel.loadError);
+    Boolean(showreel.loadError) ||
+    !contact.isConfigured ||
+    contact.migrationRequired ||
+    Boolean(contact.loadError) ||
+    !contact.delivery.emailConfigured ||
+    !contact.delivery.webhookConfigured;
 
   return (
     <div className="grid gap-4">
@@ -247,6 +255,39 @@ export default async function AdminV2OverviewPage() {
           </div>
         </Link>
 
+        <Link
+          className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_78%_10%,rgba(255,112,86,0.18),transparent_42%),#111113] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.34)] outline-none transition hover:border-white/24 focus-visible:ring-2 focus-visible:ring-white/70 sm:p-7"
+          href="/admin/v2/pages/contact"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/12 bg-white/[0.09] text-white shadow-[0_14px_38px_rgba(0,0,0,0.28)]">
+              <FaEnvelope />
+            </span>
+            <FaArrowRight className="mt-3 text-white/30 transition group-hover:translate-x-1 group-hover:text-white" />
+          </div>
+          <p className="mt-8 text-[10px] font-semibold uppercase tracking-[0.2em] text-orange-200/70">
+            Page and delivery
+          </p>
+          <h2 className="heading-ui mt-2 text-2xl font-semibold text-white sm:text-3xl">
+            Edit Contact page
+          </h2>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-white/44">
+            Edit the opening and contact details in the real page preview, then
+            see whether inbox storage and email notifications are configured.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2 text-[10px] text-white/58">
+            <span className="rounded-full border border-white/9 bg-black/22 px-3 py-2">
+              Inert form preview
+            </span>
+            <span className="rounded-full border border-white/9 bg-black/22 px-3 py-2">
+              Delivery context
+            </span>
+            <span className="rounded-full border border-white/9 bg-black/22 px-3 py-2">
+              2 clear sections
+            </span>
+          </div>
+        </Link>
+
         <aside className="rounded-[26px] border border-white/9 bg-[#0f0f11]/92 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.26)] xl:col-span-2">
           <div className="flex items-start gap-3">
             {needsAttention ? (
@@ -311,6 +352,29 @@ export default async function AdminV2OverviewPage() {
             {showreel.loadError ? (
               <p className="rounded-xl border border-red-300/14 bg-red-400/[0.055] px-3 py-2.5 text-red-100/68">
                 {showreel.loadError}
+              </p>
+            ) : null}
+            {contact.migrationRequired ? (
+              <p className="rounded-xl border border-amber-300/14 bg-amber-400/[0.055] px-3 py-2.5 text-amber-100/68">
+                The Contact editor is ready for review. Migration 0033 is still
+                required before it can publish.
+              </p>
+            ) : null}
+            {contact.loadError ? (
+              <p className="rounded-xl border border-red-300/14 bg-red-400/[0.055] px-3 py-2.5 text-red-100/68">
+                {contact.loadError}
+              </p>
+            ) : null}
+            {!contact.delivery.emailConfigured ? (
+              <p className="rounded-xl border border-amber-300/14 bg-amber-400/[0.055] px-3 py-2.5 text-amber-100/68">
+                Contact submissions can still be retained in the Inbox, but
+                one or more Resend email settings are missing in this runtime.
+              </p>
+            ) : null}
+            {!contact.delivery.webhookConfigured ? (
+              <p className="rounded-xl border border-amber-300/14 bg-amber-400/[0.055] px-3 py-2.5 text-amber-100/68">
+                Contact delivery monitoring is missing its Resend webhook
+                secret, so sent email cannot be confirmed as delivered here.
               </p>
             ) : null}
           </div>

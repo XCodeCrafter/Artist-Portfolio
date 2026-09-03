@@ -1,6 +1,6 @@
 # Artist Portfolio V2 Roadmap
 
-Updated: 2026-09-03
+Updated: 2026-09-04
 
 ## Product direction
 
@@ -309,6 +309,8 @@ Later QA findings already queued for Batch 10:
   lookup at the relevant Supabase boundary.
 - Investigate intermittent Next image-optimizer timeouts against Supabase
   Storage and keep remote-image failures graceful instead of noisy.
+- Consume the admin unsaved-change history sentinel after save/discard so the
+  first Back action does not appear to do nothing.
 
 Acceptance:
 
@@ -316,7 +318,7 @@ Acceptance:
 
 ## Batch 6 - Remaining page editors
 
-Status: Batch 6A, Batch 6B, and Batch 6C deployed
+Status: Batch 6A, Batch 6B, and Batch 6C deployed; Batch 6D implementation and database rollout complete, production delivery verification pending
 
 - [x] Bio plus Resume/Credits (Batch 6A).
   - [x] Share the exact public Bio presentation with a safe live V2 preview.
@@ -415,8 +417,51 @@ Status: Batch 6A, Batch 6B, and Batch 6C deployed
         items unchanged. The classic Showreel Studio also switched to its locked
         V2 handoff state. Do not use `supabase db push` while remote migration
         history remains empty.
-- [ ] Contact and inquiry context.
+- [ ] Contact and inquiry context (Batch 6D rollout).
+  - [x] Share one `ContactPageView` between `/booking` and the authenticated
+        1440x900 / 390x844 preview.
+  - [x] Map the public page to two plain-language edit areas: Hero and
+        Contact & form.
+  - [x] Keep the real form, links, fields, and video playback inert inside the
+        editor preview so editing cannot submit an inquiry.
+  - [x] Save Hero and Contact details independently with strict validation,
+        optimistic conflict detection, audit logging, and public revalidation.
+  - [x] Repair only a missing `booking` Hero without overwriting existing
+        content or touching historical inquiries.
+  - [x] Hand classic Contact writes to V2 once migration 0033 is active so the
+        two editors cannot silently overwrite one another.
+  - [x] Show configuration-only status for Inbox storage, Resend
+        notifications, and delivery monitoring without exposing secrets or
+        claiming that a real email was delivered.
+  - [x] Fix the mobile in-page form jump, add accessible field labels and live
+        submission feedback, and preserve the existing public composition.
+  - [x] Treat a successfully stored inquiry as accepted when only its email
+        notification fails, preventing misleading retries and duplicate Inbox
+        rows.
+  - [x] Cover Contact validation, preview messaging, framing, server actions,
+        migration contracts, origin/rate-limit protections, Inbox-only mode,
+        Resend success/failure, and dual-channel failure with automated tests.
+  - [x] Apply `0033_contact_page_editor.sql` manually, verify all three RPCs,
+        and repeat authenticated desktop/mobile editor QA without publishing
+        content. Do not use `supabase db push` while remote migration history
+        remains empty.
+  - [ ] With explicit owner approval, submit one clearly marked real QA
+        inquiry, verify the Inbox row and deployed email status/receipt, then
+        archive the test record.
 - [x] Reuse the accepted shared-preview/inspector pattern for Bio.
+
+Batch 6D rollout verification:
+
+- 357 automated tests, TypeScript, full ESLint, and the production build pass.
+- All three Contact RPCs are live and service-role-only. Invalid save probes
+  returned the expected validation errors without changing either source row or
+  timestamp.
+- Authenticated browser QA passed for the desktop/mobile preview, section
+  switching, local dirty/discard flow, public Contact layout and Hero jump, and
+  the locked classic-to-V2 handoff. No QA content was published.
+- Local configuration can persist inquiries to Supabase, but does not contain
+  the Resend sender/recipient/API settings or delivery-webhook secret. Deployed
+  email delivery therefore remains unverified until the controlled live test.
 
 Acceptance:
 

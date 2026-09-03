@@ -396,6 +396,7 @@ describe("Admin V2 shell helpers", () => {
       "gallery",
       "showreel",
       "music",
+      "contact",
     ]);
     expect(getAdminV2ActiveItem("/admin/v2").key).toBe("overview");
     expect(getAdminV2ActiveItem("/admin/v2/navigation").key).toBe(
@@ -423,6 +424,12 @@ describe("Admin V2 shell helpers", () => {
     expect(getAdminV2ActiveItem("/admin/v2/pages/music").key).toBe("music");
     expect(getAdminV2ActiveItem("/admin/v2/pages/music/history").key).toBe(
       "music"
+    );
+    expect(getAdminV2ActiveItem("/admin/v2/pages/contact").key).toBe(
+      "contact"
+    );
+    expect(getAdminV2ActiveItem("/admin/v2/pages/contact/history").key).toBe(
+      "contact"
     );
   });
 

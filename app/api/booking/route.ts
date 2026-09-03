@@ -304,18 +304,56 @@ async function writeBookingAnalytics(input: {
       ? "Mobile"
       : "Desktop";
 
-  await supabase.from("analytics_events").insert({
-    event_name: "booking_submit",
-    page_path: "/booking",
-    target_label: `${getInquiryIntentLabel(input.inquiryIntent)} inquiry form`,
-    target_url: "",
-    metadata: {
-      portfolioType: input.portfolioType,
-      inquiryType: input.inquiryType,
-      inquiryIntent: input.inquiryIntent,
-      deviceCategory,
-    },
+  try {
+    const { error } = await supabase.from("analytics_events").insert({
+      event_name: "booking_submit",
+      page_path: "/booking",
+      target_label: `${getInquiryIntentLabel(input.inquiryIntent)} inquiry form`,
+      target_url: "",
+      metadata: {
+        portfolioType: input.portfolioType,
+        inquiryType: input.inquiryType,
+        inquiryIntent: input.inquiryIntent,
+        deviceCategory,
+      },
+    });
+
+    if (error) console.error(error);
+  } catch (error) {
+    // Analytics is best-effort and must never turn an accepted message into a retry.
+    console.error(error);
+  }
+}
+
+async function respondToEmailFailure(input: {
+  inquirySaved: boolean;
+  userAgent: string;
+  portfolioType: PortfolioType;
+  inquiryType: LegacyInquiryType;
+  inquiryIntent: InquiryIntent;
+}) {
+  if (!input.inquirySaved) {
+    return jsonError(
+      502,
+      "Message could not be saved or sent. Please try again later."
+    );
+  }
+
+  await writeBookingAnalytics({
+    userAgent: input.userAgent,
+    portfolioType: input.portfolioType,
+    inquiryType: input.inquiryType,
+    inquiryIntent: input.inquiryIntent,
   });
+
+  return NextResponse.json(
+    {
+      ok: true,
+      message:
+        "Message received. It is saved in the inbox, but the email notification could not be sent.",
+    },
+    { status: 202 }
+  );
 }
 
 export async function POST(req: Request) {
@@ -589,12 +627,13 @@ export async function POST(req: Request) {
           reason: "provider-request-failed",
         },
       });
-      return jsonError(
-        502,
-        inquiry.ok
-          ? "Message was saved, but email delivery failed."
-          : "Message could not be saved or sent. Please try again later."
-      );
+      return respondToEmailFailure({
+        inquirySaved: inquiry.ok,
+        userAgent,
+        portfolioType,
+        inquiryType,
+        inquiryIntent,
+      });
     }
 
     if (emailResult.error) {
@@ -620,12 +659,13 @@ export async function POST(req: Request) {
           reason: "provider-rejected",
         },
       });
-      return jsonError(
-        502,
-        inquiry.ok
-          ? "Message was saved, but email delivery failed."
-          : "Message could not be saved or sent. Please try again later."
-      );
+      return respondToEmailFailure({
+        inquirySaved: inquiry.ok,
+        userAgent,
+        portfolioType,
+        inquiryType,
+        inquiryIntent,
+      });
     }
 
     await updateInquiryEmailTracking({

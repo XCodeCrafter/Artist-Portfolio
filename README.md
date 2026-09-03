@@ -321,14 +321,26 @@ and public `/video` stability while all seven saved videos remained present.
 The remote CLI migration history is still empty, so do not use
 `supabase db push`.
 
+Migration `0033_contact_page_editor.sql` provides the service-only Contact
+snapshot and two atomic save boundaries: Hero and Contact details. It repairs
+only a missing `booking` hero with the existing fallback copy, never overwrites
+an existing hero, and does not alter inquiry history. Contact saves use exact
+payload validation, optimistic version checks, and the same Media Library lock
+as the other visual editors. It was applied manually to the connected project;
+all three RPCs are live, preserve the existing Contact rows, and reject anon
+access. The remote CLI migration history remains empty, so `db push` is still
+not safe.
+
 The new dashboard shell lives at `/admin/v2`; its navigation workspace is
 `/admin/v2/navigation`. The 1:1 page editors live at `/admin/v2/pages/music`,
-`/admin/v2/pages/bio`, `/admin/v2/pages/gallery`, and
-`/admin/v2/pages/showreel`; each shares presentation components with its public
+`/admin/v2/pages/bio`, `/admin/v2/pages/gallery`,
+`/admin/v2/pages/showreel`, and `/admin/v2/pages/contact`; each shares
+presentation components with its public
 page, provides 1440 px and 390 px preview viewports, and saves one visible
 section at a time. Bio maps directly to Hero, Biography, Resume, and Credits;
 Gallery maps to Hero, Introduction, and recoverable Frames; Showreel maps to
-Hero, Introduction, and a recoverable all-types Video catalog.
+Hero, Introduction, and a recoverable all-types Video catalog; Contact maps to
+Hero plus Contact & form context and shows configuration-only delivery health.
 The classic `/admin` remains
 available and links to V2. V1 no longer exposes the Actor/Musician switch or its
 profile-only navbar form; it keeps both content groups available and directs
@@ -357,9 +369,9 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. All Supabase migrations through `0031_gallery_page_editor.sql` are applied
+1. All Supabase migrations through `0033_contact_page_editor.sql` are applied
    manually on the currently linked project. Take a full backup and reconcile
-   its pre-existing empty CLI history before using `db push`.
+   the pre-existing empty CLI history before using `db push`.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare

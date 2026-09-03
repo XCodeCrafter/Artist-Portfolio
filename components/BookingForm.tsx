@@ -128,21 +128,27 @@ export default function BookingForm({
           </div>
 
           <a
-            href="#form"
-            className="mt-8 inline-flex rounded-full border border-white/15 bg-black/30 px-5 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white transition"
+            href="#contact-form"
+            className="mt-8 inline-flex rounded-full border border-white/15 bg-black/30 px-5 py-2 text-sm text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           >
-            Open form -&gt;
+            Open contact form -&gt;
           </a>
         </div>
 
         <form
-          className="rounded-3xl border border-white/10 bg-white/5 p-8"
+          aria-busy={state.status === "sending"}
+          aria-labelledby="contact-form-title"
+          className="scroll-mt-28 rounded-3xl border border-white/10 bg-white/5 p-8"
+          id="contact-form"
           onFocusCapture={markFormStarted}
           onPointerDown={markFormStarted}
           onSubmit={onSubmit}
         >
           <div className="text-xs tracking-[0.35em] text-white/55">FORM</div>
-          <h2 className="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight">
+          <h2
+            className="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight"
+            id="contact-form-title"
+          >
             Send a message
           </h2>
 
@@ -189,47 +195,68 @@ export default function BookingForm({
                 ))}
               </div>
             </fieldset>
-            <input
-              name="name"
-              className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/80 placeholder:text-white/35 outline-none focus:border-white/30"
-              placeholder="Your name"
-              required
-              minLength={2}
-              maxLength={80}
-              autoComplete="name"
-            />
-            <input
-              name="email"
-              type="email"
-              className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/80 placeholder:text-white/35 outline-none focus:border-white/30"
-              placeholder="Email"
-              required
-              maxLength={200}
-              autoComplete="email"
-            />
-            <textarea
-              name="message"
-              className="min-h-[140px] w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/80 placeholder:text-white/35 outline-none focus:border-white/30"
-              placeholder="Message"
-              required
-              minLength={10}
-              maxLength={4000}
-            />
+            <label>
+              <span className="sr-only">Your name</span>
+              <input
+                name="name"
+                className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/80 placeholder:text-white/35 outline-none focus:border-white/30 focus-visible:ring-2 focus-visible:ring-white/65"
+                placeholder="Your name"
+                required
+                minLength={2}
+                maxLength={80}
+                autoComplete="name"
+              />
+            </label>
+            <label>
+              <span className="sr-only">Email address</span>
+              <input
+                name="email"
+                type="email"
+                className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/80 placeholder:text-white/35 outline-none focus:border-white/30 focus-visible:ring-2 focus-visible:ring-white/65"
+                placeholder="Email"
+                required
+                maxLength={200}
+                autoComplete="email"
+              />
+            </label>
+            <label>
+              <span className="sr-only">Message</span>
+              <textarea
+                name="message"
+                className="min-h-[140px] w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/80 placeholder:text-white/35 outline-none focus:border-white/30 focus-visible:ring-2 focus-visible:ring-white/65"
+                placeholder="Message"
+                required
+                minLength={10}
+                maxLength={4000}
+              />
+            </label>
 
             <button
-              className="rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-black hover:opacity-90 transition disabled:opacity-60"
+              className="rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-black transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:opacity-60"
               type="submit"
               disabled={state.status === "sending"}
             >
               {state.status === "sending" ? "Sending..." : "Send message ->"}
             </button>
 
-            {state.status === "success" && (
-              <div className="text-sm text-white/80">Success: {state.message}</div>
-            )}
-            {state.status === "error" && (
-              <div className="text-sm text-red-300">Error: {state.message}</div>
-            )}
+            <div
+              aria-atomic="true"
+              aria-live={state.status === "error" ? "assertive" : "polite"}
+              id="contact-form-status"
+              role={state.status === "error" ? "alert" : "status"}
+            >
+              {state.status === "sending" ? (
+                <span className="sr-only">Sending message.</span>
+              ) : null}
+              {state.status === "success" ? (
+                <div className="text-sm text-white/80">
+                  Success: {state.message}
+                </div>
+              ) : null}
+              {state.status === "error" ? (
+                <div className="text-sm text-red-300">Error: {state.message}</div>
+              ) : null}
+            </div>
           </div>
         </form>
       </div>

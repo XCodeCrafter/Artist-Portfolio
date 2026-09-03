@@ -13,6 +13,8 @@ export async function proxy(request: NextRequest) {
     "/admin/v2-preview/music/",
     "/admin/v2-preview/showreel",
     "/admin/v2-preview/showreel/",
+    "/admin/v2-preview/contact",
+    "/admin/v2-preview/contact/",
   ]);
   const allowSameOriginFraming = previewRoutes.has(request.nextUrl.pathname);
   const csp = createContentSecurityPolicy(nonce, {
