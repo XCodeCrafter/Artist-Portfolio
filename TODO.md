@@ -316,7 +316,7 @@ Acceptance:
 
 ## Batch 6 - Remaining page editors
 
-Status: Batch 6A deployed; Batch 6B implemented and verified locally, rollout pending
+Status: Batch 6A and Batch 6B deployed; Works/Showreel remains queued
 
 - [x] Bio plus Resume/Credits (Batch 6A).
   - [x] Share the exact public Bio presentation with a safe live V2 preview.
@@ -371,11 +371,15 @@ Status: Batch 6A deployed; Batch 6B implemented and verified locally, rollout pe
         QA at 1440x900 and 390x844. The three-section selector, direct preview
         selection, mobile inspector, overview card, and public `/gallery` page
         all passed without browser console errors.
-  - [ ] Apply `0031_gallery_page_editor.sql` through a controlled/manual
-        rollout; the connected project still has empty CLI migration history,
-        so `db push` must not be used.
-  - [ ] Repeat authenticated desktop/mobile browser QA against the live 0031
-        RPCs without publishing test content.
+  - [x] Apply `0031_gallery_page_editor.sql` through a controlled/manual
+        rollout. All four Gallery V2 RPCs are live. The connected project still
+        has empty CLI migration history, so `db push` must not be used.
+  - [x] Repeat authenticated browser QA against the live 0031 RPCs without
+        changing public content. An Introduction save used one trailing space;
+        server validation normalized it back to the exact original value, the
+        editor remained writable after reload, and the public `/gallery`
+        snapshot was identical before and after the write. The classic Gallery
+        Studio also correctly switched to its locked V2 handoff state.
 - [ ] Works/Showreel, preserving legacy music-video items during review.
 - [ ] Contact and inquiry context.
 - [x] Reuse the accepted shared-preview/inspector pattern for Bio.

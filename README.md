@@ -299,9 +299,11 @@ and three atomic save boundaries: Hero, Introduction, and Frames. A one-time,
 transactional ownership split clones historical dual-use mosaic/story rows for
 Gallery while preserving their original HOME story rows and visible ordering.
 Frames can then be added, reordered, hidden, or restored without hard deletes
-or accidental HOME edits. Apply this migration manually on the currently
-linked project; its CLI migration history is still empty, so do not use
-`supabase db push`.
+or accidental HOME edits. It was applied manually to the currently linked
+project and all four Gallery V2 RPCs are live. An authenticated no-content-change
+Introduction save confirmed the write path, canonical normalization, reload,
+and public-page stability. The remote CLI migration history is still empty, so
+do not use `supabase db push`.
 
 The new dashboard shell lives at `/admin/v2`; its navigation workspace is
 `/admin/v2/navigation`. The 1:1 page editors live at `/admin/v2/pages/music`,
@@ -337,10 +339,9 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. Apply all Supabase migrations through `0031_gallery_page_editor.sql`. For the
-   currently linked project, take a full backup and reconcile its pre-existing
-   empty CLI history before using `db push`; deploy `0031` manually or through
-   another controlled forward-only step in the meantime.
+1. All Supabase migrations through `0031_gallery_page_editor.sql` are applied
+   manually on the currently linked project. Take a full backup and reconcile
+   its pre-existing empty CLI history before using `db push`.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare
