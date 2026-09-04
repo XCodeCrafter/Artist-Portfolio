@@ -60,6 +60,32 @@ Production content fails closed when Supabase is unavailable so a stale demo
 identity cannot be indexed. `ALLOW_FALLBACK_CONTENT=true` is only for local
 loopback development; the application ignores it for public site URLs.
 
+## Cloudflare R2 media rollout
+
+The live uploader remains on Supabase until R2 is explicitly enabled. Creating
+the R2 resources does not move, replace, publish, or delete any current media.
+
+1. In Cloudflare R2, create a private Standard bucket named
+   `artist-portfolio-media-prod`. Keep public `r2.dev` access disabled. Bucket
+   names may contain only lowercase letters, numbers, and hyphens.
+2. Under **Manage R2 API tokens**, create **Object Read & Write** credentials
+   scoped only to that bucket. Copy the Access Key ID and Secret Access Key when
+   shown; Cloudflare does not show the secret again.
+3. Store the Account ID, Access Key ID, Secret Access Key, and bucket name only
+   in local/Vercel server environment variables. Never commit or paste them
+   into issues, logs, screenshots, or chat.
+4. Keep `MEDIA_UPLOAD_PROVIDER=supabase` and leave
+   `NEXT_PUBLIC_MEDIA_ORIGIN` empty until the signed-upload integration, exact
+   CORS policy, and real upload verification pass.
+5. Once the canonical site domain is known, attach
+   `media.<canonical-domain>` to the existing bucket. Production delivery will
+   use that hostname; presigned uploads use Cloudflare's S3 API endpoint.
+
+Cloudflare references: [bucket creation](https://developers.cloudflare.com/r2/buckets/create-buckets/),
+[R2 credentials](https://developers.cloudflare.com/r2/api/tokens/),
+[CORS](https://developers.cloudflare.com/r2/buckets/cors/), and
+[presigned URLs](https://developers.cloudflare.com/r2/api/s3/presigned-urls/).
+
 ## Content Model
 
 The editable portfolio content is modeled in `supabase/migrations/0001_initial_schema.sql`.
@@ -369,7 +395,7 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. All Supabase migrations through `0033_contact_page_editor.sql` are applied
+1. All Supabase migrations through `0035_media_pipeline_integrity_guards.sql` are applied
    manually on the currently linked project. Take a full backup and reconcile
    the pre-existing empty CLI history before using `db push`.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP

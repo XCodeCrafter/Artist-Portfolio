@@ -1,7 +1,7 @@
 # USER TODO
 
 > Historical checklist only. The connected production Supabase schema has been
-> applied manually through migration `0034`, but its CLI migration history is
+> applied manually through migration `0035`, but its CLI migration history is
 > empty. Do **not** run `supabase db push` or follow the old setup sequence below
 > until a full backup and explicit migration-history reconciliation are done.
 > The maintained implementation roadmap is `TODO.md`.

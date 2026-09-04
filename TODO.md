@@ -476,7 +476,7 @@ Acceptance:
 
 ## Batch 7A - R2 media delivery and Media Optimizer V2
 
-Status: Batch 7A.2 integrity guard ready; controlled migration rollout pending
+Status: Batch 7A.2b dormant upload foundation ready; migration 0036 rollout pending
 
 ### Batch 7A.1 - Immediate traffic and persistence foundation
 
@@ -513,8 +513,18 @@ Batch 7A.1 verification:
       derived lineage to reference a source variant, verify succeeded jobs point
       to a matching ready output, and close concurrent ready/retire races with a
       database-level foreign key (`0035_media_pipeline_integrity_guards.sql`).
-- [ ] Apply and verify migration `0035` before exposing registration or worker
-      writes.
+- [x] Apply migration `0035` manually. The existing pipeline snapshot RPC still
+      reaches the expected safe sentinel; migration `0036` adds a fail-closed
+      catalog preflight that verifies the exact guards and active FK triggers
+      before it creates any upload reservation surface.
+- [x] Add a dormant `MEDIA_UPLOAD_PROVIDER` selector that defaults to Supabase,
+      rejects malformed R2 settings without fallback, and exposes only safe
+      readiness booleans—not credentials.
+- [x] Prepare `0036_media_upload_intents.sql` with a private, expiring,
+      provider-neutral reservation table and service-only idempotent preparation
+      RPC. It creates no signed URL, finalizer, R2 write, or current-media DML.
+- [ ] Apply and verify migration `0036` before adding a signing endpoint or
+      enabling R2 uploads.
 - [ ] Keep Media Library upload progress, reference locks, usage badges, audit
       logs, recoverable trash, and contextual picking inside page editors.
 - [ ] Use immutable, versioned object keys and keep provider credentials only
@@ -587,6 +597,20 @@ Batch 7A.2 integrity-guard verification:
   foreign key.
 - The migration performs no media-row DML and does not move, replace, publish,
   or delete any current Supabase object.
+- The owner applied `0035_media_pipeline_integrity_guards.sql` manually on
+  2026-09-04. Exact catalog enforcement is deliberately rechecked by the
+  fail-closed `0036` preflight because the private trigger functions are not
+  exposed through the public API.
+
+Batch 7A.2b dormant upload-foundation verification:
+
+- Full check passes: 45 test files / 402 tests, TypeScript, full ESLint, and the
+  production build.
+- R2 remains disabled, the current Supabase uploader remains active, and no
+  object or public media reference has moved.
+- The future signing/finalization path must recheck asset-ID availability,
+  verify the uploaded object at the provider, and publish with insert-only
+  semantics in one controlled transaction.
 
 ## Batch 7B - Inbox V2 and Gmail delivery
 

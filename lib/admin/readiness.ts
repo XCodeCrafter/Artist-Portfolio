@@ -12,7 +12,7 @@ import {
 import { hasProductionSiteUrl } from "@/lib/site-url";
 import { probeDatabaseRateLimit } from "@/lib/security/rate-limit";
 import { NAVIGATION_DESTINATION_KEYS } from "@/lib/content/navigation";
-import { getConfiguredR2MediaOrigin } from "@/lib/media-source";
+import { getMediaUploadConfigSummary } from "@/lib/admin/media-upload-config";
 
 export type ReadinessCheck = {
   id: string;
@@ -60,12 +60,9 @@ function hasEmailEnv() {
 }
 
 function hasR2DeliveryEnv() {
-  return Boolean(
-    getConfiguredR2MediaOrigin() &&
-      process.env.R2_ACCOUNT_ID?.trim() &&
-      process.env.R2_ACCESS_KEY_ID?.trim() &&
-      process.env.R2_SECRET_ACCESS_KEY?.trim() &&
-      process.env.R2_BUCKET_NAME?.trim()
+  const summary = getMediaUploadConfigSummary();
+  return (
+    summary.provider !== null && Object.values(summary.r2).every(Boolean)
   );
 }
 
@@ -331,7 +328,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       critical: true,
       detail: supabase.schemaOk
         ? "Required tables and columns are available."
-        : "Apply all current Supabase migrations through 0034.",
+        : "Apply all current Supabase migrations through 0035.",
       href: "/admin/security#health",
     },
     {

@@ -20,7 +20,7 @@ describe("Batch 7A media configuration readiness", () => {
       'mediaPipelineResult.error.code === "23503"'
     );
     expect(readinessSource).toContain(
-      '"Apply all current Supabase migrations through 0034."'
+      '"Apply all current Supabase migrations through 0035."'
     );
     expect(readinessSource).not.toContain(
       '.from("media_physical_objects")'
@@ -32,17 +32,21 @@ describe("Batch 7A media configuration readiness", () => {
   });
 
   it("publishes only readiness booleans for the documented R2 contract", () => {
+    expect(exampleEnv).toContain("MEDIA_UPLOAD_PROVIDER=supabase");
     expect(exampleEnv).toContain("NEXT_PUBLIC_MEDIA_ORIGIN=");
-    expect(readinessSource).toContain("getConfiguredR2MediaOrigin()");
+    expect(readinessSource).toContain("getMediaUploadConfigSummary()");
 
     for (const key of [
       "R2_ACCOUNT_ID",
       "R2_ACCESS_KEY_ID",
       "R2_SECRET_ACCESS_KEY",
       "R2_BUCKET_NAME",
-      "MEDIA_PROCESSOR_URL",
-      "MEDIA_PROCESSOR_SECRET",
     ]) {
+      expect(exampleEnv).toContain(`${key}=`);
+      expect(readinessSource).not.toContain(`process.env.${key}`);
+    }
+
+    for (const key of ["MEDIA_PROCESSOR_URL", "MEDIA_PROCESSOR_SECRET"]) {
       expect(exampleEnv).toContain(`${key}=`);
       expect(readinessSource).toContain(`process.env.${key}`);
     }
