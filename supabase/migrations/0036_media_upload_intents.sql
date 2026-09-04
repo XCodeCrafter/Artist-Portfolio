@@ -6,6 +6,18 @@
 
 begin;
 
+-- PostgreSQL's catalog deparser formats CASE expressions differently between
+-- server versions. Build the expected expression on this same server and
+-- compare its decompiled form exactly; the empty probe is transaction-scoped
+-- and never touches portfolio content.
+create temporary table media_0036_expected_ready_status (
+  status text,
+  required_physical_object_status text
+  generated always as (
+    case when status = 'ready' then 'ready'::text else null::text end
+  ) stored
+) on commit drop;
+
 -- Fail closed when 0035 was skipped or only partially applied. Upload
 -- reservations must never be exposed without the pipeline's integrity guards.
 do $$
@@ -132,7 +144,24 @@ begin
         definition.adbin,
         definition.adrelid,
         false
-      ) = 'CASE WHEN (status = ''ready''::text) THEN ''ready''::text ELSE NULL::text END'
+      ) = (
+        select pg_catalog.pg_get_expr(
+          expected_definition.adbin,
+          expected_definition.adrelid,
+          false
+        )
+        from pg_catalog.pg_attribute as expected_attribute
+        join pg_catalog.pg_attrdef as expected_definition
+          on expected_definition.adrelid = expected_attribute.attrelid
+          and expected_definition.adnum = expected_attribute.attnum
+        where expected_attribute.attrelid = pg_catalog.to_regclass(
+            'pg_temp.media_0036_expected_ready_status'
+          )
+          and expected_attribute.attname = 'required_physical_object_status'
+          and expected_attribute.attgenerated = 's'
+          and expected_attribute.atttypid =
+            'pg_catalog.text'::pg_catalog.regtype
+      )
   ) then
     raise exception 'media_upload_intents_require_verified_0035'
       using

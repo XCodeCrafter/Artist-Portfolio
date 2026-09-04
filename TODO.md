@@ -608,6 +608,10 @@ Batch 7A.2b dormant upload-foundation verification:
   production build.
 - R2 remains disabled, the current Supabase uploader remains active, and no
   object or public media reference has moved.
+- The first manual `0036` attempt rolled back cleanly after a newline-sensitive
+  `pg_get_expr` comparison produced a false negative. The check now compares
+  against the same server's deparse of an empty transaction-scoped generated
+  column, preserving exact semantics without depending on formatting.
 - The future signing/finalization path must recheck asset-ID availability,
   verify the uploaded object at the provider, and publish with insert-only
   semantics in one controlled transaction.

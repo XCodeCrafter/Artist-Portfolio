@@ -21,6 +21,10 @@ const migrationTimeSql = migrationSql.slice(0, prepareStart);
 
 describe("Batch 7A.2b media upload-intent foundation", () => {
   it("fails closed unless every 0035 integrity prerequisite is installed", () => {
+    expect(migrationTimeSql).toContain(
+      "create temporary table media_0036_expected_ready_status"
+    );
+    expect(migrationTimeSql).toContain(") on commit drop;");
     for (const required of [
       "media_physical_objects_integrity_guard",
       "guard_media_physical_object_v1()",
@@ -67,9 +71,12 @@ describe("Batch 7A.2b media upload-intent foundation", () => {
     expect(migrationTimeSql).toContain(") = 4");
     expect(migrationTimeSql.match(/\) = 2/g)).toHaveLength(2);
     expect(migrationTimeSql).toContain(
-      "CASE WHEN (status = ''ready''::text) THEN ''ready''::text ELSE NULL::text END"
+      "'pg_temp.media_0036_expected_ready_status'"
     );
-    expect(migrationTimeSql).not.toMatch(/regexp_replace|pg_catalog\.lower/);
+    expect(migrationTimeSql.match(/pg_catalog\.pg_get_expr\(/g)).toHaveLength(2);
+    expect(migrationTimeSql).not.toMatch(
+      /regexp_replace|pg_catalog\.lower/
+    );
     expect(migrationTimeSql).toContain("errcode = '55000'");
     expect(migrationTimeSql).toContain(
       "media_upload_intents_require_verified_0035"
@@ -293,7 +300,7 @@ describe("Batch 7A.2b media upload-intent foundation", () => {
       /create\s+(?:or\s+replace\s+)?function\s+public[.](?:presign|sign|finalize)/i
     );
     expect(migrationSql).not.toMatch(/\bdelivery_url\s*=/i);
-    expect(migrationSql).not.toMatch(/\bstatus\s*=\s*'ready'/i);
+    expect(prepareBody).not.toMatch(/\bstatus\s*=\s*'ready'/i);
     for (const replaySafeCreate of [
       "create table if not exists public.media_upload_intents",
       "create unique index if not exists media_physical_objects_upload_binding_key",
