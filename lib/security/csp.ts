@@ -1,3 +1,5 @@
+import { getConfiguredR2MediaOrigin } from "@/lib/media-source";
+
 const isDev = process.env.NODE_ENV !== "production";
 
 function getHttpsOrigin(value?: string) {
@@ -16,6 +18,7 @@ export function createContentSecurityPolicy(
   options: { allowSameOriginFraming?: boolean } = {}
 ) {
   const supabaseOrigin = getHttpsOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const mediaOrigin = getConfiguredR2MediaOrigin() || "";
   const scriptSrc = [
     "'self'",
     `'nonce-${nonce}'`,
@@ -46,6 +49,7 @@ export function createContentSecurityPolicy(
     "data:",
     "blob:",
     ...(supabaseOrigin ? [supabaseOrigin] : []),
+    ...(mediaOrigin ? [mediaOrigin] : []),
   ].join(" ");
   const frameSrc = [
     "'self'",

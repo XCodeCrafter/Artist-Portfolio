@@ -2,7 +2,7 @@
 
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import Image from "next/image";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -121,59 +121,27 @@ export default function VideoHero({
             <div className="absolute inset-0 bg-[#120b0b]" />
           )
         ) : (
-          <>
-        {/* Mobile layer (with mobile object-position) */}
-        <video
-          className={[
-            "absolute inset-0 h-full w-full object-cover",
-            // ✅ Show more on mobile: no extra zoom
-            "scale-100",
-            // ✅ Only show on mobile
-            "sm:hidden",
-          ].join(" ")}
-          style={{
-            objectPosition: videoPosMobile,
-          }}
-          src={backgroundSrc}
-          poster={poster}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          controls={false}
-          disablePictureInPicture
-          controlsList="nodownload noplaybackrate noremoteplayback"
-          tabIndex={-1}
-          aria-hidden="true"
-        />
-
-        {/* Desktop/tablet layer (with desktop object-position) */}
-        <video
-          className={[
-            "absolute inset-0 h-full w-full object-cover",
-            // cinematic feel on bigger screens (very subtle)
-            "sm:scale-[1.02] lg:scale-[1.04]",
-            // show from sm upwards
-            "hidden sm:block",
-          ].join(" ")}
-          style={{
-            objectPosition: videoPosDesktop,
-          }}
-          src={backgroundSrc}
-          poster={poster}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          controls={false}
-          disablePictureInPicture
-          controlsList="nodownload noplaybackrate noremoteplayback"
-          tabIndex={-1}
-          aria-hidden="true"
-        />
-          </>
+          <video
+            aria-hidden="true"
+            autoPlay
+            className="absolute inset-0 h-full w-full scale-100 object-cover [object-position:var(--video-position-mobile)] sm:scale-[1.02] sm:[object-position:var(--video-position-desktop)] lg:scale-[1.04]"
+            controls={false}
+            controlsList="nodownload noplaybackrate noremoteplayback"
+            disablePictureInPicture
+            loop
+            muted
+            playsInline
+            poster={poster}
+            preload="metadata"
+            src={backgroundSrc}
+            style={
+              {
+                "--video-position-desktop": videoPosDesktop,
+                "--video-position-mobile": videoPosMobile,
+              } as CSSProperties
+            }
+            tabIndex={-1}
+          />
         )}
 
         {/* Overlays */}

@@ -15,6 +15,10 @@ import {
   getMediaSizeLimit,
   MEDIA_BUCKET,
 } from "@/lib/admin/media";
+import {
+  isConfiguredMediaLibrarySource,
+  isSafeLocalMediaPath,
+} from "@/lib/media-source";
 
 const MEDIA_PATH = "/admin/media";
 const REVALIDATE_PATHS = [
@@ -69,23 +73,9 @@ function isSafeMediaUrl(value: string) {
 
 function isSafeImageUrl(value: string) {
   if (!value) return true;
-  if (value.startsWith("/")) return isSafeMediaUrl(value);
-
-  const storageBase = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!storageBase) return false;
-
-  try {
-    const imageUrl = new URL(value);
-    const storageUrl = new URL(storageBase);
-    return (
-      isSafeMediaUrl(value) &&
-      storageUrl.protocol === "https:" &&
-      imageUrl.origin === storageUrl.origin &&
-      imageUrl.pathname.startsWith("/storage/v1/object/public/")
-    );
-  } catch {
-    return false;
-  }
+  return (
+    isSafeLocalMediaPath(value) || isConfiguredMediaLibrarySource(value)
+  );
 }
 
 function isSafeCtaUrl(value: string) {

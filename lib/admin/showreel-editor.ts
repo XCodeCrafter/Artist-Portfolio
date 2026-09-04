@@ -8,6 +8,10 @@ import type {
   VideoPresentation,
   VideoType,
 } from "@/lib/content/types";
+import {
+  isSafeLocalMediaPath,
+  isSafeManagedMediaSource,
+} from "@/lib/media-source";
 
 export const SHOWREEL_EDITOR_SECTIONS = [
   "hero",
@@ -136,34 +140,8 @@ function isHttpsUrl(value: string) {
   }
 }
 
-function isSafeLocalPath(value: string) {
-  return (
-    value.startsWith("/") &&
-    !value.startsWith("//") &&
-    !/[\\\u0000-\u001f\u007f]/.test(value)
-  );
-}
-
-function isConfiguredStorageAsset(value: string) {
-  const storageBase = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!storageBase) return false;
-
-  try {
-    const assetUrl = new URL(value);
-    const storageUrl = new URL(storageBase);
-    return (
-      !hasUnsafeUrlParts(assetUrl) &&
-      storageUrl.protocol === "https:" &&
-      assetUrl.origin === storageUrl.origin &&
-      assetUrl.pathname.startsWith("/storage/v1/object/public/")
-    );
-  } catch {
-    return false;
-  }
-}
-
 export function isSafeShowreelAssetSource(value: string) {
-  return isSafeLocalPath(value) || isConfiguredStorageAsset(value);
+  return isSafeManagedMediaSource(value);
 }
 
 const EMBED_HOSTS = new Set([
@@ -226,7 +204,7 @@ function isSafeWorkSource(item: Pick<ShowreelWorkEditorItem, "embedUrl" | "platf
 function isSafeOptionalHref(value: string) {
   if (!value) return true;
   if (/^#[A-Za-z][A-Za-z0-9_-]*$/.test(value)) return true;
-  return isSafeLocalPath(value) || isHttpsUrl(value);
+  return isSafeLocalMediaPath(value) || isHttpsUrl(value);
 }
 
 const assetSource = requiredText(2_048).refine(

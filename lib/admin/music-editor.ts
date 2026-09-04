@@ -7,6 +7,7 @@ import type {
   SocialLink,
 } from "@/lib/content/types";
 import { detectSocialPlatform } from "@/lib/content/social-platforms";
+import { isSafeManagedMediaSource } from "@/lib/media-source";
 
 export const MUSIC_EDITOR_SECTIONS = [
   "hero",
@@ -150,34 +151,7 @@ function isHttpsUrl(value: string, allowedHosts?: readonly string[]) {
   }
 }
 
-function isConfiguredStorageAsset(value: string) {
-  const storageBase = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!storageBase) return false;
-
-  try {
-    const assetUrl = new URL(value);
-    const storageUrl = new URL(storageBase);
-    return (
-      !hasUnsafeUrlParts(assetUrl) &&
-      storageUrl.protocol === "https:" &&
-      assetUrl.origin === storageUrl.origin &&
-      assetUrl.pathname.startsWith("/storage/v1/object/public/")
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isSafeAssetSource(value: string) {
-  if (
-    value.startsWith("/") &&
-    !value.startsWith("//") &&
-    !/[\\\u0000-\u001f\u007f]/.test(value)
-  ) {
-    return true;
-  }
-  return isConfiguredStorageAsset(value);
-}
+const isSafeAssetSource = isSafeManagedMediaSource;
 
 function isSafeOptionalHref(value: string) {
   if (!value) return true;

@@ -12,6 +12,7 @@ import {
 import { hasProductionSiteUrl } from "@/lib/site-url";
 import { probeDatabaseRateLimit } from "@/lib/security/rate-limit";
 import { NAVIGATION_DESTINATION_KEYS } from "@/lib/content/navigation";
+import { getConfiguredR2MediaOrigin } from "@/lib/media-source";
 
 export type ReadinessCheck = {
   id: string;
@@ -58,6 +59,41 @@ function hasEmailEnv() {
   );
 }
 
+function hasR2DeliveryEnv() {
+  return Boolean(
+    getConfiguredR2MediaOrigin() &&
+      process.env.R2_ACCOUNT_ID?.trim() &&
+      process.env.R2_ACCESS_KEY_ID?.trim() &&
+      process.env.R2_SECRET_ACCESS_KEY?.trim() &&
+      process.env.R2_BUCKET_NAME?.trim()
+  );
+}
+
+function hasSafeMediaProcessorUrl() {
+  const value = process.env.MEDIA_PROCESSOR_URL?.trim();
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      (!url.port || url.port === "443") &&
+      !url.hash
+    );
+  } catch {
+    return false;
+  }
+}
+
+function hasMediaProcessorEnv() {
+  return Boolean(
+    hasSafeMediaProcessorUrl() &&
+      process.env.MEDIA_PROCESSOR_SECRET?.trim()
+  );
+}
+
 async function inspectSupabase() {
   const fallback = {
     schemaOk: false,
@@ -78,6 +114,7 @@ async function inspectSupabase() {
       galleryEditorResult,
       showreelEditorResult,
       contactEditorResult,
+      mediaPipelineResult,
       contactHeroSaveProbeResult,
       contactDetailsSaveProbeResult,
       galleryResult,
@@ -107,6 +144,9 @@ async function inspectSupabase() {
       supabase.rpc("get_gallery_page_v2_snapshot", { p_site_id: "main" }),
       supabase.rpc("get_showreel_page_v2_snapshot", { p_site_id: "main" }),
       supabase.rpc("get_contact_page_v2_snapshot", { p_site_id: "main" }),
+      supabase.rpc("get_media_pipeline_v1_snapshot", {
+        p_asset_id: "~schema-probe",
+      }),
       supabase.rpc("save_contact_hero_v2", {
         p_site_id: "~schema-probe",
         p_expected_updated_at: "1970-01-01T00:00:00.000Z",
@@ -184,6 +224,8 @@ async function inspectSupabase() {
       contactHeroSaveProbeResult,
       contactDetailsSaveProbeResult,
     ].every((result) => result.error?.code === "22023");
+    const mediaPipelineRpcOk =
+      !mediaPipelineResult.error || mediaPipelineResult.error.code === "23503";
     const schemaOk = [
       settingsResult,
       navigationManagerResult,
@@ -202,7 +244,8 @@ async function inspectSupabase() {
       recoveryResult,
     ].every((result) => !result.error) &&
       navigationCatalogOk &&
-      contactSaveRpcsOk;
+      contactSaveRpcsOk &&
+      mediaPipelineRpcOk;
 
     return {
       schemaOk,
@@ -288,7 +331,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       critical: true,
       detail: supabase.schemaOk
         ? "Required tables and columns are available."
-        : "Apply all current Supabase migrations through 0033.",
+        : "Apply all current Supabase migrations through 0034.",
       href: "/admin/security#health",
     },
     {
@@ -299,6 +342,26 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       detail: supabase.storageOk
         ? `Storage bucket ${MEDIA_BUCKET} is available.`
         : `Create or migrate the ${MEDIA_BUCKET} storage bucket.`,
+      href: "/admin/media#upload",
+    },
+    {
+      id: "r2-delivery",
+      label: "R2 media delivery",
+      ok: hasR2DeliveryEnv(),
+      critical: false,
+      detail: hasR2DeliveryEnv()
+        ? "The R2 bucket, custom delivery origin, and server credentials are configured."
+        : "Before media cutover, configure the R2 bucket, custom HTTPS origin, and server-only credentials.",
+      href: "/admin/media#upload",
+    },
+    {
+      id: "media-processor",
+      label: "Media optimizer worker",
+      ok: hasMediaProcessorEnv(),
+      critical: false,
+      detail: hasMediaProcessorEnv()
+        ? "The asynchronous media processor handoff is configured."
+        : "Select the durable optimizer runtime, then configure its URL and server-only shared secret.",
       href: "/admin/media#upload",
     },
     {

@@ -67,7 +67,8 @@ Acceptance:
 
 ## Batch 1 - Navigation domain foundation
 
-Status: implementation complete; database rollout intentionally pending
+Status: implementation and manual database rollout complete; CLI migration
+history reconciliation pending
 
 - [x] Add a typed, code-owned navigation destination registry.
 - [x] Validate unique destination keys and unique normalized href/hash targets.
@@ -91,9 +92,9 @@ Status: implementation complete; database rollout intentionally pending
 Verification:
 
 - 41 automated tests, TypeScript, targeted ESLint, and the production build pass.
-- The SQL migration is prepared but has not been applied to a remote database.
-- Before rollout, run a local Supabase reset/RLS integration pass or the
-  equivalent staging migration check; the Supabase CLI is not installed here.
+- The `0025` schema and navigation data were verified on the connected project.
+  The remote CLI migration history is still empty, so `db push` remains unsafe
+  until a backup and explicit history-reconciliation step are complete.
 
 Acceptance:
 
@@ -107,7 +108,8 @@ Acceptance:
 
 ## Batch 2 - Mixed public portfolio and review navigation
 
-Status: implementation complete; database rollout intentionally pending
+Status: implementation and manual database rollout complete; CLI migration
+history reconciliation pending
 
 - [x] Stop using `portfolio_type` as the public route/content feature gate.
 - [x] Use the Actor presentation and wording as the temporary visual baseline.
@@ -133,8 +135,8 @@ Status: implementation complete; database rollout intentionally pending
 Verification:
 
 - 54 automated tests, TypeScript, full ESLint, and the production build pass.
-- Migration `0026_mixed_public_portfolio.sql` prepares the atomic review-navbar
-  activation and nullable inquiry intent, but has not been applied remotely.
+- Migration `0026_mixed_public_portfolio.sql` and its nullable inquiry-intent
+  schema were verified on the connected project through the manual SQL rollout.
 - The migration does not backfill or rewrite historical inquiry rows.
 - Browser visual QA was not run because it was not requested for this batch.
 
@@ -147,7 +149,8 @@ Acceptance:
 
 ## Batch 3 - Admin V2 shell and navigation manager
 
-Status: implementation complete; database rollout intentionally pending
+Status: implementation and manual database rollout complete; CLI migration
+history reconciliation pending
 
 - [x] Add `/admin/v2` beside the existing `/admin` routes.
 - [x] Build a dedicated V2 shell without rewriting the V1 shell.
@@ -173,9 +176,8 @@ Status: implementation complete; database rollout intentionally pending
 Verification:
 
 - 82 automated tests, TypeScript, full ESLint, and the production build pass.
-- Migration `0027_admin_v2_navigation_manager.sql` prepares a service-only
-  consistent snapshot and atomic whole-navbar save, but has not been applied
-  remotely.
+- Migration `0027_admin_v2_navigation_manager.sql` and its service-only
+  snapshot/save boundaries were verified on the connected project.
 - The V1 navbar form is now an explicit V2 handoff, while its server action
   independently refuses legacy writes after version 1 activation.
 - Browser visual/a11y QA remains in Batch 10 and was not run in this batch.
@@ -189,7 +191,8 @@ Acceptance:
 
 ## Batch 4 - Music 1:1 visual-editor pilot
 
-Status: implementation complete; database rollout intentionally pending
+Status: implementation and manual database rollout complete; CLI migration
+history reconciliation pending
 
 - [x] Add `/admin/v2/pages/music`.
 - [x] Extract a shared `MusicPageView` used by `/music` and admin preview.
@@ -209,9 +212,8 @@ Status: implementation complete; database rollout intentionally pending
 Verification:
 
 - 123 automated tests, TypeScript, full ESLint, and the production build pass.
-- Migration `0028_music_page_editor.sql` prepares public presentation headings,
-  a service-only snapshot, and four atomic section saves; it has not been
-  applied remotely.
+- Migration `0028_music_page_editor.sql`, its presentation fields, snapshot,
+  and four atomic saves were verified on the connected project.
 - Preview framing was verified at runtime: only the authenticated Music preview
   permits same-origin framing; normal routes remain frame-denied.
 - Legacy V1-valid rows remain loadable for repair, while saves reject unsafe or
@@ -417,7 +419,7 @@ Status: Batch 6A, Batch 6B, and Batch 6C deployed; Batch 6D implementation and d
         items unchanged. The classic Showreel Studio also switched to its locked
         V2 handoff state. Do not use `supabase db push` while remote migration
         history remains empty.
-- [ ] Contact and inquiry context (Batch 6D rollout).
+- [x] Contact and inquiry context (Batch 6D rollout).
   - [x] Share one `ContactPageView` between `/booking` and the authenticated
         1440x900 / 390x844 preview.
   - [x] Map the public page to two plain-language edit areas: Hero and
@@ -445,9 +447,12 @@ Status: Batch 6A, Batch 6B, and Batch 6C deployed; Batch 6D implementation and d
         and repeat authenticated desktop/mobile editor QA without publishing
         content. Do not use `supabase db push` while remote migration history
         remains empty.
-  - [ ] With explicit owner approval, submit one clearly marked real QA
-        inquiry, verify the Inbox row and deployed email status/receipt, then
-        archive the test record.
+  - [x] With explicit owner approval, submit one clearly marked real QA
+        inquiry and verify its Inbox row. The notification correctly recorded
+        `failed` while production Resend settings were absent.
+  - [ ] After production email is configured in Batch 7B, submit a second
+        marked inquiry, verify Gmail receipt plus webhook delivery state, then
+        archive both QA records.
 - [x] Reuse the accepted shared-preview/inspector pattern for Bio.
 
 Batch 6D rollout verification:
@@ -459,30 +464,141 @@ Batch 6D rollout verification:
 - Authenticated browser QA passed for the desktop/mobile preview, section
   switching, local dirty/discard flow, public Contact layout and Hero jump, and
   the locked classic-to-V2 handoff. No QA content was published.
-- Local configuration can persist inquiries to Supabase, but does not contain
-  the Resend sender/recipient/API settings or delivery-webhook secret. Deployed
-  email delivery therefore remains unverified until the controlled live test.
+- The controlled public form test persisted exactly one `Codex QA` inquiry.
+  Email status became `failed`, as expected while the Resend sender, recipient,
+  API key, and delivery-webhook secret are absent. The owner did not authorize
+  deleting or archiving that evidence row, so it remains recoverable.
 
 Acceptance:
 
 - Each public page has one predictable edit location.
 - Gallery and Works content is no longer discoverable only through Media Library.
 
-## Batch 7 - Media and Inbox V2
+## Batch 7A - R2 media delivery and Media Optimizer V2
 
-Status: planned
+Status: Batch 7A.1 implementation complete; controlled database rollout pending
 
-- [ ] Keep Media Library focused on upload, assets, usage, and recoverable trash.
-- [ ] Keep contextual media picking/upload available inside page editors.
-- [ ] Add an explicit archive/purge workflow before a recoverable video catalog
-      reaches the 120-item new-content cap.
-- [ ] Move inquiries out of Analytics into `/admin/v2/inbox`.
-- [ ] Preserve upload progress, reference checks, delivery state, and audit logs.
+### Batch 7A.1 - Immediate traffic and persistence foundation
+
+- [x] Replace the duplicate mobile/desktop Hero video elements with one
+      responsive player while preserving focal positions, scale, autoplay,
+      muted looping, poster fallback, and the existing visual composition.
+- [x] Add provider-neutral physical-object, derivative, and optimization-job
+      records without changing or deleting current `media_assets` rows.
+- [x] Centralize trusted Media Library URL validation so the existing Supabase
+      origin and the configured R2 custom origin can coexist during rollback.
+- [x] Record the R2 and processing configuration contract in example env and
+      readiness checks without exposing credentials.
+
+Batch 7A.1 verification:
+
+- 42 test files / 379 tests, TypeScript, full ESLint, and the production build
+  pass.
+- The migration is additive and grants no direct access to its operational
+  tables. Existing `media_assets` rows and stored objects remain untouched.
+- Migration `0034_media_optimization_foundation.sql` still requires a real
+  PostgreSQL/Supabase execution pass before production rollout; the available
+  local shell has neither a running Postgres service nor Supabase CLI access.
+
+### Batch 7A.2 - R2 uploads and delivery
+
+- [ ] Keep Supabase Postgres, Auth, Inbox, and searchable media metadata; move
+      binary image/video delivery to Cloudflare R2 through a production custom
+      media domain.
+- [ ] Add short-lived, admin-authorized direct R2 uploads and server-side
+      finalization checks for actual size, MIME/magic bytes, and ownership.
+- [ ] Before exposing registration or worker writes, add database guards that
+      freeze ready object identity, require every derived lineage to reference
+      a source variant, and verify succeeded jobs point to a matching ready
+      output kind and preset.
+- [ ] Keep Media Library upload progress, reference locks, usage badges, audit
+      logs, recoverable trash, and contextual picking inside page editors.
+- [ ] Use immutable, versioned object keys and keep provider credentials only
+      in server/worker secrets.
+
+### Batch 7A.3 - Media Optimizer workspace
+
+- [ ] Add `/admin/v2/media` as a visual Gallery-style library with Images,
+      Videos, Oversized, Optimized, and Needs attention filters, search,
+      sorting, multi-select, usage details, and a responsive inspector.
+- [ ] Add owner-friendly High quality, Balanced (recommended), and Smallest
+      file presets for images and videos.
+- [ ] Show estimated and actual before/after sizes, preview, progress, failure,
+      retry, and `No saving` states without promising a fixed compression ratio.
+- [ ] Always create a verified optimized copy first. Activation must be an
+      explicit, optimistic, audited action with `Restore original`; never
+      overwrite or auto-delete the source.
+- [ ] Optimize images through Cloudflare's R2-compatible image transformation
+      path and use an asynchronous video processor instead of running long
+      FFmpeg work inside a normal Vercel request.
+- [ ] Add an explicit archive/purge workflow before the recoverable video
+      catalog reaches the 120-item new-content cap.
+
+### Batch 7A.4 - Showreel variants and controlled cutover
+
+- [ ] Preserve the current Showreel visitor experience exactly: every card
+      stays visible and browsable while scrolling, with the same desktop hover,
+      mobile in-view autoplay, focus, click, modal/full-player, and audio
+      behavior.
+- [ ] Give Showreel cards lightweight moving preview derivatives while loading
+      the selected full-quality playback derivative in the modal; posters and
+      nearby metadata may warm ahead so fast scrolling does not leave blanks.
+- [ ] Optimize the two current 48-50 MB Hero videos first. Remove audio only
+      from decorative Hero loops; never strip Showreel playback audio.
+- [ ] Inventory and copy existing Supabase objects to R2, verify checksum,
+      content type, dimensions/duration, and size, then switch only verified
+      references in controlled stages.
+- [ ] Retain Supabase originals for an agreed 14-30 day rollback window. Purge
+      them only in a later batch with explicit owner approval.
+- [ ] Add Playwright delivery/network-budget coverage for desktop and mobile,
+      include real Safari/iOS verification where available, and confirm
+      Supabase cached egress falls after cutover.
 
 Acceptance:
 
-- A user editing a page does not need to understand storage architecture.
-- Messages are a first-class workspace, not an analytics sub-tab.
+- The public Showreel looks and behaves the same while transferring materially
+  less data; every card remains available during normal scrolling.
+- A nontechnical owner can optimize, compare, activate, and restore media
+  without understanding storage providers.
+- No migration, optimization, activation, or failed job deletes original media.
+- R2 uploads and every page-editor picker work through one validated media
+  contract, and an R2 outage fails gracefully rather than corrupting content.
+
+Prerequisites:
+
+- Confirm the production domain/DNS and R2 custom media hostname.
+- Select and document the asynchronous runtime for video jobs. Cloudflare
+  Media Transformations can cover short Hero/preview derivatives, while longer
+  playback files require a durable FFmpeg worker or managed video service.
+
+## Batch 7B - Inbox V2 and Gmail delivery
+
+Status: agreed; planned after the media egress emergency
+
+- [ ] Move the existing inquiry workspace intact from Analytics to
+      `/admin/v2/inbox`, preserving search/filter, statuses, private notes,
+      archive, delivery badges, pagination, audit/security behavior, and
+      `Reply by email`.
+- [ ] Configure Resend with a verified sending domain and deliver Contact
+      notifications to the owner-selected Gmail address via
+      `BOOKING_TO_EMAIL`; retain the visitor address as `Reply-To`.
+- [ ] Configure `RESEND_API_KEY`, `BOOKING_FROM_EMAIL`, `BOOKING_TO_EMAIL`, and
+      `RESEND_WEBHOOK_SECRET` in deployment without committing or displaying
+      secrets.
+- [ ] Subscribe `/api/resend/webhook` to sent, delivered, delayed, bounced,
+      complained, failed, and suppressed events and verify Inbox transitions.
+- [ ] Submit a marked production inquiry, verify the Supabase row, Gmail
+      receipt, and final Resend webhook status, then archive both QA records.
+- [ ] Configure Supabase Auth SMTP and recovery templates separately; admin
+      password recovery is not the Contact-notification channel.
+
+Acceptance:
+
+- Messages are a first-class workspace rather than an Analytics sub-tab.
+- A successfully stored message is never duplicated merely because email
+  delivery is delayed or unavailable.
+- The owner receives a readable Gmail notification and can reply directly to
+  the visitor without exposing service credentials.
 
 ## Batch 8 - Dashboard, Analytics, and Settings V2
 
@@ -523,6 +639,23 @@ Status: planned
 - [ ] Test migration/backfill and rollback against representative data.
 - [ ] Run unit, integration, typecheck, lint, and production build checks.
 - [ ] Verify sitemap, metadata, structured data, analytics, contact, and admin auth.
+- [ ] Hide truly empty public Music sections without leaving dead anchors.
+- [ ] Avoid duplicate eager Spotify iframe loads across desktop/mobile layouts.
+- [ ] Remove the Home/Bio JSON-LD CSP nonce hydration warning.
+- [ ] Replace the authenticated server-session user warning with a verified
+      user lookup at the relevant Supabase boundary.
+- [ ] Confirm R2 removes the intermittent Supabase image-optimizer timeout path
+      and keep every remote-image failure graceful.
+- [ ] Consume the unsaved-change history sentinel after save/discard so the
+      first Back action always navigates as expected.
+- [ ] Take a full database backup and reconcile the empty remote Supabase CLI
+      migration history before allowing any `db push` workflow.
+- [ ] Configure the canonical production URL and Google Search Console, then
+      submit and verify `/sitemap.xml`.
+- [ ] Verify production Auth policy: disabled public signup/anonymous login,
+      password and recovery settings, TOTP, CAPTCHA, session limits, and SMTP.
+- [ ] Configure and test deep health checks, scheduled retention maintenance,
+      security secrets, and production dependency monitoring.
 - [ ] Retire broad authenticated direct-table write policies after the V1
       editors are removed, so the audited V2 service RPCs become the only
       supported content-write boundary.
