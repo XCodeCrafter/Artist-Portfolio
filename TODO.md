@@ -476,7 +476,7 @@ Acceptance:
 
 ## Batch 7A - R2 media delivery and Media Optimizer V2
 
-Status: Batch 7A.1 implementation complete; controlled database rollout pending
+Status: Batch 7A.2 integrity guard ready; controlled migration rollout pending
 
 ### Batch 7A.1 - Immediate traffic and persistence foundation
 
@@ -496,9 +496,11 @@ Batch 7A.1 verification:
   pass.
 - The migration is additive and grants no direct access to its operational
   tables. Existing `media_assets` rows and stored objects remain untouched.
-- Migration `0034_media_optimization_foundation.sql` still requires a real
-  PostgreSQL/Supabase execution pass before production rollout; the available
-  local shell has neither a running Postgres service nor Supabase CLI access.
+- The owner applied migration `0034_media_optimization_foundation.sql` in the
+  connected Supabase project on 2026-09-04. A service-role schema probe then
+  reached `get_media_pipeline_v1_snapshot` and returned the expected `23503`
+  sentinel result. Remote CLI migration history still needs later
+  reconciliation before any `db push` workflow is safe.
 
 ### Batch 7A.2 - R2 uploads and delivery
 
@@ -507,10 +509,12 @@ Batch 7A.1 verification:
       media domain.
 - [ ] Add short-lived, admin-authorized direct R2 uploads and server-side
       finalization checks for actual size, MIME/magic bytes, and ownership.
-- [ ] Before exposing registration or worker writes, add database guards that
-      freeze ready object identity, require every derived lineage to reference
-      a source variant, and verify succeeded jobs point to a matching ready
-      output kind and preset.
+- [x] Implement database guards that freeze ready object identity, require every
+      derived lineage to reference a source variant, verify succeeded jobs point
+      to a matching ready output, and close concurrent ready/retire races with a
+      database-level foreign key (`0035_media_pipeline_integrity_guards.sql`).
+- [ ] Apply and verify migration `0035` before exposing registration or worker
+      writes.
 - [ ] Keep Media Library upload progress, reference locks, usage badges, audit
       logs, recoverable trash, and contextual picking inside page editors.
 - [ ] Use immutable, versioned object keys and keep provider credentials only
@@ -566,10 +570,23 @@ Acceptance:
 
 Prerequisites:
 
-- Confirm the production domain/DNS and R2 custom media hostname.
+- Create the domain-neutral private R2 bucket first. The production hostname is
+  intentionally deferred until the canonical site domain is known; use
+  `media.<final-domain>` and keep `r2.dev` limited to temporary testing.
 - Select and document the asynchronous runtime for video jobs. Cloudflare
   Media Transformations can cover short Hero/preview derivatives, while longer
   playback files require a durable FFmpeg worker or managed video service.
+
+Batch 7A.2 integrity-guard verification:
+
+- Full check passes: 43 test files / 387 tests, TypeScript, full ESLint, and the
+  production build.
+- Source-contract coverage verifies immutable identifiers and recipes,
+  same-asset source lineage, type-compatible ready objects, successful-job
+  outputs, private trigger functions, and the concurrency-safe ready-object
+  foreign key.
+- The migration performs no media-row DML and does not move, replace, publish,
+  or delete any current Supabase object.
 
 ## Batch 7B - Inbox V2 and Gmail delivery
 
