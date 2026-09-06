@@ -476,8 +476,8 @@ Acceptance:
 
 ## Batch 7A - Provider-neutral media delivery and Media Optimizer V2
 
-Status: Batch 7A.2c ImageKit no-card configuration foundation complete;
-migration 0036 rollout pending
+Status: Batch 7A.2e isolated ImageKit V2 authority core complete; authenticated
+issuance, migration 0037, and atomic finalization pending
 
 ### Batch 7A.1 - Immediate traffic and persistence foundation
 
@@ -527,8 +527,9 @@ Batch 7A.1 verification:
       provider-neutral reservation table and service-only idempotent preparation
       RPC. It creates no signed URL, finalizer, provider write, or current-media
       DML.
-- [ ] Apply and verify migration `0036` before adding a signing endpoint or
-      enabling any external-provider uploads.
+- [x] Apply and verify migration `0036` before adding a signing endpoint or
+      enabling any external-provider uploads. The corrected migration completed
+      successfully in the connected Supabase project on 2026-09-06.
 - [ ] Keep Media Library upload progress, reference locks, usage badges, audit
       logs, recoverable trash, and contextual picking inside page editors.
 - [ ] Use immutable, versioned object keys and keep provider credentials only
@@ -543,18 +544,27 @@ Small, reviewable rollout steps:
       for conditional CSP upload access. Retain R2 only as a dormant,
       client-owned future alternative. `MEDIA_UPLOAD_PROVIDER` stays
       `supabase`, so no live upload changed.
-- [ ] **7A.2d — migration 0036 rollout:** apply the corrected
+- [x] **7A.2d — migration 0036 rollout:** apply the corrected
       `0036_media_upload_intents.sql` manually, verify its fail-closed catalog
       preflight and service-only RPC, and do not use `db push` while remote
       migration history remains unreconciled.
-- [ ] **7A.2e — ImageKit upload authority:** add the restricted server adapter
-      and authenticated short-lived upload authority after migration 0036 is
-      verified. Keep the current Supabase uploader active.
-- [ ] **7A.2f — migration 0037 and finalizer:** allow only the required ImageKit
-      `fileId`/`filePath` provider metadata, verify the uploaded file through
-      ImageKit's server API, and atomically consume the upload intent plus
-      publish insert-only source records. A failed finalization must not leave
-      a public reference.
+- [x] **7A.2e — ImageKit V2 authority core:** add an isolated short-lived JWT
+      adapter that binds the canonical path/name, exact size, allowlisted MIME,
+      overwrite=false, public-delivery policy, and expiry for one future v2
+      database intent. ImageKit marks Upload V2 as beta, so the adapter remains
+      unreferenced by live server actions and UI while Supabase stays active.
+- [ ] **7A.2f — migration 0037 and authenticated lifecycle:** add canonical
+      MIME-specific extensions and service-only prepare/resolve/cancel/fail
+      RPCs; issue the V2 authority only after AAL2 admin, exact-origin,
+      same-account, intent, and rate-limit checks. Resolve ImageKit
+      `fileId`/`filePath`/`versionId` server-side, verify ownership, path, actual
+      MIME/size, and streamed SHA-256, then atomically publish insert-only ready
+      source records and consume the intent. Expired, failed, cancelled, or
+      abandoned uploads must enter bounded, audited reconciliation and orphan
+      cleanup. Because every V2 JWT is one-shot even after an upload error, a
+      retry must first resolve the old intent and allocate a new intent/object
+      key; the same authority must never be reissued. A failed finalization
+      creates no public reference or silent provider orphan.
 - [ ] **7A.2g — live pilot:** upload one disposable image and one disposable
       video through Admin V2, verify progress, provider metadata, delivery,
       deletion/cache behavior, and quota reporting, then remove the pilot
@@ -577,6 +587,26 @@ Batch 7A.2c verification:
   ImageKit is explicitly selected or the bounded pilot flag is enabled.
 - `MEDIA_UPLOAD_PROVIDER=supabase` remains active. No object, database row, or
   public media reference moved in this batch.
+
+Batch 7A.2d-2e verification:
+
+- 46 test files / 427 tests, TypeScript, full ESLint, and the production build
+  pass.
+- Migration `0036` completed successfully in the connected Supabase project on
+  2026-09-06. Remote CLI migration history remains unreconciled, so `db push`
+  is still prohibited.
+- The isolated V2 signer accepts only the canonical MIME-specific object key
+  for one intent, enforces the pilot size limit, expires within five minutes,
+  and never outlives the database intent.
+- The JWT binds the exact multipart fields and server-side ImageKit checks for
+  size and MIME. It exposes neither the private key nor an unsigned upload
+  option. A retry is contract-tested with a new intent/object key rather than
+  reusing ImageKit's one-shot JWT. ImageKit still marks V2 as beta; production
+  wiring remains pending.
+- The existing Admin Media Library still calls only Supabase
+  `uploadToSignedUrl`. `IMAGEKIT_PILOT_UPLOAD_ENABLED` stays false until
+  same-account preflight, migration `0037`, authenticated issuance, server-side
+  byte verification, atomic finalization, and orphan cleanup are complete.
 
 ### Batch 7A.3 - Media Optimizer workspace
 

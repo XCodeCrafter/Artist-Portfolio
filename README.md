@@ -93,19 +93,29 @@ not force content records to be rewritten.
 Pilot sequence:
 
 1. Create a client-owned ImageKit Forever Free account; it requires no card.
-2. Configure `IMAGEKIT_PUBLIC_KEY`, server-only `IMAGEKIT_PRIVATE_KEY`, and
-   `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT`. Add `IMAGEKIT_WEBHOOK_SECRET` only when
-   verified webhook reconciliation is implemented.
-3. Keep `MEDIA_UPLOAD_PROVIDER=supabase` until migration `0036`, ImageKit
-   configuration validation, the atomic finalizer, and a real image/video pilot
-   have all passed.
-4. Keep `IMAGEKIT_PILOT_UPLOAD_ENABLED=false` until the authenticated pilot
-   flow exists. During the bounded live pilot it can temporarily permit direct
-   browser uploads without switching the active provider; turn it off again
-   after the test.
-5. Test with disposable pilot assets first. Do not switch an existing public
+   The pilot account was created on 2026-09-06.
+2. Create a dedicated restricted API-key pair for the pilot with **Media
+   Management = Read and write** and **Account Management = None**. Configure
+   that pair and the default `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` from the same
+   client-owned account. `IMAGEKIT_PRIVATE_KEY` is server-only: never paste it
+   into chat, issues, screenshots, commits, client code, logs, or a
+   `NEXT_PUBLIC_` variable. Rotate the pair immediately if it is exposed. See
+   the official [ImageKit API-key guide](https://imagekit.io/docs/api-keys).
+3. Before a pilot upload, a server preflight must prove that the key pair and
+   URL endpoint belong to the same ImageKit account. Matching formats are not
+   proof. If quota reporting later needs Account Management read access, use a
+   separate read-only key instead of widening the upload key.
+4. Migration `0036` was applied successfully on 2026-09-06. Keep
+   `MEDIA_UPLOAD_PROVIDER=supabase` until migration `0037`, the atomic
+   finalizer, and a real image/video pilot have all passed.
+5. Keep `IMAGEKIT_PILOT_UPLOAD_ENABLED=false` until the payload-bound V2
+   authority, migration `0037`, resolver/finalizer, orphan cleanup, and the
+   disposable Admin V2 pilot panel are complete. ImageKit currently marks
+   [Upload V2](https://imagekit.io/docs/api-reference/upload-file/upload-file-v2)
+   as beta, so this boundary remains isolated and fail-closed.
+6. Test with disposable pilot assets first. Do not switch an existing public
    media reference or delete a Supabase original during provider validation.
-6. Enable ImageKit only through the future fail-closed adapter and controlled
+7. Enable ImageKit only through the future fail-closed adapter and controlled
    cutover recorded in `TODO.md`.
 
 Cloudflare R2 remains a dormant future alternative. If later traffic economics
@@ -395,9 +405,13 @@ existing `media_assets` rows or stored files. Migration
 `0035_media_pipeline_integrity_guards.sql` freezes verified identities and
 lineage and is live in the connected project. Migration
 `0036_media_upload_intents.sql` prepares private, expiring, service-only upload
-reservations; its manual rollout and verification must finish before any
-ImageKit signing endpoint or finalizer is enabled. None of these migrations
-activates an external storage provider by itself.
+reservations and was applied successfully on 2026-09-06. The isolated ImageKit
+Upload V2 adapter signs the exact target path, name, size, MIME type, overwrite
+policy, privacy, and expiry into a short-lived JWT. It is not imported by the
+live Admin UI, and the pilot remains disabled until same-account preflight,
+migration `0037`, authenticated issuance, atomic finalization, and bounded
+orphan cleanup are complete. None of these migrations activates an external
+storage provider by itself.
 
 The new dashboard shell lives at `/admin/v2`; its navigation workspace is
 `/admin/v2/navigation`. The 1:1 page editors live at `/admin/v2/pages/music`,

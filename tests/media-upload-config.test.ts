@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getImageKitMediaUploadCredentials,
+  getImageKitPilotUploadCredentials,
   getMediaUploadConfigSummary,
   getR2MediaUploadCredentials,
 } from "@/lib/admin/media-upload-config";
@@ -15,6 +16,7 @@ const ENV_KEYS = [
   "IMAGEKIT_PUBLIC_KEY",
   "IMAGEKIT_PRIVATE_KEY",
   "NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT",
+  "IMAGEKIT_PILOT_UPLOAD_ENABLED",
 ] as const;
 
 const originalEnvironment = Object.fromEntries(
@@ -69,6 +71,65 @@ describe("media upload provider configuration", () => {
       status: "unavailable",
       isAvailable: false,
       reason: "provider-not-imagekit",
+      issues: [],
+    });
+    expect(getImageKitPilotUploadCredentials()).toEqual({
+      status: "unavailable",
+      isAvailable: false,
+      reason: "pilot-disabled",
+      issues: [],
+    });
+  });
+
+  it("opens ImageKit credentials only for an explicit Supabase-backed pilot", () => {
+    process.env.MEDIA_UPLOAD_PROVIDER = "supabase";
+    process.env.IMAGEKIT_PILOT_UPLOAD_ENABLED = "true";
+    process.env.IMAGEKIT_PUBLIC_KEY = "public_abcdefghijklmnop";
+    process.env.IMAGEKIT_PRIVATE_KEY = "private_abcdefghijklmnop";
+    process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT =
+      "https://ik.imagekit.io/artistportfolio";
+
+    expect(getImageKitMediaUploadCredentials()).toMatchObject({
+      status: "unavailable",
+      reason: "provider-not-imagekit",
+    });
+    expect(getImageKitPilotUploadCredentials()).toEqual({
+      status: "available",
+      isAvailable: true,
+      credentials: {
+        publicKey: "public_abcdefghijklmnop",
+        privateKey: "private_abcdefghijklmnop",
+        urlEndpoint: "https://ik.imagekit.io/artistportfolio",
+        imageKitId: "artistportfolio",
+      },
+    });
+  });
+
+  it("fails the pilot closed for bad credentials or a provider cutover", () => {
+    process.env.MEDIA_UPLOAD_PROVIDER = "supabase";
+    process.env.IMAGEKIT_PILOT_UPLOAD_ENABLED = "true";
+    process.env.IMAGEKIT_PUBLIC_KEY = "not-public";
+    process.env.IMAGEKIT_PRIVATE_KEY = "not-private";
+    process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT =
+      "https://ik.imagekit.io/artistportfolio/extra";
+
+    expect(getImageKitPilotUploadCredentials()).toEqual({
+      status: "unavailable",
+      isAvailable: false,
+      reason: "invalid-imagekit-configuration",
+      issues: [
+        "invalid-public-key",
+        "invalid-private-key",
+        "invalid-url-endpoint",
+      ],
+    });
+
+    configureValidImageKitEnvironment();
+    process.env.IMAGEKIT_PILOT_UPLOAD_ENABLED = "true";
+    expect(getImageKitPilotUploadCredentials()).toEqual({
+      status: "unavailable",
+      isAvailable: false,
+      reason: "provider-not-supabase",
       issues: [],
     });
   });

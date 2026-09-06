@@ -136,6 +136,22 @@ export type ImageKitMediaUploadCredentialResult =
       issues: readonly ImageKitMediaUploadConfigIssue[];
     }>;
 
+export type ImageKitPilotUploadCredentialResult =
+  | Readonly<{
+      status: "available";
+      isAvailable: true;
+      credentials: ImageKitMediaUploadCredentials;
+    }>
+  | Readonly<{
+      status: "unavailable";
+      isAvailable: false;
+      reason:
+        | "pilot-disabled"
+        | "provider-not-supabase"
+        | "invalid-imagekit-configuration";
+      issues: readonly ImageKitMediaUploadConfigIssue[];
+    }>;
+
 type R2Environment = Readonly<{
   accountId: string;
   accessKeyId: string;
@@ -430,6 +446,57 @@ export function getImageKitMediaUploadCredentials(): ImageKitMediaUploadCredenti
       isAvailable: false,
       reason: "invalid-imagekit-configuration",
       issues: ["invalid-url-endpoint"],
+    };
+  }
+
+  return {
+    status: "available",
+    isAvailable: true,
+    credentials: {
+      publicKey: environment.publicKey,
+      privateKey: environment.privateKey,
+      urlEndpoint: endpoint.urlEndpoint,
+      imageKitId: endpoint.imageKitId,
+    },
+  };
+}
+
+/**
+ * @internal Credentials for the bounded ImageKit pilot only. The pilot is
+ * deliberately available while Supabase remains the active provider, and only
+ * after the server-only feature flag is an exact `true`. Never serialize this
+ * result, log it, or pass it to a Client Component.
+ */
+export function getImageKitPilotUploadCredentials(): ImageKitPilotUploadCredentialResult {
+  if (process.env.IMAGEKIT_PILOT_UPLOAD_ENABLED !== "true") {
+    return {
+      status: "unavailable",
+      isAvailable: false,
+      reason: "pilot-disabled",
+      issues: [],
+    };
+  }
+
+  if (getRequestedProvider() !== "supabase") {
+    return {
+      status: "unavailable",
+      isAvailable: false,
+      reason: "provider-not-supabase",
+      issues: [],
+    };
+  }
+
+  const environment = readImageKitEnvironment();
+  const readiness = getImageKitReadiness(environment);
+  const issues = getImageKitIssues(readiness);
+  const endpoint = parseImageKitUrlEndpoint(environment.urlEndpoint);
+
+  if (issues.length > 0 || !endpoint) {
+    return {
+      status: "unavailable",
+      isAvailable: false,
+      reason: "invalid-imagekit-configuration",
+      issues,
     };
   }
 
