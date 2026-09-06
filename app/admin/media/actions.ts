@@ -640,8 +640,14 @@ export async function finalizeMediaUpload(input: unknown) {
 
   if (insertResult.error) {
     await supabase.storage.from(MEDIA_BUCKET).remove([parsed.data.storagePath]);
-    console.error(insertResult.error);
-    return { ok: false as const, error: insertResult.error.message };
+    console.error("Media asset insert failed after upload verification.", {
+      code: insertResult.error.code || "unknown",
+      message: insertResult.error.message,
+    });
+    return {
+      ok: false as const,
+      error: "Uploaded media could not be added to the library.",
+    };
   }
 
   await writeAuditLog({

@@ -874,6 +874,54 @@ Acceptance:
 - Classic Analytics and its complete Inbox remain available throughout the V2
   migration.
 
+### Batch 8C - Admin boundary hardening
+
+Status: code-only protections implemented and verified; production controls
+requiring migration or owner settings remain planned
+
+- [x] Replace the recovery flow's unverified server-session read with verified
+      Supabase claims, require matching admin `sub` and UUID `session_id`, and
+      keep the stored challenge bound to a one-way session digest.
+- [x] Verify the active admin's AAL2 state from signed claims with a matching
+      subject instead of reading MFA state from an untrusted session user.
+      Memoize the auth boundary per request so the preview layout and its data
+      loader keep defense in depth without duplicate network round-trips.
+- [x] Invalidate older recovery challenges for the same administrator before a
+      replacement link is issued; fail closed if that invalidation cannot be
+      confirmed.
+- [x] Add an authenticated layout around every `/admin/v2-preview/*` route so a
+      future loader refactor cannot accidentally expose unpublished drafts.
+- [x] Require development loopback actions to match the request Host and port
+      exactly instead of trusting every localhost origin.
+- [x] Make the shared audit writer exception-safe so a network failure after a
+      successful mutation cannot turn into a misleading 500 and invite a
+      duplicate retry.
+- [x] Keep media insert diagnostics in server logs and return only a generic
+      upload failure to the browser.
+- [x] Review production dependencies. The current audit reports one upstream
+      PostCSS source-map advisory through two dependency paths; the installed
+      release has no available fix and the application does not process
+      visitor-supplied CSS during runtime. Recheck it on dependency updates.
+- [x] Pass 57 test files / 496 tests, TypeScript, ESLint, and the production
+      build.
+- [ ] Make replacement recovery challenge issuance transactionally
+      single-active per administrator so two concurrent callback requests
+      cannot race between invalidation and insert. This needs a service-only
+      RPC or a new uniqueness constraint.
+- [ ] Make Security Center session revocation immediate by validating the JWT
+      `session_id` against a service-only database boundary, then reduce the
+      Supabase JWT lifetime to an agreed fallback window. This needs a reviewed
+      migration plus a production Auth setting change.
+- [ ] Retire broad authenticated direct-table and Storage mutation policies
+      after every remaining V1 writer has a service-only replacement. Until
+      then an AAL2 admin token can bypass application validation and audit by
+      calling Supabase REST directly.
+- [ ] Prevent Classic Bio and Music writes from bypassing V2 optimistic
+      locking once their V2 snapshot functions are active; provide a visible
+      handoff before disabling those legacy forms.
+- [ ] Add server-verified Turnstile and a bounded global limiter before Contact
+      email delivery is activated; this requires owner-controlled site keys.
+
 Acceptance:
 
 - A nontechnical owner can reach common edits without knowing internal terms.
@@ -905,8 +953,9 @@ Status: planned
 - [ ] Hide truly empty public Music sections without leaving dead anchors.
 - [ ] Avoid duplicate eager Spotify iframe loads across desktop/mobile layouts.
 - [ ] Remove the Home/Bio JSON-LD CSP nonce hydration warning.
-- [ ] Replace the authenticated server-session user warning with a verified
-      user lookup at the relevant Supabase boundary.
+- [x] Replace the authenticated server-session user warning with verified
+      claims and subject matching at the relevant Supabase boundaries (Batch
+      8C).
 - [ ] Confirm the verified ImageKit cutover removes the intermittent Supabase
       image-optimizer timeout path and keep every remote-image failure graceful.
 - [ ] Consume the unsaved-change history sentinel after save/discard so the

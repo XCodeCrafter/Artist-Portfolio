@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import {
   createAdminServiceClient,
@@ -109,26 +110,29 @@ export async function isAllowedAdmin(user: User | null) {
   return isAdminEmailAllowed(email);
 }
 
-export async function getCurrentAdmin(): Promise<AdminUser | null> {
+export const getCurrentAdmin = cache(async (): Promise<AdminUser | null> => {
   const admin = await getCurrentAdminCandidate();
   if (!admin) return null;
 
   const supabase = await createClient();
-  const { data, error } =
-    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data, error } = await supabase.auth.getClaims();
 
-  if (error || data.currentLevel !== "aal2") {
+  if (
+    error ||
+    data?.claims.sub !== admin.id ||
+    data.claims.aal !== "aal2"
+  ) {
     return null;
   }
 
   return admin;
-}
+});
 
 /**
  * Returns an approved password-authenticated admin before MFA elevation.
  * Only MFA enrollment, MFA verification, and password recovery may use this.
  */
-export async function getCurrentAdminCandidate(): Promise<AdminUser | null> {
+export const getCurrentAdminCandidate = cache(async (): Promise<AdminUser | null> => {
   if (!hasSupabaseBrowserEnv()) {
     return null;
   }
@@ -161,9 +165,9 @@ export async function getCurrentAdminCandidate(): Promise<AdminUser | null> {
     role: profile?.role || "admin",
     hasActiveProfile: Boolean(profile),
   };
-}
+});
 
-export async function requireAdmin() {
+export const requireAdmin = cache(async () => {
   const admin = await getCurrentAdmin();
 
   if (!admin) {
@@ -173,4 +177,4 @@ export async function requireAdmin() {
   }
 
   return admin;
-}
+});

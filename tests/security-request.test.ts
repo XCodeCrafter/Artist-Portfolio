@@ -46,14 +46,36 @@ describe("request origin guard", () => {
     ).toBe(false);
   });
 
-  it("allows loopback development but rejects non-web origins", () => {
+  it("allows only the exact request host for loopback development", () => {
     vi.stubEnv("NODE_ENV", "development");
 
     expect(
-      hasAllowedRequestOrigin(headers({ origin: "http://localhost:3000" }))
+      hasAllowedRequestOrigin(
+        headers({ origin: "http://localhost:3000", host: "localhost:3000" })
+      )
     ).toBe(true);
     expect(
-      hasAllowedRequestOrigin(headers({ origin: "javascript:alert(1)" }))
+      hasAllowedRequestOrigin(
+        headers({ origin: "http://localhost:3001", host: "localhost:3000" })
+      )
+    ).toBe(false);
+    expect(
+      hasAllowedRequestOrigin(
+        headers({
+          referer: "http://localhost:3000/admin/login?next=ignored",
+          host: "localhost:3000",
+        })
+      )
+    ).toBe(true);
+    expect(
+      hasAllowedRequestOrigin(
+        headers({ origin: "http://localhost:3000" })
+      )
+    ).toBe(false);
+    expect(
+      hasAllowedRequestOrigin(
+        headers({ origin: "javascript:alert(1)", host: "localhost:3000" })
+      )
     ).toBe(false);
   });
 

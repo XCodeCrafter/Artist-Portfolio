@@ -121,7 +121,9 @@ export function hasAllowedRequestOrigin(headerStore: HeaderReader) {
     : parseWebOrigin(headerStore.get("referer"));
 
   if (!candidate) return false;
-  if (isDevelopmentLoopback(candidate)) return true;
+  if (isDevelopmentLoopback(candidate)) {
+    return hasMatchingLoopbackHost(headerStore, candidate);
+  }
 
   return (
     getConfiguredOrigins().has(candidate) &&

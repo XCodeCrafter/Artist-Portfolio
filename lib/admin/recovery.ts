@@ -35,22 +35,31 @@ function tokenDigest(token: string) {
   return keyedDigest("admin-recovery-token", token);
 }
 
-function getSessionId(accessToken: string) {
-  try {
-    const payload = accessToken.split(".")[1];
-    if (!payload) return "";
-    const claims = JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8")
-    ) as { session_id?: unknown };
-    return typeof claims.session_id === "string" ? claims.session_id : "";
-  } catch {
-    return "";
-  }
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    )
+  );
 }
 
-function sessionDigest(accessToken: string) {
-  const sessionId = getSessionId(accessToken);
-  return sessionId ? keyedDigest("admin-recovery-session", sessionId) : "";
+function sessionDigest(sessionId: string) {
+  return keyedDigest("admin-recovery-session", sessionId);
+}
+
+async function getVerifiedSessionIdentity(accessToken?: string) {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getClaims(accessToken);
+    const userId = data?.claims.sub;
+    const sessionId = data?.claims.session_id;
+
+    if (error || !isUuid(userId) || !isUuid(sessionId)) return null;
+    return { sessionId, userId };
+  } catch {
+    return null;
+  }
 }
 
 export async function issueAdminRecoveryChallenge(
@@ -60,9 +69,12 @@ export async function issueAdminRecoveryChallenge(
   const supabase = createAdminServiceClient();
   if (!supabase || !hasAuthSecuritySecret()) return false;
 
+  const identity = await getVerifiedSessionIdentity(accessToken);
+  if (!identity || identity.userId !== userId) return false;
+
   const token = randomBytes(32).toString("base64url");
   const tokenHash = tokenDigest(token);
-  const sessionHash = sessionDigest(accessToken);
+  const sessionHash = sessionDigest(identity.sessionId);
   if (!tokenHash || !sessionHash) return false;
 
   const now = new Date();
@@ -74,6 +86,16 @@ export async function issueAdminRecoveryChallenge(
     .from("admin_recovery_challenges")
     .delete()
     .lt("expires_at", now.toISOString());
+
+  // A newly issued link supersedes every older reset flow for this account.
+  // Treat an inability to invalidate the old rows as a hard failure instead of
+  // creating two simultaneously valid recovery paths.
+  const { error: invalidationError } = await supabase
+    .from("admin_recovery_challenges")
+    .delete()
+    .eq("user_id", userId);
+
+  if (invalidationError) return false;
 
   const { error } = await supabase.from("admin_recovery_challenges").insert({
     user_id: userId,
@@ -94,14 +116,11 @@ async function getChallengeLookup(userId: string) {
   const token = cookieStore.get(RECOVERY_COOKIE)?.value || "";
   if (!token || !hasAuthSecuritySecret()) return null;
 
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.access_token) return null;
+  const identity = await getVerifiedSessionIdentity();
+  if (!identity || identity.userId !== userId) return null;
 
   const tokenHash = tokenDigest(token);
-  const sessionHash = sessionDigest(session.access_token);
+  const sessionHash = sessionDigest(identity.sessionId);
   if (!tokenHash || !sessionHash) return null;
 
   return { sessionHash, tokenHash, userId };
