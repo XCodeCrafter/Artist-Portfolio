@@ -11,12 +11,17 @@ import {
   FaMinus,
   FaMousePointer,
   FaSearch,
+  FaUsers,
 } from "react-icons/fa";
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import { deleteInquiry, updateInquiry } from "@/app/admin/analytics/actions";
 import type { AnalyticsSummary } from "@/lib/admin/analytics";
+import {
+  getAdminAnalyticsPath,
+  type AdminAnalyticsSurface,
+} from "@/lib/admin/analytics-routes";
 import {
   ANALYTICS_RANGE_DAYS,
   getAnalyticsPageLabel,
@@ -44,6 +49,36 @@ type AnalyticsDashboardProps = {
   status?: string;
 };
 
+export type InsightsDashboardProps = Pick<
+  AnalyticsDashboardProps,
+  | "analytics"
+  | "analyticsAvailable"
+  | "analyticsConfigured"
+  | "analyticsError"
+>;
+
+type AnalyticsWorkspaceProps = AnalyticsDashboardProps & {
+  surface: AdminAnalyticsSurface;
+};
+
+const EMPTY_INQUIRY_SUMMARY: InquirySummary = {
+  total: 0,
+  new: 0,
+  read: 0,
+  replied: 0,
+  archived: 0,
+  current7Days: 0,
+  previous7Days: 0,
+};
+
+const EMPTY_INQUIRY_PAGINATION: InquiryPagination = {
+  page: 1,
+  pageSize: 0,
+  totalPages: 0,
+  from: 0,
+  to: 0,
+};
+
 const statusCopy: Record<string, string> = {
   deleted: "Inquiry deleted.",
   "delete-error": "Delete failed.",
@@ -55,7 +90,7 @@ const statusCopy: Record<string, string> = {
 };
 
 const sectionClass =
-  "scroll-mt-28 rounded-[22px] border border-white/9 bg-[#0f0f11]/92 p-4 shadow-[0_18px_65px_rgba(0,0,0,0.24)] sm:p-5";
+  "min-w-0 scroll-mt-28 rounded-[22px] border border-white/9 bg-[#0f0f11]/92 p-4 shadow-[0_18px_65px_rgba(0,0,0,0.24)] sm:p-5";
 const labelClass =
   "text-[11px] font-semibold uppercase tracking-[0.16em] text-white/46";
 const inputClass =
@@ -151,7 +186,7 @@ function MetricCard({
   value: number | string;
 }) {
   return (
-    <article className="rounded-[18px] border border-white/9 bg-[#101012]/90 p-4 shadow-[0_16px_52px_rgba(0,0,0,0.2)]">
+    <article className="min-w-0 rounded-[18px] border border-white/9 bg-[#101012]/90 p-4 shadow-[0_16px_52px_rgba(0,0,0,0.2)]">
       <div className="flex items-start justify-between gap-3">
         <p className={labelClass}>{label}</p>
         <span className="grid h-8 w-8 place-items-center rounded-xl border border-white/8 bg-white/[0.045] text-xs text-white/42">
@@ -545,7 +580,7 @@ function InquiriesSection({
 
 type WorkspaceSection = { id: string; label: string; badge?: string; node: ReactNode };
 
-export default function AnalyticsDashboard(props: AnalyticsDashboardProps) {
+function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
   const {
     analytics,
     analyticsAvailable,
@@ -557,8 +592,10 @@ export default function AnalyticsDashboard(props: AnalyticsDashboardProps) {
     inquiriesError,
     inquiryPagination,
     inquirySummary,
+    surface,
     status,
   } = props;
+  const isV2 = surface === "v2";
   const [activeSectionId, setActiveSectionId] = useState("overview");
   const { clearDirty, confirmDiscard, hasUnsavedChanges, markDirty } = useUnsavedChangesGuard();
   const dirtyFormsRef = useRef<Set<HTMLFormElement>>(new Set());
@@ -597,7 +634,7 @@ export default function AnalyticsDashboard(props: AnalyticsDashboardProps) {
     return true;
   }
 
-  const sections: WorkspaceSection[] = [
+  const classicSections: WorkspaceSection[] = [
     {
       id: "overview",
       label: "Overview",
@@ -639,9 +676,9 @@ export default function AnalyticsDashboard(props: AnalyticsDashboardProps) {
       node: (
         <section className={sectionClass}>
           <p className={labelClass}>Data confidence</p><h2 className="heading-ui mt-2 text-2xl font-semibold text-white">Monitoring sources</h2><p className="mt-2 text-sm text-white/42">A zero is shown only when its source loaded successfully. Revolutionary technology, apparently.</p>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className={`mt-6 grid gap-3 ${isV2 ? "" : "sm:grid-cols-2"}`}>
             <div className="rounded-[18px] border border-white/9 bg-black/22 p-4"><div className="flex items-center justify-between"><span className="font-semibold text-white">Analytics events</span><span className={analyticsAvailable ? "text-emerald-200" : "text-amber-200"}>{analyticsAvailable ? "Available" : "Unavailable"}</span></div><p className="mt-2 text-xs leading-5 text-white/38">{analyticsAvailable ? `${analytics.totalEvents} events in range · latest ${formatDate(analytics.lastEventAt)}` : analyticsError || "Configuration is incomplete."}</p></div>
-            <div className="rounded-[18px] border border-white/9 bg-black/22 p-4"><div className="flex items-center justify-between"><span className="font-semibold text-white">Inquiry database</span><span className={inquiriesAvailable ? "text-emerald-200" : "text-amber-200"}>{inquiriesAvailable ? "Available" : "Unavailable"}</span></div><p className="mt-2 text-xs leading-5 text-white/38">{inquiriesAvailable ? `${inquirySummary.total} exact records · ${inquiryPagination.from}–${inquiryPagination.to} loaded · ${deliveryKnown} delivery states known${deliveryIssues ? ` · ${deliveryIssues} need attention` : ""}` : inquiriesError || "Configuration is incomplete."}</p></div>
+            {!isV2 ? <div className="rounded-[18px] border border-white/9 bg-black/22 p-4"><div className="flex items-center justify-between"><span className="font-semibold text-white">Inquiry database</span><span className={inquiriesAvailable ? "text-emerald-200" : "text-amber-200"}>{inquiriesAvailable ? "Available" : "Unavailable"}</span></div><p className="mt-2 text-xs leading-5 text-white/38">{inquiriesAvailable ? `${inquirySummary.total} exact records · ${inquiryPagination.from}–${inquiryPagination.to} loaded · ${deliveryKnown} delivery states known${deliveryIssues ? ` · ${deliveryIssues} need attention` : ""}` : inquiriesError || "Configuration is incomplete."}</p></div> : null}
           </div>
           {analyticsAvailable ? <div className="mt-4 grid gap-3 sm:grid-cols-3">{(["LCP", "INP", "CLS"] as const).map((name) => { const vital = analytics.webVitals.find((item) => item.name === name); return <div className="rounded-[16px] border border-white/8 bg-black/20 p-3" key={name}><div className="flex items-center justify-between"><span className="font-mono text-[10px] text-white/42">{name}</span><span className={vital?.rating === "good" ? "text-[10px] text-emerald-200" : vital ? "text-[10px] text-amber-200" : "text-[10px] text-white/30"}>{vital?.rating || "Waiting"}</span></div><p className="mt-2 text-lg font-semibold text-white">{vital ? `${name === "CLS" ? vital.value.toFixed(3) : Math.round(vital.value)}${name === "CLS" ? "" : " ms"}` : "—"}</p><p className="mt-1 text-[9px] text-white/28">{vital ? `p75 · ${vital.samples} samples` : "No samples in range"}</p></div>; })}</div> : null}
           {analytics.isCapped ? <div className="mt-4 rounded-xl border border-amber-300/16 bg-amber-400/[0.06] p-3 text-xs leading-5 text-amber-100/62">The raw event query reached 5,000 rows. Totals and comparisons are partial until server-side aggregation is added.</div> : null}
@@ -649,6 +686,27 @@ export default function AnalyticsDashboard(props: AnalyticsDashboardProps) {
       ),
     },
   ];
+
+  const sectionById = new Map(
+    classicSections.map((section) => [section.id, section] as const)
+  );
+  const v2SectionBlueprint = [
+    ["overview", "overview", "Overview"],
+    ["content", "popular-pages", "Popular pages"],
+    ["acquisition", "visitors", "Visitors"],
+    ["engagement", "interactions", "Interactions"],
+    ["events", "recent-activity", "Recent activity"],
+    ["health", "data-health", "Data health"],
+  ] as const;
+  const sections: WorkspaceSection[] = isV2
+    ? v2SectionBlueprint.map(([sourceId, id, label]) => {
+        const section = sectionById.get(sourceId);
+        if (!section) {
+          throw new Error(`Missing analytics workspace section: ${sourceId}`);
+        }
+        return { ...section, id, label };
+      })
+    : classicSections;
 
   useEffect(() => {
     const syncHash = () => {
@@ -688,29 +746,44 @@ export default function AnalyticsDashboard(props: AnalyticsDashboardProps) {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 gap-4">
       <StatusNotice analyticsConfigured={analyticsConfigured} analyticsError={analyticsError} inquiriesConfigured={inquiriesConfigured} inquiriesError={inquiriesError} status={status} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-white/9 bg-[#0f0f11]/90 p-3">
-        <div><p className={labelClass}>Reporting window</p><p className="mt-1 text-xs text-white/38">Every comparison uses the immediately preceding equal period.</p></div>
-        <div className="flex rounded-xl border border-white/9 bg-black/24 p-1">
-          {ANALYTICS_RANGE_DAYS.map((days) => <Link aria-current={analytics.rangeDays === days ? "page" : undefined} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${analytics.rangeDays === days ? "bg-white text-black" : "text-white/44 hover:text-white"}`} href={`/admin/analytics?range=${days}#${activeSectionId}`} key={days}>{days}d</Link>)}
+      {isV2 && analyticsAvailable && analytics.isCapped ? (
+        <div className="rounded-xl border border-amber-300/20 bg-amber-400/[0.08] px-4 py-3 text-sm leading-6 text-amber-100">
+          This report reached the 5,000-event read limit. Totals and comparisons
+          are partial; rankings still describe only the loaded sample.
         </div>
+      ) : null}
+
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-[18px] border border-white/9 bg-[#0f0f11]/90 p-3">
+        <div className="min-w-0"><p className={labelClass}>Reporting window</p><p className="mt-1 text-xs text-white/38">Every comparison uses the immediately preceding equal period.</p></div>
+        <div className="admin-scrollbar-none flex max-w-full overflow-x-auto rounded-xl border border-white/9 bg-black/24 p-1">
+          {ANALYTICS_RANGE_DAYS.map((days) => <Link aria-current={analytics.rangeDays === days ? "page" : undefined} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${analytics.rangeDays === days ? "bg-white text-black" : "text-white/44 hover:text-white"}`} href={`${getAdminAnalyticsPath(surface)}?range=${days}#${activeSectionId}`} key={days}>{days}d</Link>)}
+        </div>
+        {isV2 && analytics.rangeDays === 180 ? (
+          <p className="basis-full text-[10px] leading-5 text-amber-100/58">
+            The portfolio keeps analytics for 180 days, so the preceding
+            180-day comparison can be incomplete even when the current range is
+            fully available.
+          </p>
+        ) : null}
       </div>
 
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard available={analyticsAvailable} current={analytics.currentPeriod.pageViews} description={`Page views · ${analytics.rangeDays} days`} icon={<FaChartLine />} label="Page views" previous={analytics.previousPeriod.pageViews} rangeDays={analytics.rangeDays} value={formatNumber(analytics.pageViews)} />
-        <MetricCard available={analyticsAvailable} current={analytics.currentPeriod.outboundClicks} description={`External clicks · ${analytics.rangeDays} days`} icon={<FaMousePointer />} label="Outbound" previous={analytics.previousPeriod.outboundClicks} rangeDays={analytics.rangeDays} value={formatNumber(analytics.outboundClicks)} />
-        <MetricCard available={inquiriesAvailable} current={inquirySummary.current7Days} description="New messages · last 7 days" icon={<FaEnvelope />} label="Inquiries" previous={inquirySummary.previous7Days} rangeDays={7} value={formatNumber(inquirySummary.current7Days)} />
-        <MetricCard available={analyticsAvailable} description={`Inbox or e-mail accepted · ${analytics.rangeDays} days`} icon={<FaArrowUp />} label="Accepted inquiries" rangeDays={analytics.rangeDays} value={formatNumber(analytics.bookingSubmits)} />
+        {isV2 ? <MetricCard available={analyticsAvailable} description={`Anonymous 30-minute sessions · ${analytics.rangeDays} days`} icon={<FaUsers />} label="Anonymous visits" rangeDays={analytics.rangeDays} value={formatNumber(analytics.uniqueSessions)} /> : null}
+        <MetricCard available={analyticsAvailable} current={analytics.currentPeriod.outboundClicks} description={`External clicks · ${analytics.rangeDays} days`} icon={<FaMousePointer />} label={isV2 ? "External clicks" : "Outbound"} previous={analytics.previousPeriod.outboundClicks} rangeDays={analytics.rangeDays} value={formatNumber(analytics.outboundClicks)} />
+        {!isV2 ? <MetricCard available={inquiriesAvailable} current={inquirySummary.current7Days} description="New messages · last 7 days" icon={<FaEnvelope />} label="Inquiries" previous={inquirySummary.previous7Days} rangeDays={7} value={formatNumber(inquirySummary.current7Days)} /> : null}
+        <MetricCard available={analyticsAvailable} current={isV2 ? analytics.currentPeriod.bookingSubmits : undefined} description={`Inbox or e-mail accepted · ${analytics.rangeDays} days`} icon={<FaArrowUp />} label={isV2 ? "Accepted contact forms" : "Accepted inquiries"} previous={isV2 ? analytics.previousPeriod.bookingSubmits : undefined} rangeDays={analytics.rangeDays} value={formatNumber(analytics.bookingSubmits)} />
       </section>
 
-      <div className="sticky top-2 z-20 rounded-[20px] border border-white/9 bg-[#0f0f11]/95 p-2 shadow-2xl backdrop-blur-xl">
-        <nav aria-label="Insights workspaces" className="flex gap-1 overflow-x-auto" role="tablist">
+      <div className={`sticky min-w-0 z-20 rounded-[20px] border border-white/9 bg-[#0f0f11]/95 p-2 shadow-2xl backdrop-blur-xl ${isV2 ? "top-[76px] lg:top-3" : "top-2"}`}>
+        <nav aria-label="Insights workspaces" className={`admin-scrollbar-none gap-1 overflow-x-auto ${isV2 ? "flex lg:grid lg:grid-cols-6 lg:overflow-visible" : "flex"}`} role="tablist">
           {sections.map((section, index) => {
             const active = section.id === activeSection.id;
             return (
-              <button aria-controls="analytics-panel" aria-selected={active} className={`min-h-12 min-w-[132px] flex-1 rounded-xl border px-3 py-2 text-left transition ${active ? "border-white/14 bg-white/[0.09] text-white" : "border-transparent text-white/44 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"}`} id={`analytics-tab-${section.id}`} key={section.id} onClick={() => {
+              <button aria-controls="analytics-panel" aria-selected={active} className={`min-h-12 min-w-[132px] flex-1 rounded-xl border px-3 py-2 text-left transition ${isV2 ? "lg:min-w-0" : ""} ${active ? "border-white/14 bg-white/[0.09] text-white" : "border-transparent text-white/44 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"}`} id={`analytics-tab-${section.id}`} key={section.id} onClick={() => {
                 if (openSection(section.id)) return;
                 window.requestAnimationFrame(() => {
                   document.getElementById(`analytics-tab-${activeSection.id}`)?.focus();
@@ -722,7 +795,7 @@ export default function AnalyticsDashboard(props: AnalyticsDashboardProps) {
           })}
         </nav>
         <div className="mt-2 flex flex-wrap items-center justify-end gap-2 px-2 text-[10px] text-white/30">
-          {hasUnsavedChanges ? <span className="rounded-full border border-amber-300/18 bg-amber-400/[0.07] px-2 py-1 font-semibold text-amber-100/72">Unsaved inquiry</span> : null}
+          {!isV2 && hasUnsavedChanges ? <span className="rounded-full border border-amber-300/18 bg-amber-400/[0.07] px-2 py-1 font-semibold text-amber-100/72">Unsaved inquiry</span> : null}
           <span className={`h-1.5 w-1.5 rounded-full ${analyticsAvailable ? "bg-emerald-300" : "bg-amber-300"}`} />
           {analyticsAvailable ? (analytics.lastEventAt ? `Updated ${formatDate(analytics.lastEventAt)}` : "Connected · waiting for first event") : "Analytics unavailable"}
         </div>
@@ -731,4 +804,22 @@ export default function AnalyticsDashboard(props: AnalyticsDashboardProps) {
       <div aria-labelledby={`analytics-tab-${activeSection.id}`} className="scroll-mt-28" id="analytics-panel" role="tabpanel"><div id="analytics-workspace">{activeSection.node}</div></div>
     </div>
   );
+}
+
+export function InsightsDashboard(props: InsightsDashboardProps) {
+  return (
+    <AnalyticsWorkspace
+      {...props}
+      inquiries={[]}
+      inquiriesAvailable={false}
+      inquiriesConfigured
+      inquiryPagination={EMPTY_INQUIRY_PAGINATION}
+      inquirySummary={EMPTY_INQUIRY_SUMMARY}
+      surface="v2"
+    />
+  );
+}
+
+export default function AnalyticsDashboard(props: AnalyticsDashboardProps) {
+  return <AnalyticsWorkspace {...props} surface="classic" />;
 }

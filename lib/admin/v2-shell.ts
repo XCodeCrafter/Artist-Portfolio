@@ -45,6 +45,12 @@ export const ADMIN_V2_NAVIGATION = [
     description: "Page and inquiry delivery",
   },
   {
+    key: "insights",
+    href: "/admin/v2/insights",
+    label: "Insights",
+    description: "Traffic and engagement",
+  },
+  {
     key: "security",
     href: "/admin/v2/security",
     label: "Security",

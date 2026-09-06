@@ -738,12 +738,12 @@ Acceptance:
 
 ## Batch 8 - Dashboard, Analytics, and Settings V2
 
-Status: in progress; Security & access workspace implemented
+Status: in progress; Security & access and Insights workspaces implemented
 
 - [x] Build a task-first `/admin/v2` overview.
 - [ ] Prioritize actionable issues, quick actions, pages, and new messages.
 - [ ] Add a `What do you want to change?` destination finder.
-- [ ] Keep traffic summaries secondary to editing tasks.
+- [x] Keep traffic summaries secondary to editing tasks.
 - [ ] Move healthy technical checks out of the main dashboard.
 - [ ] Place Brand, Access, Security, and technical health under Settings.
 
@@ -783,6 +783,50 @@ Acceptance:
 - Desktop, collapsed-sidebar, mobile drawer, sticky tabs, and keyboard paths
   remain usable without overlapping navigation.
 - This presentation-only V2 move needs no migration, secret, or owner action.
+
+### Batch 8B - Insights V2
+
+Status: implemented and verified
+
+- [x] Add `/admin/v2/insights` to the overview and V2 sidebar without removing
+      `/admin/analytics`.
+- [x] Keep V2 Insights analytics-only. Do not load or render inquiry records;
+      the complete Inbox remains in Classic until Batch 7B gives it a dedicated
+      `/admin/v2/inbox` workspace.
+- [x] Reuse the existing analytics presentation and aggregation instead of
+      maintaining a second reporting implementation.
+- [x] Reorder and rename the V2 workspaces for a nontechnical owner: Overview,
+      Popular pages, Visitors, Interactions, Recent activity, and Data health.
+- [x] Preserve the 7, 30, 90, and 180 day windows, equal-period trends, complete
+      daily chart, accessible data table, top rankings, anonymous sessions,
+      accepted contact activity, privacy wording, latest events, and p75 Web
+      Vitals.
+- [x] Keep range links on their originating Classic or V2 route through a fixed
+      two-value path map.
+- [x] Surface the 5,000-event cap beside the report and explain that the prior
+      180-day comparison can be incomplete under the current 180-day retention
+      policy.
+- [x] Keep explicit AAL2 admin authentication ahead of the service-role
+      analytics load, while requiring no migration, secret, or owner action.
+- [x] Verify expanded and collapsed desktop layouts, the 390 px mobile drawer,
+      mobile overflow, sticky tabs, Arrow/Home/End keyboard navigation, hash
+      state, report ranges, the overview entry point, and unchanged Classic
+      Analytics/Inbox behavior in an authenticated browser.
+- [x] Pass 450 automated tests, TypeScript, ESLint, and the production build.
+- [ ] Replace the capped raw-event read with server-side aggregation before
+      traffic grows enough to make high-volume ranges routinely partial, and
+      decide whether to extend retention or disable the incomplete 180-day
+      comparison baseline.
+
+Acceptance:
+
+- The owner can understand the portfolio performance without finding messages
+  and analytics mixed into the same workspace.
+- Missing data remains unavailable rather than fabricated as zero, partial
+  reports are clearly labelled, and no raw URLs or visitor fingerprints are
+  exposed.
+- Classic Analytics and its complete Inbox remain available throughout the V2
+  migration.
 
 Acceptance:
 

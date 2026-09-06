@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   FaArrowRight,
+  FaChartLine,
   FaCheckCircle,
   FaExclamationTriangle,
   FaEye,
@@ -290,31 +291,55 @@ export default async function AdminV2OverviewPage() {
         </Link>
 
         <Link
-          className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_92%_12%,rgba(255,59,31,0.14),transparent_34%),#0f0f11] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.26)] outline-none transition hover:border-white/24 focus-visible:ring-2 focus-visible:ring-white/70 sm:p-7 xl:col-span-2"
+          className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_92%_12%,rgba(76,121,255,0.15),transparent_36%),#0f0f11] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.26)] outline-none transition hover:border-white/24 focus-visible:ring-2 focus-visible:ring-white/70 sm:p-7"
+          href="/admin/v2/insights"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-blue-200/16 bg-blue-400/10 text-blue-100/78">
+              <FaChartLine />
+            </span>
+            <FaArrowRight className="mt-3 text-white/30 transition group-hover:translate-x-1 group-hover:text-white" />
+          </div>
+          <p className="mt-8 text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-200/60">
+            Understand visitors
+          </p>
+          <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
+            Insights
+          </h2>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-white/44">
+            Review popular pages, anonymous visits, interactions, contact
+            activity, and page experience without mixing reports with Inbox
+            work.
+          </p>
+          <div className="mt-6 flex items-center gap-3 text-xs font-semibold text-white/54 transition group-hover:text-white">
+            Open insights
+            <FaArrowRight className="transition group-hover:translate-x-1" />
+          </div>
+        </Link>
+
+        <Link
+          className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_92%_12%,rgba(255,59,31,0.14),transparent_34%),#0f0f11] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.26)] outline-none transition hover:border-white/24 focus-visible:ring-2 focus-visible:ring-white/70 sm:p-7"
           href="/admin/v2/security"
         >
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-start gap-4">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[#ff664f]/24 bg-[#ff3b1f]/12 text-[#ff735f]">
-                <FaShieldAlt />
-              </span>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/34">
-                  Settings
-                </p>
-                <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
-                  Security &amp; access
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/44">
-                  Check protection health, manage dashboard access and MFA,
-                  inspect blocked activity, and review the audit log.
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-3 text-xs font-semibold text-white/54 transition group-hover:text-white">
-              Open security center
-              <FaArrowRight className="transition group-hover:translate-x-1" />
-            </div>
+          <div className="flex items-start justify-between gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[#ff664f]/24 bg-[#ff3b1f]/12 text-[#ff735f]">
+              <FaShieldAlt />
+            </span>
+            <FaArrowRight className="mt-3 text-white/30 transition group-hover:translate-x-1 group-hover:text-white" />
+          </div>
+          <p className="mt-8 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/34">
+            Settings
+          </p>
+          <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
+            Security &amp; access
+          </h2>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-white/44">
+            Check protection health, manage dashboard access and MFA, inspect
+            blocked activity, and review the audit log.
+          </p>
+          <div className="mt-6 flex items-center gap-3 text-xs font-semibold text-white/54 transition group-hover:text-white">
+            Open security center
+            <FaArrowRight className="transition group-hover:translate-x-1" />
           </div>
         </Link>
 

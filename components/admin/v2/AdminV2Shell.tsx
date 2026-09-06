@@ -12,6 +12,7 @@ import {
 } from "react";
 import {
   FaBars,
+  FaChartLine,
   FaChevronLeft,
   FaChevronRight,
   FaExternalLinkAlt,
@@ -74,6 +75,7 @@ function iconFor(key: AdminV2NavigationKey) {
     showreel: <FaVideo />,
     music: <FaMusic />,
     contact: <FaEnvelope />,
+    insights: <FaChartLine />,
     security: <FaShieldAlt />,
   };
   return icons[key];
