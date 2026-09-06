@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  getImageKitMediaUploadCredentials,
   getMediaUploadConfigSummary,
   getR2MediaUploadCredentials,
 } from "@/lib/admin/media-upload-config";
@@ -11,6 +12,9 @@ const ENV_KEYS = [
   "R2_SECRET_ACCESS_KEY",
   "R2_BUCKET_NAME",
   "NEXT_PUBLIC_MEDIA_ORIGIN",
+  "IMAGEKIT_PUBLIC_KEY",
+  "IMAGEKIT_PRIVATE_KEY",
+  "NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT",
 ] as const;
 
 const originalEnvironment = Object.fromEntries(
@@ -28,6 +32,14 @@ function configureValidR2Environment() {
   process.env.R2_SECRET_ACCESS_KEY = "a".repeat(64);
   process.env.R2_BUCKET_NAME = "artist-portfolio-media-prod";
   process.env.NEXT_PUBLIC_MEDIA_ORIGIN = "https://media.example.com";
+}
+
+function configureValidImageKitEnvironment() {
+  process.env.MEDIA_UPLOAD_PROVIDER = "imagekit";
+  process.env.IMAGEKIT_PUBLIC_KEY = "public_abcdefghijklmnop";
+  process.env.IMAGEKIT_PRIVATE_KEY = "private_abcdefghijklmnop";
+  process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT =
+    "https://ik.imagekit.io/artistportfolio";
 }
 
 beforeEach(clearMediaUploadEnvironment);
@@ -53,6 +65,12 @@ describe("media upload provider configuration", () => {
       reason: "provider-not-r2",
       issues: [],
     });
+    expect(getImageKitMediaUploadCredentials()).toEqual({
+      status: "unavailable",
+      isAvailable: false,
+      reason: "provider-not-imagekit",
+      issues: [],
+    });
   });
 
   it("returns a safe ready summary for a complete R2 configuration", () => {
@@ -69,6 +87,11 @@ describe("media upload provider configuration", () => {
         hasValidAccessKeyId: true,
         hasValidSecretAccessKey: true,
         hasValidMediaOrigin: true,
+      },
+      imagekit: {
+        hasValidPublicKey: false,
+        hasValidPrivateKey: false,
+        hasValidUrlEndpoint: false,
       },
     });
 
@@ -125,12 +148,116 @@ describe("media upload provider configuration", () => {
         hasValidSecretAccessKey: false,
         hasValidMediaOrigin: false,
       },
+      imagekit: {
+        hasValidPublicKey: false,
+        hasValidPrivateKey: false,
+        hasValidUrlEndpoint: false,
+      },
     });
     expect(getR2MediaUploadCredentials()).toMatchObject({
       status: "unavailable",
       isAvailable: false,
       reason: "invalid-r2-configuration",
     });
+  });
+
+  it("returns a safe ready summary and internal credentials for ImageKit", () => {
+    configureValidImageKitEnvironment();
+
+    const summary = getMediaUploadConfigSummary();
+    expect(summary).toEqual({
+      status: "available",
+      isAvailable: true,
+      provider: "imagekit",
+      r2: {
+        hasValidAccountId: false,
+        hasValidBucketName: false,
+        hasValidAccessKeyId: false,
+        hasValidSecretAccessKey: false,
+        hasValidMediaOrigin: false,
+      },
+      imagekit: {
+        hasValidPublicKey: true,
+        hasValidPrivateKey: true,
+        hasValidUrlEndpoint: true,
+      },
+    });
+
+    const serialized = JSON.stringify(summary);
+    expect(serialized).not.toContain(process.env.IMAGEKIT_PUBLIC_KEY);
+    expect(serialized).not.toContain(process.env.IMAGEKIT_PRIVATE_KEY);
+    expect(serialized).not.toContain(
+      process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT
+    );
+
+    expect(getImageKitMediaUploadCredentials()).toEqual({
+      status: "available",
+      isAvailable: true,
+      credentials: {
+        publicKey: "public_abcdefghijklmnop",
+        privateKey: "private_abcdefghijklmnop",
+        urlEndpoint: "https://ik.imagekit.io/artistportfolio",
+        imageKitId: "artistportfolio",
+      },
+    });
+  });
+
+  it("fails closed instead of falling back when ImageKit config is invalid", () => {
+    process.env.MEDIA_UPLOAD_PROVIDER = "imagekit";
+    process.env.IMAGEKIT_PUBLIC_KEY = "not-public";
+    process.env.IMAGEKIT_PRIVATE_KEY = "not-private";
+    process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT =
+      "https://ik.imagekit.io/artistportfolio/extra";
+
+    expect(getMediaUploadConfigSummary()).toMatchObject({
+      status: "unavailable",
+      isAvailable: false,
+      provider: "imagekit",
+      reason: "invalid-imagekit-configuration",
+      issues: [
+        "invalid-public-key",
+        "invalid-private-key",
+        "invalid-url-endpoint",
+      ],
+      imagekit: {
+        hasValidPublicKey: false,
+        hasValidPrivateKey: false,
+        hasValidUrlEndpoint: false,
+      },
+    });
+    expect(getImageKitMediaUploadCredentials()).toMatchObject({
+      status: "unavailable",
+      isAvailable: false,
+      reason: "invalid-imagekit-configuration",
+    });
+  });
+
+  it("accepts only an exact standard ImageKit account endpoint", () => {
+    const invalidEndpoints = [
+      "http://ik.imagekit.io/artistportfolio",
+      "https://ik.imagekit.io/artistportfolio/",
+      "https://ik.imagekit.io/artistportfolio/extra",
+      "https://ik.imagekit.io/artistportfolio?version=1",
+      "https://ik.imagekit.io/artistportfolio#fragment",
+      "https://ik.imagekit.io:444/artistportfolio",
+      "https://artistportfolio.imagekit.io/artistportfolio",
+      "https://ik.imagekit.io/artist.portfolio",
+      "https://user@ik.imagekit.io/artistportfolio",
+    ];
+
+    for (const endpoint of invalidEndpoints) {
+      configureValidImageKitEnvironment();
+      process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT = endpoint;
+      expect(
+        getMediaUploadConfigSummary(),
+        endpoint
+      ).toMatchObject({
+        status: "unavailable",
+        isAvailable: false,
+        provider: "imagekit",
+        issues: ["invalid-url-endpoint"],
+      });
+    }
   });
 
   it("strictly validates bucket, account, credentials, and the exact custom origin", () => {

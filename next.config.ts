@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
-import { getConfiguredR2MediaOrigin } from "./lib/media-source";
+import {
+  getConfiguredImageKitUrlEndpoint,
+  getConfiguredR2MediaOrigin,
+} from "./lib/media-source";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -22,6 +25,8 @@ const supabaseStorageHostname = supabaseStorageOrigin
   : "";
 const r2MediaOrigin = getConfiguredR2MediaOrigin();
 const r2MediaHostname = r2MediaOrigin ? new URL(r2MediaOrigin).hostname : "";
+const imageKitUrlEndpoint = getConfiguredImageKitUrlEndpoint();
+const imageKitUrl = imageKitUrlEndpoint ? new URL(imageKitUrlEndpoint) : null;
 
 const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
   ...(supabaseStorageHostname
@@ -40,6 +45,17 @@ const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
           hostname: r2MediaHostname,
           port: "",
           pathname: "/media/**",
+        },
+      ]
+    : []),
+  ...(imageKitUrl
+    ? [
+        {
+          protocol: "https" as const,
+          hostname: imageKitUrl.hostname,
+          port: "",
+          pathname: `${imageKitUrl.pathname}/media/**`,
+          search: "",
         },
       ]
     : []),

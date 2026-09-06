@@ -31,9 +31,11 @@ describe("Batch 7A media configuration readiness", () => {
     );
   });
 
-  it("publishes only readiness booleans for the documented R2 contract", () => {
+  it("publishes only readiness booleans for documented media providers", () => {
     expect(exampleEnv).toContain("MEDIA_UPLOAD_PROVIDER=supabase");
     expect(exampleEnv).toContain("NEXT_PUBLIC_MEDIA_ORIGIN=");
+    expect(exampleEnv).toContain("NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT=");
+    expect(exampleEnv).toContain("IMAGEKIT_PILOT_UPLOAD_ENABLED=false");
     expect(readinessSource).toContain("getMediaUploadConfigSummary()");
 
     for (const key of [
@@ -46,14 +48,26 @@ describe("Batch 7A media configuration readiness", () => {
       expect(readinessSource).not.toContain(`process.env.${key}`);
     }
 
+    for (const key of [
+      "IMAGEKIT_PUBLIC_KEY",
+      "IMAGEKIT_PRIVATE_KEY",
+      "NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT",
+    ]) {
+      expect(exampleEnv).toContain(`${key}=`);
+      expect(readinessSource).not.toContain(`process.env.${key}`);
+    }
+
     for (const key of ["MEDIA_PROCESSOR_URL", "MEDIA_PROCESSOR_SECRET"]) {
       expect(exampleEnv).toContain(`${key}=`);
       expect(readinessSource).toContain(`process.env.${key}`);
     }
 
-    expect(readinessSource).toContain('id: "r2-delivery"');
+    expect(readinessSource).toContain('id: "external-media-delivery"');
+    expect(readinessSource).toContain("Object.values(summary.imagekit)");
+    expect(readinessSource).toContain("Object.values(summary.r2)");
     expect(readinessSource).toContain('id: "media-processor"');
     expect(readinessSource).not.toContain("R2 credentials:");
+    expect(readinessSource).not.toContain("ImageKit credentials:");
     expect(readinessSource).not.toContain("MEDIA_PROCESSOR_SECRET,");
   });
 });

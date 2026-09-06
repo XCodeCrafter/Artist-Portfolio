@@ -1,4 +1,7 @@
-import { getConfiguredR2MediaOrigin } from "@/lib/media-source";
+import {
+  getConfiguredImageKitUrlEndpoint,
+  getConfiguredR2MediaOrigin,
+} from "@/lib/media-source";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -19,6 +22,15 @@ export function createContentSecurityPolicy(
 ) {
   const supabaseOrigin = getHttpsOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const mediaOrigin = getConfiguredR2MediaOrigin() || "";
+  const imageKitUrlEndpoint = getConfiguredImageKitUrlEndpoint();
+  const imageKitCdnOrigin = imageKitUrlEndpoint
+    ? new URL(imageKitUrlEndpoint).origin
+    : "";
+  const imageKitUploadsEnabled = Boolean(
+    imageKitCdnOrigin &&
+      (process.env.MEDIA_UPLOAD_PROVIDER === "imagekit" ||
+        process.env.IMAGEKIT_PILOT_UPLOAD_ENABLED === "true")
+  );
   const scriptSrc = [
     "'self'",
     `'nonce-${nonce}'`,
@@ -35,6 +47,7 @@ export function createContentSecurityPolicy(
     "https://w.soundcloud.com",
     "https://challenges.cloudflare.com",
     ...(supabaseOrigin ? [supabaseOrigin] : []),
+    ...(imageKitUploadsEnabled ? ["https://upload.imagekit.io"] : []),
     ...(isDev
       ? [
           "http://localhost:*",
@@ -50,6 +63,7 @@ export function createContentSecurityPolicy(
     "blob:",
     ...(supabaseOrigin ? [supabaseOrigin] : []),
     ...(mediaOrigin ? [mediaOrigin] : []),
+    ...(imageKitCdnOrigin ? [imageKitCdnOrigin] : []),
   ].join(" ");
   const frameSrc = [
     "'self'",

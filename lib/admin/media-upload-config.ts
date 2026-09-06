@@ -7,8 +7,13 @@ const R2_ACCESS_KEY_ID_PATTERN = /^[a-f0-9]{32}$/i;
 const R2_SECRET_ACCESS_KEY_PATTERN = /^[a-f0-9]{64}$/i;
 const DNS_LABEL_PATTERN =
   /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const IMAGEKIT_PUBLIC_KEY_PATTERN =
+  /^public_[A-Za-z0-9+/_-]{8,192}={0,2}$/;
+const IMAGEKIT_PRIVATE_KEY_PATTERN =
+  /^private_[A-Za-z0-9+/_-]{8,192}={0,2}$/;
+const IMAGEKIT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
-export type MediaUploadProvider = "supabase" | "r2";
+export type MediaUploadProvider = "supabase" | "r2" | "imagekit";
 
 export type R2MediaUploadReadiness = Readonly<{
   hasValidAccountId: boolean;
@@ -25,18 +30,31 @@ export type R2MediaUploadConfigIssue =
   | "invalid-secret-access-key"
   | "invalid-media-origin";
 
+export type ImageKitMediaUploadReadiness = Readonly<{
+  hasValidPublicKey: boolean;
+  hasValidPrivateKey: boolean;
+  hasValidUrlEndpoint: boolean;
+}>;
+
+export type ImageKitMediaUploadConfigIssue =
+  | "invalid-public-key"
+  | "invalid-private-key"
+  | "invalid-url-endpoint";
+
 export type MediaUploadConfigSummary =
   | Readonly<{
       status: "available";
       isAvailable: true;
       provider: "supabase";
       r2: R2MediaUploadReadiness;
+      imagekit: ImageKitMediaUploadReadiness;
     }>
   | Readonly<{
       status: "available";
       isAvailable: true;
       provider: "r2";
       r2: R2MediaUploadReadiness;
+      imagekit: ImageKitMediaUploadReadiness;
     }>
   | Readonly<{
       status: "unavailable";
@@ -45,6 +63,23 @@ export type MediaUploadConfigSummary =
       reason: "invalid-r2-configuration";
       issues: readonly R2MediaUploadConfigIssue[];
       r2: R2MediaUploadReadiness;
+      imagekit: ImageKitMediaUploadReadiness;
+    }>
+  | Readonly<{
+      status: "available";
+      isAvailable: true;
+      provider: "imagekit";
+      r2: R2MediaUploadReadiness;
+      imagekit: ImageKitMediaUploadReadiness;
+    }>
+  | Readonly<{
+      status: "unavailable";
+      isAvailable: false;
+      provider: "imagekit";
+      reason: "invalid-imagekit-configuration";
+      issues: readonly ImageKitMediaUploadConfigIssue[];
+      r2: R2MediaUploadReadiness;
+      imagekit: ImageKitMediaUploadReadiness;
     }>
   | Readonly<{
       status: "unavailable";
@@ -53,6 +88,7 @@ export type MediaUploadConfigSummary =
       reason: "unsupported-provider";
       issues: readonly ["invalid-provider"];
       r2: R2MediaUploadReadiness;
+      imagekit: ImageKitMediaUploadReadiness;
     }>;
 
 export type R2MediaUploadCredentials = Readonly<{
@@ -78,12 +114,40 @@ export type R2MediaUploadCredentialResult =
       issues: readonly R2MediaUploadConfigIssue[];
     }>;
 
+export type ImageKitMediaUploadCredentials = Readonly<{
+  publicKey: string;
+  privateKey: string;
+  urlEndpoint: string;
+  imageKitId: string;
+}>;
+
+export type ImageKitMediaUploadCredentialResult =
+  | Readonly<{
+      status: "available";
+      isAvailable: true;
+      credentials: ImageKitMediaUploadCredentials;
+    }>
+  | Readonly<{
+      status: "unavailable";
+      isAvailable: false;
+      reason:
+        | "provider-not-imagekit"
+        | "invalid-imagekit-configuration";
+      issues: readonly ImageKitMediaUploadConfigIssue[];
+    }>;
+
 type R2Environment = Readonly<{
   accountId: string;
   accessKeyId: string;
   secretAccessKey: string;
   bucketName: string;
   mediaOrigin: string;
+}>;
+
+type ImageKitEnvironment = Readonly<{
+  publicKey: string;
+  privateKey: string;
+  urlEndpoint: string;
 }>;
 
 function readR2Environment(): R2Environment {
@@ -94,6 +158,43 @@ function readR2Environment(): R2Environment {
     bucketName: process.env.R2_BUCKET_NAME ?? "",
     mediaOrigin: process.env.NEXT_PUBLIC_MEDIA_ORIGIN ?? "",
   };
+}
+
+function readImageKitEnvironment(): ImageKitEnvironment {
+  return {
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY ?? "",
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY ?? "",
+    urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT ?? "",
+  };
+}
+
+function parseImageKitUrlEndpoint(value: string) {
+  try {
+    const url = new URL(value);
+    const pathMatch = url.pathname.match(/^\/([A-Za-z0-9_-]{1,128})$/);
+
+    if (
+      url.protocol !== "https:" ||
+      url.hostname.toLowerCase() !== "ik.imagekit.io" ||
+      url.port ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      !pathMatch ||
+      value !== `${url.origin}${url.pathname}` ||
+      !IMAGEKIT_ID_PATTERN.test(pathMatch[1])
+    ) {
+      return null;
+    }
+
+    return {
+      imageKitId: pathMatch[1],
+      urlEndpoint: `${url.origin}${url.pathname}`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function isValidCustomMediaOrigin(value: string) {
@@ -149,6 +250,30 @@ function getR2Issues(readiness: R2MediaUploadReadiness) {
   return issues;
 }
 
+function getImageKitReadiness(
+  environment: ImageKitEnvironment
+): ImageKitMediaUploadReadiness {
+  return {
+    hasValidPublicKey: IMAGEKIT_PUBLIC_KEY_PATTERN.test(environment.publicKey),
+    hasValidPrivateKey: IMAGEKIT_PRIVATE_KEY_PATTERN.test(
+      environment.privateKey
+    ),
+    hasValidUrlEndpoint: Boolean(
+      parseImageKitUrlEndpoint(environment.urlEndpoint)
+    ),
+  };
+}
+
+function getImageKitIssues(readiness: ImageKitMediaUploadReadiness) {
+  const issues: ImageKitMediaUploadConfigIssue[] = [];
+
+  if (!readiness.hasValidPublicKey) issues.push("invalid-public-key");
+  if (!readiness.hasValidPrivateKey) issues.push("invalid-private-key");
+  if (!readiness.hasValidUrlEndpoint) issues.push("invalid-url-endpoint");
+
+  return issues;
+}
+
 function getRequestedProvider() {
   const configured = process.env.MEDIA_UPLOAD_PROVIDER;
   return configured === undefined || configured === "" ? "supabase" : configured;
@@ -156,11 +281,13 @@ function getRequestedProvider() {
 
 /**
  * Safe for readiness responses: this summary contains validation booleans and
- * issue codes only. It never contains R2 credential values.
+ * issue codes only. It never contains R2 or ImageKit credential values.
  */
 export function getMediaUploadConfigSummary(): MediaUploadConfigSummary {
-  const environment = readR2Environment();
-  const r2 = getR2Readiness(environment);
+  const r2Environment = readR2Environment();
+  const imageKitEnvironment = readImageKitEnvironment();
+  const r2 = getR2Readiness(r2Environment);
+  const imagekit = getImageKitReadiness(imageKitEnvironment);
   const provider = getRequestedProvider();
 
   if (provider === "supabase") {
@@ -169,37 +296,64 @@ export function getMediaUploadConfigSummary(): MediaUploadConfigSummary {
       isAvailable: true,
       provider,
       r2,
+      imagekit,
     };
   }
 
-  if (provider !== "r2") {
-    return {
-      status: "unavailable",
-      isAvailable: false,
-      provider: null,
-      reason: "unsupported-provider",
-      issues: ["invalid-provider"],
-      r2,
-    };
-  }
+  if (provider === "r2") {
+    const issues = getR2Issues(r2);
+    if (issues.length > 0) {
+      return {
+        status: "unavailable",
+        isAvailable: false,
+        provider,
+        reason: "invalid-r2-configuration",
+        issues,
+        r2,
+        imagekit,
+      };
+    }
 
-  const issues = getR2Issues(r2);
-  if (issues.length > 0) {
     return {
-      status: "unavailable",
-      isAvailable: false,
+      status: "available",
+      isAvailable: true,
       provider,
-      reason: "invalid-r2-configuration",
-      issues,
       r2,
+      imagekit,
+    };
+  }
+
+  if (provider === "imagekit") {
+    const issues = getImageKitIssues(imagekit);
+    if (issues.length > 0) {
+      return {
+        status: "unavailable",
+        isAvailable: false,
+        provider,
+        reason: "invalid-imagekit-configuration",
+        issues,
+        r2,
+        imagekit,
+      };
+    }
+
+    return {
+      status: "available",
+      isAvailable: true,
+      provider,
+      r2,
+      imagekit,
     };
   }
 
   return {
-    status: "available",
-    isAvailable: true,
-    provider,
+    status: "unavailable",
+    isAvailable: false,
+    provider: null,
+    reason: "unsupported-provider",
+    issues: ["invalid-provider"],
     r2,
+    imagekit,
   };
 }
 
@@ -239,6 +393,54 @@ export function getR2MediaUploadCredentials(): R2MediaUploadCredentialResult {
       mediaOrigin: environment.mediaOrigin,
       endpoint: `https://${environment.accountId}.r2.cloudflarestorage.com`,
       region: "auto",
+    },
+  };
+}
+
+/**
+ * @internal Server-only accessor for the future ImageKit upload adapter. Never
+ * pass the private key to a Client Component, API response, readiness payload,
+ * audit record, or log.
+ */
+export function getImageKitMediaUploadCredentials(): ImageKitMediaUploadCredentialResult {
+  const summary = getMediaUploadConfigSummary();
+  if (summary.provider !== "imagekit") {
+    return {
+      status: "unavailable",
+      isAvailable: false,
+      reason: "provider-not-imagekit",
+      issues: [],
+    };
+  }
+
+  if (!summary.isAvailable) {
+    return {
+      status: "unavailable",
+      isAvailable: false,
+      reason: "invalid-imagekit-configuration",
+      issues: summary.issues,
+    };
+  }
+
+  const environment = readImageKitEnvironment();
+  const endpoint = parseImageKitUrlEndpoint(environment.urlEndpoint);
+  if (!endpoint) {
+    return {
+      status: "unavailable",
+      isAvailable: false,
+      reason: "invalid-imagekit-configuration",
+      issues: ["invalid-url-endpoint"],
+    };
+  }
+
+  return {
+    status: "available",
+    isAvailable: true,
+    credentials: {
+      publicKey: environment.publicKey,
+      privateKey: environment.privateKey,
+      urlEndpoint: endpoint.urlEndpoint,
+      imageKitId: endpoint.imageKitId,
     },
   };
 }

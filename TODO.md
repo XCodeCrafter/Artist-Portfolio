@@ -474,9 +474,10 @@ Acceptance:
 - Each public page has one predictable edit location.
 - Gallery and Works content is no longer discoverable only through Media Library.
 
-## Batch 7A - R2 media delivery and Media Optimizer V2
+## Batch 7A - Provider-neutral media delivery and Media Optimizer V2
 
-Status: Batch 7A.2b dormant upload foundation ready; migration 0036 rollout pending
+Status: Batch 7A.2c ImageKit no-card configuration foundation complete;
+migration 0036 rollout pending
 
 ### Batch 7A.1 - Immediate traffic and persistence foundation
 
@@ -486,9 +487,10 @@ Status: Batch 7A.2b dormant upload foundation ready; migration 0036 rollout pend
 - [x] Add provider-neutral physical-object, derivative, and optimization-job
       records without changing or deleting current `media_assets` rows.
 - [x] Centralize trusted Media Library URL validation so the existing Supabase
-      origin and the configured R2 custom origin can coexist during rollback.
-- [x] Record the R2 and processing configuration contract in example env and
-      readiness checks without exposing credentials.
+      origin and a configured external-provider origin can coexist during
+      rollback.
+- [x] Record the provider-neutral persistence model plus the initial dormant R2
+      and processing configuration contracts without exposing credentials.
 
 Batch 7A.1 verification:
 
@@ -502,13 +504,14 @@ Batch 7A.1 verification:
   sentinel result. Remote CLI migration history still needs later
   reconciliation before any `db push` workflow is safe.
 
-### Batch 7A.2 - R2 uploads and delivery
+### Batch 7A.2 - Provider foundation and ImageKit pilot
 
 - [ ] Keep Supabase Postgres, Auth, Inbox, and searchable media metadata; move
-      binary image/video delivery to Cloudflare R2 through a production custom
-      media domain.
-- [ ] Add short-lived, admin-authorized direct R2 uploads and server-side
-      finalization checks for actual size, MIME/magic bytes, and ownership.
+      verified binary image/video delivery to the selected provider without
+      changing the public content model.
+- [ ] Add short-lived, admin-authorized direct ImageKit uploads and server-side
+      finalization checks for provider identity, path, actual size, media type,
+      and ownership.
 - [x] Implement database guards that freeze ready object identity, require every
       derived lineage to reference a source variant, verify succeeded jobs point
       to a matching ready output, and close concurrent ready/retire races with a
@@ -518,17 +521,62 @@ Batch 7A.1 verification:
       catalog preflight that verifies the exact guards and active FK triggers
       before it creates any upload reservation surface.
 - [x] Add a dormant `MEDIA_UPLOAD_PROVIDER` selector that defaults to Supabase,
-      rejects malformed R2 settings without fallback, and exposes only safe
-      readiness booleans—not credentials.
+      rejects malformed R2 or ImageKit settings without fallback, and exposes
+      only safe readiness booleans—not credentials.
 - [x] Prepare `0036_media_upload_intents.sql` with a private, expiring,
       provider-neutral reservation table and service-only idempotent preparation
-      RPC. It creates no signed URL, finalizer, R2 write, or current-media DML.
+      RPC. It creates no signed URL, finalizer, provider write, or current-media
+      DML.
 - [ ] Apply and verify migration `0036` before adding a signing endpoint or
-      enabling R2 uploads.
+      enabling any external-provider uploads.
 - [ ] Keep Media Library upload progress, reference locks, usage badges, audit
       logs, recoverable trash, and contextual picking inside page editors.
 - [ ] Use immutable, versioned object keys and keep provider credentials only
       in server/worker secrets.
+
+Small, reviewable rollout steps:
+
+- [x] **7A.2c — decision and dormant configuration:** select ImageKit Forever
+      Free as the no-card pilot; document its environment contract and upgrade
+      path; add fail-closed credential/endpoint validation, exact account media
+      allowlists, queryless Next Image delivery, and a server-only pilot flag
+      for conditional CSP upload access. Retain R2 only as a dormant,
+      client-owned future alternative. `MEDIA_UPLOAD_PROVIDER` stays
+      `supabase`, so no live upload changed.
+- [ ] **7A.2d — migration 0036 rollout:** apply the corrected
+      `0036_media_upload_intents.sql` manually, verify its fail-closed catalog
+      preflight and service-only RPC, and do not use `db push` while remote
+      migration history remains unreconciled.
+- [ ] **7A.2e — ImageKit upload authority:** add the restricted server adapter
+      and authenticated short-lived upload authority after migration 0036 is
+      verified. Keep the current Supabase uploader active.
+- [ ] **7A.2f — migration 0037 and finalizer:** allow only the required ImageKit
+      `fileId`/`filePath` provider metadata, verify the uploaded file through
+      ImageKit's server API, and atomically consume the upload intent plus
+      publish insert-only source records. A failed finalization must not leave
+      a public reference.
+- [ ] **7A.2g — live pilot:** upload one disposable image and one disposable
+      video through Admin V2, verify progress, provider metadata, delivery,
+      deletion/cache behavior, and quota reporting, then remove the pilot
+      records without touching existing portfolio media.
+- [ ] **7A.3 — optimizer:** introduce the three owner-facing presets and
+      verified source/preview/poster/playback variants in small media-type
+      batches.
+- [ ] **7A.4 — controlled cutover:** copy and verify existing assets in stages,
+      switch only accepted references, measure Supabase egress, and retain the
+      originals through the agreed rollback window.
+
+Batch 7A.2c verification:
+
+- 45 test files / 420 tests, TypeScript, full ESLint, and the production build
+  pass.
+- ImageKit credentials and the exact account endpoint fail closed without
+  leaking secrets into readiness output.
+- Next Image and the public media validator accept only the configured account's
+  queryless `/media/` namespace. The browser upload origin stays blocked until
+  ImageKit is explicitly selected or the bounded pilot flag is enabled.
+- `MEDIA_UPLOAD_PROVIDER=supabase` remains active. No object, database row, or
+  public media reference moved in this batch.
 
 ### Batch 7A.3 - Media Optimizer workspace
 
@@ -542,9 +590,14 @@ Batch 7A.1 verification:
 - [ ] Always create a verified optimized copy first. Activation must be an
       explicit, optimistic, audited action with `Restore original`; never
       overwrite or auto-delete the source.
-- [ ] Optimize images through Cloudflare's R2-compatible image transformation
-      path and use an asynchronous video processor instead of running long
-      FFmpeg work inside a normal Vercel request.
+- [ ] Use a bounded set of ImageKit named transformations for pilot image,
+      poster, and short-preview variants; restrict unnamed transformations so
+      arbitrary URLs cannot consume the monthly processing quota. Use a
+      durable asynchronous processor when longer video work is unsuitable for
+      ImageKit limits, never long-running FFmpeg inside a normal Vercel request.
+- [ ] Display ImageKit bandwidth, storage, and video-processing limits in plain
+      language before enabling a preset; Lite increases bandwidth/storage but
+      retains the Free plan's 500 monthly video-processing units.
 - [ ] Add an explicit archive/purge workflow before the recoverable video
       catalog reaches the 120-item new-content cap.
 
@@ -559,9 +612,10 @@ Batch 7A.1 verification:
       nearby metadata may warm ahead so fast scrolling does not leave blanks.
 - [ ] Optimize the two current 48-50 MB Hero videos first. Remove audio only
       from decorative Hero loops; never strip Showreel playback audio.
-- [ ] Inventory and copy existing Supabase objects to R2, verify checksum,
-      content type, dimensions/duration, and size, then switch only verified
-      references in controlled stages.
+- [ ] Inventory and copy existing Supabase objects to the verified ImageKit
+      pilot account, verify provider identity, checksum evidence, content type,
+      dimensions/duration, and size, then switch only accepted references in
+      controlled stages.
 - [ ] Retain Supabase originals for an agreed 14-30 day rollback window. Purge
       them only in a later batch with explicit owner approval.
 - [ ] Add Playwright delivery/network-budget coverage for desktop and mobile,
@@ -575,17 +629,24 @@ Acceptance:
 - A nontechnical owner can optimize, compare, activate, and restore media
   without understanding storage providers.
 - No migration, optimization, activation, or failed job deletes original media.
-- R2 uploads and every page-editor picker work through one validated media
-  contract, and an R2 outage fails gracefully rather than corrupting content.
+- ImageKit uploads and every page-editor picker work through one validated,
+  provider-neutral media contract, and a provider outage fails gracefully
+  rather than corrupting content.
 
 Prerequisites:
 
-- Create the domain-neutral private R2 bucket first. The production hostname is
-  intentionally deferred until the canonical site domain is known; use
-  `media.<final-domain>` and keep `r2.dev` limited to temporary testing.
+- Create the ImageKit Forever Free account under client ownership and configure
+  only its public key, restricted server-only private key, and URL endpoint for
+  the pilot. No developer-owned payment method is part of the test setup.
+- Keep `MEDIA_UPLOAD_PROVIDER=supabase` through migration 0036, configuration,
+  finalizer, and live-pilot verification. Credentials are configuration, not a
+  cutover switch and not proof that delivery works.
+- Keep Cloudflare R2 dormant. Reconsider it only as a separately reviewed,
+  client-owned production alternative if measured usage or economics outgrow
+  ImageKit; it is no longer a prerequisite for Batch 7A.
 - Select and document the asynchronous runtime for video jobs. Cloudflare
-  Media Transformations can cover short Hero/preview derivatives, while longer
-  playback files require a durable FFmpeg worker or managed video service.
+  services, a durable FFmpeg worker, or another managed video service remain
+  options only when ImageKit's bounded transformations do not fit the workload.
 
 Batch 7A.2 integrity-guard verification:
 
@@ -606,8 +667,8 @@ Batch 7A.2b dormant upload-foundation verification:
 
 - Full check passes: 45 test files / 402 tests, TypeScript, full ESLint, and the
   production build.
-- R2 remains disabled, the current Supabase uploader remains active, and no
-  object or public media reference has moved.
+- Every external provider remains disabled, the current Supabase uploader
+  remains active, and no object or public media reference has moved.
 - The first manual `0036` attempt rolled back cleanly after a newline-sensitive
   `pg_get_expr` comparison produced a false negative. The check now compares
   against the same server's deparse of an empty transaction-scoped generated
@@ -689,8 +750,8 @@ Status: planned
 - [ ] Remove the Home/Bio JSON-LD CSP nonce hydration warning.
 - [ ] Replace the authenticated server-session user warning with a verified
       user lookup at the relevant Supabase boundary.
-- [ ] Confirm R2 removes the intermittent Supabase image-optimizer timeout path
-      and keep every remote-image failure graceful.
+- [ ] Confirm the verified ImageKit cutover removes the intermittent Supabase
+      image-optimizer timeout path and keep every remote-image failure graceful.
 - [ ] Consume the unsaved-change history sentinel after save/discard so the
       first Back action always navigates as expected.
 - [ ] Take a full database backup and reconcile the empty remote Supabase CLI

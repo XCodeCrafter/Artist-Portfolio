@@ -59,11 +59,58 @@ function hasEmailEnv() {
   );
 }
 
-function hasR2DeliveryEnv() {
+function getExternalMediaDeliveryReadiness() {
   const summary = getMediaUploadConfigSummary();
-  return (
-    summary.provider !== null && Object.values(summary.r2).every(Boolean)
-  );
+  const imageKitReady = Object.values(summary.imagekit).every(Boolean);
+  const r2Ready = Object.values(summary.r2).every(Boolean);
+
+  if (summary.provider === null) {
+    return {
+      ok: false,
+      detail:
+        "MEDIA_UPLOAD_PROVIDER is unsupported; keep Supabase selected until a verified provider cutover.",
+    };
+  }
+
+  if (summary.provider === "imagekit") {
+    return {
+      ok: summary.isAvailable,
+      detail: summary.isAvailable
+        ? "ImageKit is selected with an exact delivery endpoint and complete server credentials."
+        : "ImageKit is selected, but its endpoint or server credentials are invalid.",
+    };
+  }
+
+  if (summary.provider === "r2") {
+    return {
+      ok: summary.isAvailable,
+      detail: summary.isAvailable
+        ? "R2 is selected with its bucket, exact delivery origin, and server credentials configured."
+        : "R2 is selected, but its bucket, delivery origin, or server credentials are invalid.",
+    };
+  }
+
+  if (imageKitReady) {
+    return {
+      ok: true,
+      detail:
+        "The ImageKit pilot account is configured; Supabase remains the active uploader until controlled cutover.",
+    };
+  }
+
+  if (r2Ready) {
+    return {
+      ok: true,
+      detail:
+        "Dormant R2 delivery is configured; Supabase remains the active uploader until controlled cutover.",
+    };
+  }
+
+  return {
+    ok: false,
+    detail:
+      "Configure the client-owned ImageKit pilot account before external media cutover.",
+  };
 }
 
 function hasSafeMediaProcessorUrl() {
@@ -278,6 +325,7 @@ async function inspectAuthSettings() {
 export async function getProductionReadiness(): Promise<ProductionReadiness> {
   const authConfigured = hasSupabaseBrowserEnv();
   const serviceConfigured = hasAdminServiceEnv();
+  const externalMedia = getExternalMediaDeliveryReadiness();
   const [supabase, publicSignupDisabled] = await Promise.all([
     serviceConfigured
       ? inspectSupabase()
@@ -342,13 +390,11 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
       href: "/admin/media#upload",
     },
     {
-      id: "r2-delivery",
-      label: "R2 media delivery",
-      ok: hasR2DeliveryEnv(),
+      id: "external-media-delivery",
+      label: "External media pilot",
+      ok: externalMedia.ok,
       critical: false,
-      detail: hasR2DeliveryEnv()
-        ? "The R2 bucket, custom delivery origin, and server credentials are configured."
-        : "Before media cutover, configure the R2 bucket, custom HTTPS origin, and server-only credentials.",
+      detail: externalMedia.detail,
       href: "/admin/media#upload",
     },
     {

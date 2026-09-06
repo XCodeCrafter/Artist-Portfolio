@@ -42,6 +42,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SECRET_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 SUPABASE_MEDIA_BUCKET=portfolio-media
+MEDIA_UPLOAD_PROVIDER=supabase
 AUTH_SECURITY_SECRET=at-least-32-random-characters
 CRON_SECRET=at-least-16-random-characters
 HEALTHCHECK_SECRET=random-monitor-bearer-token
@@ -60,31 +61,62 @@ Production content fails closed when Supabase is unavailable so a stale demo
 identity cannot be indexed. `ALLOW_FALLBACK_CONTENT=true` is only for local
 loopback development; the application ignores it for public site URLs.
 
-## Cloudflare R2 media rollout
+## Provider-neutral media rollout
 
-The live uploader remains on Supabase until R2 is explicitly enabled. Creating
-the R2 resources does not move, replace, publish, or delete any current media.
+The live uploader remains on Supabase. The new upload-intent and optimization
+tables are provider-neutral, and merely adding external-provider credentials
+does not move, replace, publish, or delete current media.
 
-1. In Cloudflare R2, create a private Standard bucket named
-   `artist-portfolio-media-prod`. Keep public `r2.dev` access disabled. Bucket
-   names may contain only lowercase letters, numbers, and hyphens.
-2. Under **Manage R2 API tokens**, create **Object Read & Write** credentials
-   scoped only to that bucket. Copy the Access Key ID and Secret Access Key when
-   shown; Cloudflare does not show the secret again.
-3. Store the Account ID, Access Key ID, Secret Access Key, and bucket name only
-   in local/Vercel server environment variables. Never commit or paste them
-   into issues, logs, screenshots, or chat.
-4. Keep `MEDIA_UPLOAD_PROVIDER=supabase` and leave
-   `NEXT_PUBLIC_MEDIA_ORIGIN` empty until the signed-upload integration, exact
-   CORS policy, and real upload verification pass.
-5. Once the canonical site domain is known, attach
-   `media.<canonical-domain>` to the existing bucket. Production delivery will
-   use that hostname; presigned uploads use Cloudflare's S3 API endpoint.
+ImageKit is the selected no-card pilot. Its Forever Free plan currently
+includes 20 GB of monthly delivery bandwidth, 3 GB of Media Library storage,
+500 monthly video processing units, and two users. Delivery or new processing
+stops at the relevant free limit instead of creating an overage bill. Check the
+current [ImageKit plans](https://imagekit.io/plans/) and
+[pricing behavior](https://imagekit.io/docs/how-pricing-works) before a
+production cutover.
 
-Cloudflare references: [bucket creation](https://developers.cloudflare.com/r2/buckets/create-buckets/),
-[R2 credentials](https://developers.cloudflare.com/r2/api/tokens/),
+The same account can later move through the following upgrade path without an
+application-level media migration:
+
+- Lite starts at $9/month with 40 GB bandwidth and 10 GB storage included,
+  followed by usage-based overages. It still includes 500 monthly video
+  processing units.
+- Pro starts at $89/month with 225 GB bandwidth, 225 GB storage, 5,000 monthly
+  video processing units, larger uploads, and one custom delivery domain.
+- Enterprise provides custom limits when the standard plans no longer fit.
+
+Paid billing must belong to the artist/client, not the developer. The adapter
+will retain ImageKit's provider `fileId` and canonical `filePath` separately
+from the derived delivery URL, so a later plan or delivery-domain change does
+not force content records to be rewritten.
+
+Pilot sequence:
+
+1. Create a client-owned ImageKit Forever Free account; it requires no card.
+2. Configure `IMAGEKIT_PUBLIC_KEY`, server-only `IMAGEKIT_PRIVATE_KEY`, and
+   `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT`. Add `IMAGEKIT_WEBHOOK_SECRET` only when
+   verified webhook reconciliation is implemented.
+3. Keep `MEDIA_UPLOAD_PROVIDER=supabase` until migration `0036`, ImageKit
+   configuration validation, the atomic finalizer, and a real image/video pilot
+   have all passed.
+4. Keep `IMAGEKIT_PILOT_UPLOAD_ENABLED=false` until the authenticated pilot
+   flow exists. During the bounded live pilot it can temporarily permit direct
+   browser uploads without switching the active provider; turn it off again
+   after the test.
+5. Test with disposable pilot assets first. Do not switch an existing public
+   media reference or delete a Supabase original during provider validation.
+6. Enable ImageKit only through the future fail-closed adapter and controlled
+   cutover recorded in `TODO.md`.
+
+Cloudflare R2 remains a dormant future alternative. If later traffic economics
+justify it, create the private bucket, scoped credentials, billing account, and
+custom media domain under client ownership. The existing R2 variables document
+that future contract; they are not prerequisites for the ImageKit pilot and
+must remain empty otherwise. See Cloudflare's [bucket](https://developers.cloudflare.com/r2/buckets/create-buckets/),
+[credential](https://developers.cloudflare.com/r2/api/tokens/),
 [CORS](https://developers.cloudflare.com/r2/buckets/cors/), and
-[presigned URLs](https://developers.cloudflare.com/r2/api/s3/presigned-urls/).
+[presigned URL](https://developers.cloudflare.com/r2/api/s3/presigned-urls/)
+documentation if that path is resumed.
 
 ## Content Model
 
@@ -356,6 +388,16 @@ as the other visual editors. It was applied manually to the connected project;
 all three RPCs are live, preserve the existing Contact rows, and reject anon
 access. The remote CLI migration history remains empty, so `db push` is still
 not safe.
+
+Migration `0034_media_optimization_foundation.sql` adds provider-neutral
+physical objects, media variants, and optimization jobs without changing
+existing `media_assets` rows or stored files. Migration
+`0035_media_pipeline_integrity_guards.sql` freezes verified identities and
+lineage and is live in the connected project. Migration
+`0036_media_upload_intents.sql` prepares private, expiring, service-only upload
+reservations; its manual rollout and verification must finish before any
+ImageKit signing endpoint or finalizer is enabled. None of these migrations
+activates an external storage provider by itself.
 
 The new dashboard shell lives at `/admin/v2`; its navigation workspace is
 `/admin/v2/navigation`. The 1:1 page editors live at `/admin/v2/pages/music`,
