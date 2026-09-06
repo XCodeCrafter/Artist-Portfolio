@@ -430,6 +430,15 @@ navigation changes to V2. The navbar editor exposes only the six main portfolio
 pages; in-page anchors remain in their content, while music/social shortcut
 icons are managed separately.
 
+Security V2 lives at `/admin/v2/security`. It reuses the proven Security Center
+instead of forking its authorization logic, while giving the workspace a
+task-first V2 entry point and clearer order: Overview, Admin access, Protection
+activity, Audit log, then Advanced technical checks. All profile, session, and
+MFA mutations carry an allowlisted surface identifier so successful and failed
+actions return to the admin version that initiated them; arbitrary return URLs
+are never accepted. Classic `/admin/security` remains fully supported, and this
+V2 move requires no database migration.
+
 ## Search and AI discovery
 
 - `/robots.txt` allows public search/discovery crawlers, blocks `/api`, and

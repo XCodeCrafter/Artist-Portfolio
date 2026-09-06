@@ -397,6 +397,7 @@ describe("Admin V2 shell helpers", () => {
       "showreel",
       "music",
       "contact",
+      "security",
     ]);
     expect(getAdminV2ActiveItem("/admin/v2").key).toBe("overview");
     expect(getAdminV2ActiveItem("/admin/v2/navigation").key).toBe(
@@ -430,6 +431,10 @@ describe("Admin V2 shell helpers", () => {
     );
     expect(getAdminV2ActiveItem("/admin/v2/pages/contact/history").key).toBe(
       "contact"
+    );
+    expect(getAdminV2ActiveItem("/admin/v2/security").key).toBe("security");
+    expect(getAdminV2ActiveItem("/admin/v2/security/audit").key).toBe(
+      "security"
     );
   });
 

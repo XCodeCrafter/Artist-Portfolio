@@ -21,6 +21,7 @@ import {
   FaListUl,
   FaMagic,
   FaMusic,
+  FaShieldAlt,
   FaUserAlt,
   FaTimes,
   FaVideo,
@@ -73,6 +74,7 @@ function iconFor(key: AdminV2NavigationKey) {
     showreel: <FaVideo />,
     music: <FaMusic />,
     contact: <FaEnvelope />,
+    security: <FaShieldAlt />,
   };
   return icons[key];
 }

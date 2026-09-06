@@ -738,14 +738,51 @@ Acceptance:
 
 ## Batch 8 - Dashboard, Analytics, and Settings V2
 
-Status: planned
+Status: in progress; Security & access workspace implemented
 
-- [ ] Build a task-first `/admin/v2` overview.
+- [x] Build a task-first `/admin/v2` overview.
 - [ ] Prioritize actionable issues, quick actions, pages, and new messages.
 - [ ] Add a `What do you want to change?` destination finder.
 - [ ] Keep traffic summaries secondary to editing tasks.
 - [ ] Move healthy technical checks out of the main dashboard.
 - [ ] Place Brand, Access, Security, and technical health under Settings.
+
+### Batch 8A - Security & access V2
+
+Status: implemented and verified
+
+- [x] Add `/admin/v2/security` to the overview, collapsible desktop sidebar,
+      and mobile drawer without removing `/admin/security`.
+- [x] Reuse the complete Security Center data and mutation boundaries instead
+      of maintaining a second access-control implementation.
+- [x] Reorder the workspace for a nontechnical owner: Overview, Admin access,
+      Protection activity, Audit log, then Advanced checks.
+- [x] Preserve role management, MFA reset, session revocation, audit filters,
+      event-cap/load/configuration warnings, hash links, keyboard tabs, pending
+      buttons, confirmation prompts, and unsaved-change protection.
+- [x] Keep every action on its originating Classic or V2 surface through a
+      strict two-value allowlist; never accept an arbitrary return URL.
+- [x] Revalidate both Security views and both overview pages after mutations.
+- [x] Keep AAL2 authentication, exact-origin checks, owner authorization,
+      Auth-email matching, current-owner protection, and the database-backed
+      final-owner guard intact.
+- [x] Improve status semantics and surface an explicit audit warning when an
+      MFA reset succeeds but its audit record cannot be written.
+- [x] Verify expanded and collapsed desktop layouts, the 390 px mobile drawer,
+      sticky tabs while scrolling, keyboard tab navigation, the V2 overview
+      entry point, and the unchanged Classic route in an authenticated browser.
+- [x] Pass 442 automated tests, TypeScript, ESLint, and the production build.
+- [ ] Replace the advanced Supabase Auth UUID handoff with a separately
+      designed invitation-by-email flow; do not weaken account provisioning to
+      make the current form look friendlier.
+
+Acceptance:
+
+- Classic and V2 expose the same protected capabilities and neither route can
+  redirect an action to an attacker-controlled destination.
+- Desktop, collapsed-sidebar, mobile drawer, sticky tabs, and keyboard paths
+  remain usable without overlapping navigation.
+- This presentation-only V2 move needs no migration, secret, or owner action.
 
 Acceptance:
 

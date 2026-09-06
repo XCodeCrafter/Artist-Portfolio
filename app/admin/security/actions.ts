@@ -6,9 +6,13 @@ import { z } from "zod";
 import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { requireAdmin } from "@/lib/admin/auth";
 import { writeAuditLog } from "@/lib/admin/audit";
+import {
+  ADMIN_SECURITY_SURFACE_PATHS,
+  getAdminSecurityPath,
+  parseAdminSecuritySurface,
+  type AdminSecuritySurface,
+} from "@/lib/admin/security-routes";
 import { createAdminServiceClient } from "@/lib/admin/service";
-
-const SECURITY_PATH = "/admin/security";
 
 const adminProfileSchema = z.object({
   userId: z.string().uuid(),
@@ -35,24 +39,35 @@ function isLastOwnerError(error: { message?: string } | null) {
   );
 }
 
-function redirectToStatus(status: string): never {
+function redirectToStatus(
+  status: string,
+  surface: AdminSecuritySurface
+): never {
   const params = new URLSearchParams({ status });
-  redirect(`${SECURITY_PATH}?${params.toString()}#access`);
+  redirect(`${getAdminSecurityPath(surface)}?${params.toString()}#access`);
 }
 
-async function getOwnerWriteContext() {
+function revalidateSecurityViews() {
+  for (const path of Object.values(ADMIN_SECURITY_SURFACE_PATHS)) {
+    revalidatePath(path);
+  }
+  revalidatePath("/admin");
+  revalidatePath("/admin/v2");
+}
+
+async function getOwnerWriteContext(surface: AdminSecuritySurface) {
   const admin = await requireAdmin();
   if (!(await verifyAdminActionOrigin(admin.id, "security:admin-profiles"))) {
-    redirectToStatus("security-error");
+    redirectToStatus("security-error", surface);
   }
 
   if (admin.role !== "owner") {
-    redirectToStatus("owner-required");
+    redirectToStatus("owner-required", surface);
   }
 
   const supabase = createAdminServiceClient();
   if (!supabase) {
-    redirectToStatus("missing-service");
+    redirectToStatus("missing-service", surface);
   }
 
   return { admin, supabase };
@@ -82,7 +97,8 @@ async function revokeSessions(
 
 async function hasAdminProfile(
   supabase: NonNullable<ReturnType<typeof createAdminServiceClient>>,
-  userId: string
+  userId: string,
+  surface: AdminSecuritySurface
 ) {
   const result = await supabase
     .from("admin_profiles")
@@ -93,12 +109,13 @@ async function hasAdminProfile(
 
   if (result.error) {
     console.error(result.error);
-    redirectToStatus("profile-check-error");
+    redirectToStatus("profile-check-error", surface);
   }
   return Boolean(result.data);
 }
 
 export async function saveAdminProfile(formData: FormData) {
+  const surface = parseAdminSecuritySurface(formData.get("securitySurface"));
   const parsed = adminProfileSchema.safeParse({
     userId: formValue(formData, "userId"),
     email: formValue(formData, "email"),
@@ -106,9 +123,9 @@ export async function saveAdminProfile(formData: FormData) {
     isActive: formChecked(formData, "isActive"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid");
+  if (!parsed.success) redirectToStatus("invalid", surface);
 
-  const { admin, supabase } = await getOwnerWriteContext();
+  const { admin, supabase } = await getOwnerWriteContext(surface);
   const authUserResult = await supabase.auth.admin.getUserById(
     parsed.data.userId
   );
@@ -119,14 +136,14 @@ export async function saveAdminProfile(formData: FormData) {
     !authEmail ||
     authEmail !== parsed.data.email.toLowerCase()
   ) {
-    redirectToStatus("auth-user-mismatch");
+    redirectToStatus("auth-user-mismatch", surface);
   }
 
   if (
     parsed.data.userId === admin.id &&
     (!parsed.data.isActive || parsed.data.role !== "owner")
   ) {
-    redirectToStatus("self-protected");
+    redirectToStatus("self-protected", surface);
   }
 
   const result = await supabase.from("admin_profiles").upsert({
@@ -139,16 +156,16 @@ export async function saveAdminProfile(formData: FormData) {
   if (result.error) {
     console.error(result.error);
     if (isLastOwnerError(result.error)) {
-      redirectToStatus("last-owner-required");
+      redirectToStatus("last-owner-required", surface);
     }
-    redirectToStatus("save-error");
+    redirectToStatus("save-error", surface);
   }
 
   if (
     !parsed.data.isActive &&
     !(await revokeSessions(supabase, admin.id, parsed.data.userId))
   ) {
-    redirectToStatus("session-revoke-error");
+    redirectToStatus("session-revoke-error", surface);
   }
 
   const auditResult = await writeAuditLog({
@@ -163,29 +180,32 @@ export async function saveAdminProfile(formData: FormData) {
     },
   });
 
-  revalidatePath(SECURITY_PATH);
-  revalidatePath("/admin");
-  redirectToStatus(auditResult.ok ? "saved" : "saved-audit-warning");
+  revalidateSecurityViews();
+  redirectToStatus(
+    auditResult.ok ? "saved" : "saved-audit-warning",
+    surface
+  );
 }
 
 export async function deleteAdminProfile(formData: FormData) {
+  const surface = parseAdminSecuritySurface(formData.get("securitySurface"));
   const parsed = deleteProfileSchema.safeParse({
     userId: formValue(formData, "userId"),
   });
 
-  if (!parsed.success) redirectToStatus("invalid");
+  if (!parsed.success) redirectToStatus("invalid", surface);
 
-  const { admin, supabase } = await getOwnerWriteContext();
+  const { admin, supabase } = await getOwnerWriteContext(surface);
 
   if (parsed.data.userId === admin.id) {
-    redirectToStatus("self-protected");
+    redirectToStatus("self-protected", surface);
   }
-  if (!(await hasAdminProfile(supabase, parsed.data.userId))) {
-    redirectToStatus("admin-not-found");
+  if (!(await hasAdminProfile(supabase, parsed.data.userId, surface))) {
+    redirectToStatus("admin-not-found", surface);
   }
 
   if (!(await revokeSessions(supabase, admin.id, parsed.data.userId))) {
-    redirectToStatus("session-revoke-error");
+    redirectToStatus("session-revoke-error", surface);
   }
 
   const result = await supabase
@@ -196,9 +216,9 @@ export async function deleteAdminProfile(formData: FormData) {
   if (result.error) {
     console.error(result.error);
     if (isLastOwnerError(result.error)) {
-      redirectToStatus("last-owner-required");
+      redirectToStatus("last-owner-required", surface);
     }
-    redirectToStatus("delete-error");
+    redirectToStatus("delete-error", surface);
   }
 
   const auditResult = await writeAuditLog({
@@ -208,23 +228,26 @@ export async function deleteAdminProfile(formData: FormData) {
     recordId: parsed.data.userId,
   });
 
-  revalidatePath(SECURITY_PATH);
-  revalidatePath("/admin");
-  redirectToStatus(auditResult.ok ? "deleted" : "deleted-audit-warning");
+  revalidateSecurityViews();
+  redirectToStatus(
+    auditResult.ok ? "deleted" : "deleted-audit-warning",
+    surface
+  );
 }
 
 export async function revokeAdminSessions(formData: FormData) {
+  const surface = parseAdminSecuritySurface(formData.get("securitySurface"));
   const parsed = deleteProfileSchema.safeParse({
     userId: formValue(formData, "userId"),
   });
-  if (!parsed.success) redirectToStatus("invalid");
+  if (!parsed.success) redirectToStatus("invalid", surface);
 
-  const { admin, supabase } = await getOwnerWriteContext();
-  if (!(await hasAdminProfile(supabase, parsed.data.userId))) {
-    redirectToStatus("admin-not-found");
+  const { admin, supabase } = await getOwnerWriteContext(surface);
+  if (!(await hasAdminProfile(supabase, parsed.data.userId, surface))) {
+    redirectToStatus("admin-not-found", surface);
   }
   if (!(await revokeSessions(supabase, admin.id, parsed.data.userId))) {
-    redirectToStatus("session-revoke-error");
+    redirectToStatus("session-revoke-error", surface);
   }
 
   const auditResult = await writeAuditLog({
@@ -234,26 +257,28 @@ export async function revokeAdminSessions(formData: FormData) {
     recordId: parsed.data.userId,
   });
 
-  revalidatePath(SECURITY_PATH);
+  revalidateSecurityViews();
   redirectToStatus(
-    auditResult.ok ? "sessions-revoked" : "sessions-revoked-audit-warning"
+    auditResult.ok ? "sessions-revoked" : "sessions-revoked-audit-warning",
+    surface
   );
 }
 
 export async function resetAdminMfa(formData: FormData) {
+  const surface = parseAdminSecuritySurface(formData.get("securitySurface"));
   const parsed = deleteProfileSchema.safeParse({
     userId: formValue(formData, "userId"),
   });
-  if (!parsed.success) redirectToStatus("invalid");
+  if (!parsed.success) redirectToStatus("invalid", surface);
 
-  const { admin, supabase } = await getOwnerWriteContext();
-  if (!(await hasAdminProfile(supabase, parsed.data.userId))) {
-    redirectToStatus("admin-not-found");
+  const { admin, supabase } = await getOwnerWriteContext(surface);
+  if (!(await hasAdminProfile(supabase, parsed.data.userId, surface))) {
+    redirectToStatus("admin-not-found", surface);
   }
   const factors = await supabase.auth.admin.mfa.listFactors({
     userId: parsed.data.userId,
   });
-  if (factors.error) redirectToStatus("mfa-reset-error");
+  if (factors.error) redirectToStatus("mfa-reset-error", surface);
 
   // Revoke first: if the database RPC is unavailable, no factor is removed
   // while an existing aal2 session remains usable.
@@ -272,7 +297,7 @@ export async function resetAdminMfa(formData: FormData) {
         errorCode: revokedSessions.error.code || "unknown",
       },
     });
-    redirectToStatus("mfa-reset-error");
+    redirectToStatus("mfa-reset-error", surface);
   }
 
   for (const factor of factors.data.factors) {
@@ -280,10 +305,10 @@ export async function resetAdminMfa(formData: FormData) {
       id: factor.id,
       userId: parsed.data.userId,
     });
-    if (result.error) redirectToStatus("mfa-reset-error");
+    if (result.error) redirectToStatus("mfa-reset-error", surface);
   }
 
-  await writeAuditLog({
+  const auditResult = await writeAuditLog({
     actorId: admin.id,
     action: "admin_mfa_reset",
     tableName: "auth",
@@ -291,5 +316,9 @@ export async function resetAdminMfa(formData: FormData) {
     metadata: { factorCount: factors.data.factors.length },
   });
 
-  redirectToStatus("mfa-reset");
+  revalidateSecurityViews();
+  redirectToStatus(
+    auditResult.ok ? "mfa-reset" : "mfa-reset-audit-warning",
+    surface
+  );
 }

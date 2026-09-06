@@ -24,6 +24,7 @@ import type {
   SecurityCheck,
   SecurityEventSummary,
 } from "@/lib/admin/security";
+import type { AdminSecuritySurface } from "@/lib/admin/security-routes";
 
 type SecurityCenterProps = {
   currentAdminId: string;
@@ -36,6 +37,7 @@ type SecurityCenterProps = {
   canManageAdmins: boolean;
   loadError?: string;
   status?: string;
+  surface?: AdminSecuritySurface;
 };
 
 const statusCopy: Record<string, string> = {
@@ -50,6 +52,8 @@ const statusCopy: Record<string, string> = {
   "missing-service": "Server-side Supabase admin key is missing.",
   "auth-user-mismatch": "The email must exactly match the Supabase Auth user.",
   "mfa-reset": "Authenticator factors removed. The admin must enroll MFA again.",
+  "mfa-reset-audit-warning":
+    "Authenticator factors were removed, but the audit event could not be recorded. Review the server log and Audit Read Path status.",
   "mfa-reset-error": "Authenticator factors could not be reset.",
   "owner-required": "Only owner admins can manage admin profiles.",
   "profile-check-error":
@@ -140,10 +144,12 @@ function StatusNotice({
   status,
   isConfigured,
   loadError,
+  compact = false,
 }: {
   status?: string;
   isConfigured: boolean;
   loadError?: string;
+  compact?: boolean;
 }) {
   const message = status ? statusCopy[status] : "";
   const statusIsError = Boolean(
@@ -151,7 +157,9 @@ function StatusNotice({
       (status.includes("error") ||
         status === "invalid" ||
         status === "admin-not-found" ||
-        status === "auth-user-mismatch")
+        status === "auth-user-mismatch" ||
+        status === "missing-service" ||
+        status === "owner-required")
   );
   const statusIsWarning = Boolean(
     status &&
@@ -163,15 +171,21 @@ function StatusNotice({
   if (!message && isConfigured && !loadError) return null;
 
   return (
-    <div className="mt-8 space-y-3">
+    <div className={compact ? "space-y-3" : "mt-8 space-y-3"}>
       {!isConfigured ? (
-        <div className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-100">
+        <div
+          className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-100"
+          role="alert"
+        >
           Supabase service key is not configured. Security center is read-only
           and admin profiles cannot be verified.
         </div>
       ) : null}
       {loadError ? (
-        <div className="rounded-lg border border-red-300/25 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-100">
+        <div
+          className="rounded-lg border border-red-300/25 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-100"
+          role="alert"
+        >
           {loadError}
         </div>
       ) : null}
@@ -184,6 +198,7 @@ function StatusNotice({
                 ? "border-amber-300/25 bg-amber-400/10 text-amber-100"
                 : "border-emerald-300/20 bg-emerald-500/[0.08] text-emerald-100"
           }`}
+          role={statusIsError ? "alert" : "status"}
         >
           {message}
         </div>
@@ -523,11 +538,13 @@ function AdminProfileForm({
   canManageAdmins,
   isCurrentAdmin,
   mode = "edit",
+  surface,
 }: {
   profile?: AdminProfile;
   canManageAdmins: boolean;
   isCurrentAdmin?: boolean;
   mode?: "edit" | "new";
+  surface: AdminSecuritySurface;
 }) {
   const disabled = !canManageAdmins;
   const mfaLabel =
@@ -556,12 +573,29 @@ function AdminProfileForm({
       variant="item"
     >
       <form action={saveAdminProfile}>
+        <input name="securitySurface" type="hidden" value={surface} />
         <fieldset disabled={disabled}>
           <div className="grid gap-4 sm:grid-cols-2">
             {mode === "new" ? (
-              <Field label="Supabase user ID" wide>
-                <TextInput name="userId" required />
-              </Field>
+              <div className="sm:col-span-2">
+                <Field
+                  label={
+                    surface === "v2"
+                      ? "Supabase Auth user ID · Advanced"
+                      : "Supabase user ID"
+                  }
+                  wide
+                >
+                  <TextInput name="userId" required />
+                </Field>
+                {surface === "v2" ? (
+                  <p className="mt-2 text-[11px] leading-5 text-white/36">
+                    Create the person in Supabase Auth first, then paste their
+                    user ID here. A friendlier email invitation flow belongs in
+                    a later batch.
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <div className="sm:col-span-2">
                 <span className={labelClass}>Supabase user ID</span>
@@ -584,8 +618,12 @@ function AdminProfileForm({
                 defaultValue={profile?.role || "admin"}
                 name="role"
               >
-                <option value="admin">admin</option>
-                <option value="owner">owner</option>
+                <option value="admin">
+                  {surface === "v2" ? "Admin · standard access" : "admin"}
+                </option>
+                <option value="owner">
+                  {surface === "v2" ? "Owner · full access" : "owner"}
+                </option>
               </select>
             </Field>
           </div>
@@ -675,6 +713,7 @@ function AdminProfileForm({
               }
             }}
           >
+            <input name="securitySurface" type="hidden" value={surface} />
             <input name="userId" type="hidden" value={profile.userId} />
             <ActionButton
               className={dangerButtonClass}
@@ -701,6 +740,7 @@ function AdminProfileForm({
               }
             }}
           >
+            <input name="securitySurface" type="hidden" value={surface} />
             <input name="userId" type="hidden" value={profile.userId} />
             <ActionButton
               className={dangerButtonClass}
@@ -722,6 +762,7 @@ function AdminProfileForm({
               }
             }}
           >
+            <input name="securitySurface" type="hidden" value={surface} />
             <input name="userId" type="hidden" value={profile.userId} />
             <ActionButton
               className={dangerButtonClass}
@@ -741,10 +782,12 @@ function AdminProfilesSection({
   profiles,
   canManageAdmins,
   currentAdminId,
+  surface,
 }: {
   profiles: AdminProfile[];
   canManageAdmins: boolean;
   currentAdminId: string;
+  surface: AdminSecuritySurface;
 }) {
   return (
     <section className={sectionClass} id="admin-profiles">
@@ -765,9 +808,14 @@ function AdminProfilesSection({
             isCurrentAdmin={profile.userId === currentAdminId}
             key={profile.userId}
             profile={profile}
+            surface={surface}
           />
         ))}
-        <AdminProfileForm canManageAdmins={canManageAdmins} mode="new" />
+        <AdminProfileForm
+          canManageAdmins={canManageAdmins}
+          mode="new"
+          surface={surface}
+        />
       </div>
     </section>
   );
@@ -1051,6 +1099,7 @@ export default function SecurityCenter({
   canManageAdmins,
   loadError,
   status,
+  surface = "classic",
 }: SecurityCenterProps) {
   const [activeSectionId, setActiveSectionId] = useState("overview");
   const {
@@ -1075,7 +1124,7 @@ export default function SecurityCenter({
       window.removeEventListener("hashchange", syncHash);
     };
   }, []);
-  const sections: SecurityWorkspaceSection[] = [
+  const surfaceSections: SecurityWorkspaceSection[] = [
     {
       id: "overview",
       number: "00",
@@ -1094,16 +1143,8 @@ export default function SecurityCenter({
       ),
     },
     {
-      id: "activity",
-      number: "01",
-      label: "Protection activity",
-      description: "Blocked requests, auth failures, and operational signals.",
-      count: securitySummary.total7d,
-      node: <SecurityCountersSection summary={securitySummary} />,
-    },
-    {
       id: "access",
-      number: "02",
+      number: surface === "v2" ? "01" : "02",
       label: "Admin access",
       description: "Roles, MFA state, sign-ins, sessions, and access profiles.",
       count: profiles.length,
@@ -1112,8 +1153,17 @@ export default function SecurityCenter({
           canManageAdmins={canManageAdmins && isConfigured && !loadError}
           currentAdminId={currentAdminId}
           profiles={profiles}
+          surface={surface}
         />
       ),
+    },
+    {
+      id: "activity",
+      number: surface === "v2" ? "02" : "01",
+      label: "Protection activity",
+      description: "Blocked requests, auth failures, and operational signals.",
+      count: securitySummary.total7d,
+      node: <SecurityCountersSection summary={securitySummary} />,
     },
     {
       id: "audit",
@@ -1126,7 +1176,7 @@ export default function SecurityCenter({
     {
       id: "configuration",
       number: "04",
-      label: "Configuration",
+      label: surface === "v2" ? "Advanced" : "Configuration",
       description:
         "Runtime checks, code-level controls, and development fallback settings.",
       count: checks.filter(
@@ -1142,6 +1192,16 @@ export default function SecurityCenter({
       ),
     },
   ];
+  const sections =
+    surface === "v2"
+      ? surfaceSections
+      : [
+          surfaceSections[0],
+          surfaceSections[2],
+          surfaceSections[1],
+          surfaceSections[3],
+          surfaceSections[4],
+        ];
   const activeSection =
     sections.find((section) => section.id === activeSectionId) || sections[0];
 
@@ -1219,7 +1279,7 @@ export default function SecurityCenter({
 
   return (
     <div
-      className="grid gap-4"
+      className="grid min-w-0 gap-4"
       onChangeCapture={(event) => {
         const target = event.target;
         if (
@@ -1244,6 +1304,7 @@ export default function SecurityCenter({
       }}
     >
       <StatusNotice
+        compact={surface === "v2"}
         isConfigured={isConfigured}
         loadError={loadError}
         status={status}
@@ -1260,7 +1321,11 @@ export default function SecurityCenter({
         </div>
       ) : null}
 
-      <div className="sticky top-3 z-20 rounded-[22px] border border-white/9 bg-[#0f0f11]/95 p-2 shadow-[0_14px_38px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+      <div
+        className={`sticky z-20 rounded-[22px] border border-white/9 bg-[#0f0f11]/95 p-2 shadow-[0_14px_38px_rgba(0,0,0,0.3)] backdrop-blur-xl ${
+          surface === "v2" ? "top-[76px] lg:top-3" : "top-3"
+        }`}
+      >
         {hasUnsavedChanges ? (
           <div
             className="mb-2 rounded-lg border border-amber-300/18 bg-amber-400/[0.06] px-3 py-2 text-[11px] text-amber-100/70"
@@ -1271,7 +1336,7 @@ export default function SecurityCenter({
         ) : null}
         <nav
           aria-label="Security views"
-          className="admin-scrollbar-none flex snap-x gap-1 overflow-x-auto"
+          className="admin-scrollbar-none flex snap-x gap-1 overflow-x-auto lg:grid lg:grid-cols-5 lg:overflow-visible"
           role="tablist"
         >
           {sections.map((section, index) => {
@@ -1281,7 +1346,7 @@ export default function SecurityCenter({
               <button
                 aria-controls={`security-panel-${section.id}`}
                 aria-selected={active}
-                className={`min-h-12 min-w-[148px] flex-1 snap-start rounded-xl border px-3 py-2 text-left transition ${
+                className={`min-h-12 min-w-[148px] shrink-0 snap-start rounded-xl border px-3 py-2 text-left transition lg:min-w-0 ${
                   active
                     ? "border-white/14 bg-white/[0.09] text-white"
                     : "border-transparent text-white/48 hover:border-white/8 hover:bg-white/[0.045] hover:text-white"

@@ -44,6 +44,12 @@ export const ADMIN_V2_NAVIGATION = [
     label: "Contact page",
     description: "Page and inquiry delivery",
   },
+  {
+    key: "security",
+    href: "/admin/v2/security",
+    label: "Security",
+    description: "Access and protection",
+  },
 ] as const;
 
 export type AdminV2NavigationKey =
