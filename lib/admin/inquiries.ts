@@ -2,6 +2,7 @@ import {
   createAdminServiceClient,
   hasAdminServiceEnv,
 } from "@/lib/admin/service";
+import { normalizeAdminInquiryPage } from "@/lib/admin/inquiry-routes";
 import type { PortfolioType } from "@/lib/content";
 import {
   isInquiryIntent,
@@ -33,14 +34,10 @@ export type BookingInquiry = {
   inquiryType: StoredLegacyInquiryType;
   inquiryIntent: StoredInquiryIntent;
   status: InquiryStatus;
-  sourceIp: string;
-  userAgent: string;
   adminNotes: string;
-  resendEmailId: string;
   emailStatus: InquiryEmailStatus;
   emailStatusChangedAt: string;
   createdAt: string;
-  updatedAt: string;
 };
 
 export type InquirySummary = {
@@ -70,15 +67,36 @@ type BookingInquiryRow = {
   inquiry_type?: string | null;
   inquiry_intent?: string | null;
   status: InquiryStatus;
-  source_ip: string | null;
-  user_agent: string | null;
   admin_notes: string;
-  resend_email_id?: string | null;
   email_status?: string | null;
   email_status_changed_at?: string | null;
   created_at: string;
-  updated_at: string;
 };
+
+const INQUIRY_SELECT =
+  "id,name,email,message,portfolio_type,inquiry_type,inquiry_intent,status,admin_notes,email_status,email_status_changed_at,created_at";
+const LEGACY_INQUIRY_SELECT =
+  "id,name,email,message,portfolio_type,inquiry_type,status,admin_notes,created_at";
+const OPTIONAL_INQUIRY_COLUMNS = [
+  "inquiry_intent",
+  "email_status",
+  "email_status_changed_at",
+];
+
+function isMissingOptionalInquiryColumn(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as {
+    code?: unknown;
+    details?: unknown;
+    message?: unknown;
+  };
+  const code = String(candidate.code || "");
+  if (code !== "42703" && code !== "PGRST204") return false;
+  const detail = `${String(candidate.message || "")} ${String(
+    candidate.details || ""
+  )}`.toLowerCase();
+  return OPTIONAL_INQUIRY_COLUMNS.some((column) => detail.includes(column));
+}
 
 const EMPTY_SUMMARY: InquirySummary = {
   total: 0,
@@ -100,16 +118,12 @@ function mapInquiry(row: BookingInquiryRow): BookingInquiry {
     inquiryType: normalizeStoredInquiryType(row.inquiry_type),
     inquiryIntent: normalizeStoredInquiryIntent(row.inquiry_intent),
     status: row.status,
-    sourceIp: row.source_ip || "",
-    userAgent: row.user_agent || "",
     adminNotes: row.admin_notes,
-    resendEmailId: row.resend_email_id || "",
     emailStatus: isInquiryEmailStatus(row.email_status)
       ? row.email_status
       : "unknown",
     emailStatusChangedAt: row.email_status_changed_at || "",
     createdAt: row.created_at,
-    updatedAt: row.updated_at,
   };
 }
 
@@ -167,7 +181,7 @@ export async function getBookingInquiries(
   isConfigured: boolean;
   loadError?: string;
 }> {
-  const page = Math.max(1, Math.floor(options.page || 1));
+  const page = normalizeAdminInquiryPage(options.page);
   const pageSize = Math.min(50, Math.max(10, Math.floor(options.pageSize || 25)));
 
   if (!hasAdminServiceEnv()) {
@@ -203,6 +217,22 @@ export async function getBookingInquiries(
       .select("id", { count: "exact", head: true })
       .eq("status", status);
 
+  const selectInquiryRows = (columns: string) =>
+    supabase
+      .from("booking_inquiries")
+      .select(columns)
+      .order("created_at", { ascending: false })
+      .range(from, to)
+      .returns<BookingInquiryRow[]>();
+
+  const rowsPromise = (async () => {
+    const enrichedRows = await selectInquiryRows(INQUIRY_SELECT);
+    if (!isMissingOptionalInquiryColumn(enrichedRows.error)) {
+      return enrichedRows;
+    }
+    return selectInquiryRows(LEGACY_INQUIRY_SELECT);
+  })();
+
   const [
     rowsResult,
     totalResult,
@@ -213,12 +243,7 @@ export async function getBookingInquiries(
     currentResult,
     previousResult,
   ] = await Promise.all([
-    supabase
-      .from("booking_inquiries")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .range(from, to)
-      .returns<BookingInquiryRow[]>(),
+    rowsPromise,
     supabase
       .from("booking_inquiries")
       .select("id", { count: "exact", head: true }),

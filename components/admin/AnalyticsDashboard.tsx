@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   FaArrowDown,
   FaArrowUp,
@@ -10,13 +10,13 @@ import {
   FaExclamationTriangle,
   FaMinus,
   FaMousePointer,
-  FaSearch,
   FaUsers,
 } from "react-icons/fa";
-import ActionButton from "@/components/admin/ActionButton";
-import AdminDisclosure from "@/components/admin/AdminDisclosure";
+import {
+  InquiryInboxView,
+  isInquiryFormDirty,
+} from "@/components/admin/InquiryInbox";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
-import { deleteInquiry, updateInquiry } from "@/app/admin/analytics/actions";
 import type { AnalyticsSummary } from "@/lib/admin/analytics";
 import {
   getAdminAnalyticsPath,
@@ -28,12 +28,9 @@ import {
 } from "@/lib/admin/analytics-shared";
 import type {
   BookingInquiry,
-  InquiryEmailStatus,
   InquiryPagination,
   InquirySummary,
-  InquiryStatus,
 } from "@/lib/admin/inquiries";
-import { getStoredInquiryLabel } from "@/lib/inquiries";
 
 type AnalyticsDashboardProps = {
   analytics: AnalyticsSummary;
@@ -81,10 +78,15 @@ const EMPTY_INQUIRY_PAGINATION: InquiryPagination = {
 
 const statusCopy: Record<string, string> = {
   deleted: "Inquiry deleted.",
+  "deleted-audit-warning":
+    "Inquiry deleted, but its audit record could not be verified. Review Security activity.",
   "delete-error": "Delete failed.",
   invalid: "Inquiry update is invalid.",
   "missing-service": "Server-side Supabase admin key is missing.",
+  "not-found": "That inquiry no longer exists. The Inbox has been refreshed.",
   saved: "Inquiry saved.",
+  "saved-audit-warning":
+    "Inquiry saved, but its audit record could not be verified. Review Security activity.",
   "save-error": "Inquiry could not be saved.",
   "security-error": "Request origin was blocked. Refresh admin and try again.",
 };
@@ -93,13 +95,6 @@ const sectionClass =
   "min-w-0 scroll-mt-28 rounded-[22px] border border-white/9 bg-[#0f0f11]/92 p-4 shadow-[0_18px_65px_rgba(0,0,0,0.24)] sm:p-5";
 const labelClass =
   "text-[11px] font-semibold uppercase tracking-[0.16em] text-white/46";
-const inputClass =
-  "mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/30 disabled:cursor-not-allowed disabled:opacity-50";
-const textareaClass = `${inputClass} min-h-24 resize-y leading-6`;
-const buttonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/84 disabled:cursor-not-allowed disabled:opacity-45";
-const dangerButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-xl border border-rose-300/22 px-4 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/12 disabled:cursor-not-allowed disabled:opacity-45";
 
 function formatDate(iso: string) {
   if (!iso) return "Not available";
@@ -224,6 +219,9 @@ function StatusNotice({
   | "status"
 >) {
   const message = status ? statusCopy[status] : "";
+  const statusNeedsAttention = Boolean(
+    status && status !== "saved" && status !== "deleted"
+  );
   const notices = [
     !analyticsConfigured
       ? "Analytics is unavailable until the Supabase service key is configured."
@@ -241,12 +239,20 @@ function StatusNotice({
         <div
           className="rounded-xl border border-amber-300/20 bg-amber-400/[0.08] px-4 py-3 text-sm leading-6 text-amber-100"
           key={notice}
+          role="alert"
         >
           {notice} Values from this source are shown as unavailable, not zero.
         </div>
       ))}
       {message ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 text-sm leading-6 text-white/78">
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm leading-6 ${
+            statusNeedsAttention
+              ? "border-amber-300/20 bg-amber-400/[0.08] text-amber-100"
+              : "border-white/10 bg-white/[0.07] text-white/78"
+          }`}
+          role={statusNeedsAttention ? "alert" : "status"}
+        >
           {message}
         </div>
       ) : null}
@@ -456,128 +462,6 @@ function RecentEvents({ analytics }: { analytics: AnalyticsSummary }) {
   );
 }
 
-function InquiryStatusBadge({ status }: { status: InquiryStatus }) {
-  const tone = status === "new" ? "border-[#ff765f]/22 text-[#ffb3a7] bg-[#ff3b1f]/10" : status === "replied" ? "border-emerald-300/20 text-emerald-100 bg-emerald-500/8" : "border-white/9 text-white/48 bg-white/[0.035]";
-  return <span className={`rounded-full border px-2.5 py-1 text-[10px] ${tone}`}>{status}</span>;
-}
-
-function DeliveryBadge({ status }: { status: InquiryEmailStatus }) {
-  const negative = ["bounced", "complained", "failed", "suppressed"].includes(status);
-  const positive = status === "delivered";
-  const tone = negative
-    ? "border-rose-300/20 bg-rose-500/[0.08] text-rose-100"
-    : positive
-      ? "border-emerald-300/20 bg-emerald-500/[0.08] text-emerald-100"
-      : "border-white/9 bg-white/[0.035] text-white/42";
-  return <span className={`rounded-full border px-2.5 py-1 text-[10px] ${tone}`}>Email: {status}</span>;
-}
-
-function InquiryCard({
-  defaultOpen,
-  disabled,
-  inquiry,
-  onDirty,
-  onSubmit,
-}: {
-  defaultOpen?: boolean;
-  disabled: boolean;
-  inquiry: BookingInquiry;
-  onDirty: (form: HTMLFormElement) => void;
-  onSubmit: (form: HTMLFormElement) => boolean;
-}) {
-  const typeLabel = getStoredInquiryLabel(inquiry);
-  return (
-    <AdminDisclosure badge={<span className="flex flex-wrap items-center gap-1.5"><InquiryStatusBadge status={inquiry.status} /><DeliveryBadge status={inquiry.emailStatus} /></span>} defaultOpen={defaultOpen} description={`${inquiry.email} · ${typeLabel} · ${formatDate(inquiry.createdAt)}`} id={`inquiry-${inquiry.id}`} title={inquiry.name} variant="item">
-      <article>
-        <a className="block truncate text-sm text-white/52 underline-offset-4 hover:text-white hover:underline" href={`mailto:${inquiry.email}`}>{inquiry.email}</a>
-        <div className="mt-2 flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.14em] text-white/32"><span>{inquiry.portfolioType || "no legacy profile"}</span><span>·</span><span>{typeLabel}</span>{inquiry.emailStatusChangedAt ? <><span>·</span><span>email updated {formatDate(inquiry.emailStatusChangedAt)}</span></> : null}</div>
-        <p className="mt-4 whitespace-pre-wrap rounded-xl border border-white/8 bg-black/24 p-4 text-sm leading-6 text-white/68">{inquiry.message}</p>
-        <form
-          action={updateInquiry}
-          className="mt-4"
-          onChangeCapture={(event) => onDirty(event.currentTarget)}
-          onSubmit={(event) => {
-            if (!onSubmit(event.currentTarget)) event.preventDefault();
-          }}
-        >
-          <fieldset disabled={disabled}>
-            <input name="id" type="hidden" value={inquiry.id} />
-            <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
-              <label><span className={labelClass}>Status</span><select className={inputClass} defaultValue={inquiry.status} name="status"><option value="new">New</option><option value="read">Read</option><option value="replied">Replied</option><option value="archived">Archived</option></select></label>
-              <label><span className={labelClass}>Private notes</span><textarea className={textareaClass} defaultValue={inquiry.adminNotes} name="adminNotes" /></label>
-            </div>
-            <div className="mt-4 flex flex-wrap justify-end gap-2"><a className="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/10 px-4 text-sm font-semibold text-white/64 transition hover:bg-white hover:text-black" href={`mailto:${inquiry.email}`}>Reply by email</a><ActionButton className={buttonClass} disabled={disabled} pendingLabel="Saving...">Save inquiry</ActionButton></div>
-          </fieldset>
-        </form>
-        <form action={deleteInquiry} className="mt-3 flex justify-end border-t border-white/7 pt-3" onSubmit={(event) => {
-          if (
-            !window.confirm(`Delete the inquiry from ${inquiry.name}? This cannot be undone.`) ||
-            !onSubmit(event.currentTarget)
-          ) {
-            event.preventDefault();
-          }
-        }}>
-          <input name="id" type="hidden" value={inquiry.id} /><ActionButton className={dangerButtonClass} disabled={disabled} pendingLabel="Deleting...">Delete inquiry</ActionButton>
-        </form>
-      </article>
-    </AdminDisclosure>
-  );
-}
-
-function InquiriesSection({
-  disabled,
-  inquiries,
-  inquiryPagination,
-  inquirySummary,
-  onDirty,
-  onSubmit,
-  rangeDays,
-}: {
-  disabled: boolean;
-  inquiries: BookingInquiry[];
-  inquiryPagination: InquiryPagination;
-  inquirySummary: InquirySummary;
-  onDirty: (form: HTMLFormElement) => void;
-  onSubmit: (form: HTMLFormElement) => boolean;
-  rangeDays: number;
-}) {
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<InquiryStatus | "all">("all");
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return inquiries.filter((inquiry) => {
-      if (statusFilter !== "all" && inquiry.status !== statusFilter) return false;
-      if (!needle) return true;
-      return [inquiry.name, inquiry.email, inquiry.message, inquiry.adminNotes].some((value) => value.toLowerCase().includes(needle));
-    });
-  }, [inquiries, query, statusFilter]);
-  const pageHref = (page: number) => `/admin/analytics?range=${rangeDays}&inquiryPage=${page}#inquiries`;
-
-  return (
-    <section className={sectionClass} id="inquiries">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div><p className={labelClass}>Inbox</p><h2 className="heading-ui mt-2 text-2xl font-semibold text-white">Contact inquiries</h2><p className="mt-2 text-sm text-white/42">Search the loaded page, update status, add notes, reply, or archive.</p></div>
-        <div className="flex flex-wrap gap-2 text-[10px] text-white/46"><span className="rounded-full border border-white/9 px-2.5 py-1">{inquirySummary.new} new</span><span className="rounded-full border border-white/9 px-2.5 py-1">{inquirySummary.replied} replied</span><span className="rounded-full border border-white/9 px-2.5 py-1">{inquirySummary.total} total</span></div>
-      </div>
-      <div className="mt-5 grid gap-2 sm:grid-cols-[1fr_180px]">
-        <label className="relative"><span className="sr-only">Search loaded inquiries</span><FaSearch className="absolute left-3.5 top-3.5 text-xs text-white/28" /><input className="w-full rounded-xl border border-white/10 bg-black/30 py-2.5 pl-9 pr-3 text-sm text-white outline-none focus:border-white/30" onChange={(event) => setQuery(event.target.value)} placeholder="Search this page…" type="search" value={query} /></label>
-        <label><span className="sr-only">Filter by status</span><select className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-white/30" onChange={(event) => setStatusFilter(event.target.value as InquiryStatus | "all")} value={statusFilter}><option value="all">All statuses</option><option value="new">New</option><option value="read">Read</option><option value="replied">Replied</option><option value="archived">Archived</option></select></label>
-      </div>
-      <p className="mt-3 text-[10px] text-white/32">Showing {inquiryPagination.from || 0}–{inquiryPagination.to || 0} of {inquirySummary.total} exact database records.</p>
-      <div className="mt-4 grid gap-3">
-        {visible.length ? visible.map((inquiry, index) => <InquiryCard defaultOpen={index === 0 && inquiry.status === "new"} disabled={disabled} inquiry={inquiry} key={inquiry.id} onDirty={onDirty} onSubmit={onSubmit} />) : <div className="rounded-[18px] border border-dashed border-white/10 p-8 text-center text-sm text-white/38">No inquiries match this page and filter.</div>}
-      </div>
-      {inquiryPagination.totalPages > 1 ? (
-        <nav aria-label="Inquiry pages" className="mt-5 flex items-center justify-between gap-3 border-t border-white/7 pt-4">
-          {inquiryPagination.page > 1 ? <Link className="rounded-xl border border-white/9 px-3 py-2 text-xs text-white/58 hover:bg-white hover:text-black" href={pageHref(inquiryPagination.page - 1)}>Previous</Link> : <span />}
-          <span className="text-[10px] text-white/34">Page {inquiryPagination.page} of {inquiryPagination.totalPages}</span>
-          {inquiryPagination.page < inquiryPagination.totalPages ? <Link className="rounded-xl border border-white/9 px-3 py-2 text-xs text-white/58 hover:bg-white hover:text-black" href={pageHref(inquiryPagination.page + 1)}>Next</Link> : <span />}
-        </nav>
-      ) : null}
-    </section>
-  );
-}
-
 type WorkspaceSection = { id: string; label: string; badge?: string; node: ReactNode };
 
 function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
@@ -611,8 +495,16 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
   ).length;
 
   function rememberInquiryDraft(form: HTMLFormElement) {
-    dirtyFormsRef.current.add(form);
-    markDirty();
+    for (const dirtyForm of dirtyFormsRef.current) {
+      if (!dirtyForm.isConnected) dirtyFormsRef.current.delete(dirtyForm);
+    }
+    if (isInquiryFormDirty(form)) {
+      dirtyFormsRef.current.add(form);
+      markDirty();
+      return;
+    }
+    dirtyFormsRef.current.delete(form);
+    if (dirtyFormsRef.current.size === 0) clearDirty();
   }
 
   function submitInquiryForm(form: HTMLFormElement) {
@@ -629,8 +521,13 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
       return false;
     }
 
+    otherDraftForms.forEach((dirtyForm) => dirtyForm.reset());
     dirtyFormsRef.current.clear();
-    clearDirty();
+    if (form.elements.namedItem("adminNotes")) {
+      dirtyFormsRef.current.add(form);
+    } else {
+      clearDirty();
+    }
     return true;
   }
 
@@ -668,7 +565,7 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
       id: "inquiries",
       label: "Inbox",
       badge: inquiriesAvailable ? `${inquirySummary.new} new` : "—",
-      node: inquiriesAvailable ? <InquiriesSection disabled={!inquiriesAvailable} inquiries={inquiries} inquiryPagination={inquiryPagination} inquirySummary={inquirySummary} onDirty={rememberInquiryDraft} onSubmit={submitInquiryForm} rangeDays={analytics.rangeDays} /> : unavailableInquiries,
+      node: inquiriesAvailable ? <InquiryInboxView disabled={!inquiriesAvailable} inquiries={inquiries} inquiryPagination={inquiryPagination} inquirySummary={inquirySummary} onDirty={rememberInquiryDraft} onSubmit={submitInquiryForm} rangeDays={analytics.rangeDays} resultStatus={status} surface="classic" /> : unavailableInquiries,
     },
     {
       id: "health",

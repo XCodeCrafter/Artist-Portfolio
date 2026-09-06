@@ -6,6 +6,7 @@ import {
   FaExclamationTriangle,
   FaEye,
   FaEnvelope,
+  FaInbox,
   FaImages,
   FaListUl,
   FaMusic,
@@ -287,6 +288,35 @@ export default async function AdminV2OverviewPage() {
             <span className="rounded-full border border-white/9 bg-black/22 px-3 py-2">
               2 clear sections
             </span>
+          </div>
+        </Link>
+
+        <Link
+          className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_88%_10%,rgba(255,59,31,0.17),transparent_36%),#0f0f11] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.26)] outline-none transition hover:border-white/24 focus-visible:ring-2 focus-visible:ring-white/70 sm:p-7 xl:col-span-2"
+          href="/admin/v2/inbox"
+        >
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-4">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[#ff664f]/24 bg-[#ff3b1f]/12 text-[#ff735f]">
+                <FaInbox />
+              </span>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-orange-200/64">
+                  Handle incoming work
+                </p>
+                <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
+                  Open Inbox
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/44">
+                  Read collaboration and booking messages, reply in your email
+                  app, keep private notes, and archive finished conversations.
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-3 text-xs font-semibold text-white/54 transition group-hover:text-white">
+              Manage messages
+              <FaArrowRight className="transition group-hover:translate-x-1" />
+            </div>
           </div>
         </Link>
 

@@ -91,14 +91,14 @@ export default function AdminDisclosure({
         ) : null}
         <span
           className={cx(
-            "block font-semibold text-white/88",
+            "block break-words font-semibold text-white/88",
             variant === "section" ? "mt-0.5 text-base" : "text-sm"
           )}
         >
           {title}
         </span>
         {description ? (
-          <span className="mt-1 block text-xs leading-5 text-white/38 sm:truncate">
+          <span className="mt-1 block break-words text-xs leading-5 text-white/38 sm:truncate">
             {description}
           </span>
         ) : null}

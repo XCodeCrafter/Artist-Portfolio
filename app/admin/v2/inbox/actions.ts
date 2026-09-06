@@ -6,9 +6,9 @@ import {
 } from "@/lib/admin/inquiry-actions";
 
 export async function updateInquiry(formData: FormData) {
-  return updateInquiryOnSurface("classic", formData);
+  return updateInquiryOnSurface("v2", formData);
 }
 
 export async function deleteInquiry(formData: FormData) {
-  return deleteInquiryOnSurface("classic", formData);
+  return deleteInquiryOnSurface("v2", formData);
 }

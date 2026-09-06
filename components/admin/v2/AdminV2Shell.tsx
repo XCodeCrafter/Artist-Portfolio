@@ -17,6 +17,7 @@ import {
   FaChevronRight,
   FaExternalLinkAlt,
   FaEnvelope,
+  FaInbox,
   FaImages,
   FaHome,
   FaListUl,
@@ -75,6 +76,7 @@ function iconFor(key: AdminV2NavigationKey) {
     showreel: <FaVideo />,
     music: <FaMusic />,
     contact: <FaEnvelope />,
+    inbox: <FaInbox />,
     insights: <FaChartLine />,
     security: <FaShieldAlt />,
   };

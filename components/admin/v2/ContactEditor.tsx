@@ -765,9 +765,9 @@ export default function ContactEditor({
           </div>
           <Link
             className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs font-semibold text-white/58 transition hover:bg-white hover:text-black"
-            href="/admin/analytics#inquiries"
+            href="/admin/v2/inbox#messages"
           >
-            Open current Inbox <FaExternalLinkAlt />
+            Open Inbox <FaExternalLinkAlt />
           </Link>
         </div>
         <div className="mt-4 grid gap-2 md:grid-cols-3">

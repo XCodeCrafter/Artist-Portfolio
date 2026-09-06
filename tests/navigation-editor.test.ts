@@ -397,6 +397,7 @@ describe("Admin V2 shell helpers", () => {
       "showreel",
       "music",
       "contact",
+      "inbox",
       "insights",
       "security",
     ]);
@@ -433,6 +434,8 @@ describe("Admin V2 shell helpers", () => {
     expect(getAdminV2ActiveItem("/admin/v2/pages/contact/history").key).toBe(
       "contact"
     );
+    expect(getAdminV2ActiveItem("/admin/v2/inbox").key).toBe("inbox");
+    expect(getAdminV2ActiveItem("/admin/v2/inbox/message").key).toBe("inbox");
     expect(getAdminV2ActiveItem("/admin/v2/insights").key).toBe("insights");
     expect(getAdminV2ActiveItem("/admin/v2/insights/detail").key).toBe(
       "insights"

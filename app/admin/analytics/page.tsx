@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -7,6 +8,11 @@ import {
   type AnalyticsRangeDays,
 } from "@/lib/admin/analytics";
 import { getBookingInquiries } from "@/lib/admin/inquiries";
+import {
+  getAdminInquiryPagePath,
+  getAdminInquiryStatusPath,
+  normalizeAdminInquiryPage,
+} from "@/lib/admin/inquiry-routes";
 import { getPortfolioContent } from "@/lib/content";
 
 export const metadata = {
@@ -32,12 +38,44 @@ export default async function AdminAnalyticsPage({
   )
     ? (requestedRange as AnalyticsRangeDays)
     : 30;
-  const inquiryPage = Math.max(1, Number.parseInt(params.inquiryPage || "1", 10) || 1);
+  const inquiryPage = normalizeAdminInquiryPage(params.inquiryPage);
   const [analyticsResult, inquiriesResult, content] = await Promise.all([
     getAnalyticsSummary({ rangeDays }),
     getBookingInquiries({ page: inquiryPage }),
     getPortfolioContent(),
   ]);
+  const inquiriesAvailable =
+    inquiriesResult.isConfigured && !inquiriesResult.loadError;
+  const lastAvailableInquiryPage = Math.max(
+    1,
+    inquiriesResult.pagination.totalPages
+  );
+  const canonicalInquiryPage = Math.min(
+    inquiryPage,
+    lastAvailableInquiryPage
+  );
+  const inquiryPageParameterIsCanonical =
+    params.inquiryPage === undefined ||
+    params.inquiryPage === String(canonicalInquiryPage);
+
+  if (
+    inquiriesAvailable &&
+    (inquiryPage > lastAvailableInquiryPage ||
+      !inquiryPageParameterIsCanonical)
+  ) {
+    redirect(
+      params.status
+        ? getAdminInquiryStatusPath("classic", params.status, {
+            page: canonicalInquiryPage,
+            rangeDays,
+          })
+        : getAdminInquiryPagePath(
+            "classic",
+            canonicalInquiryPage,
+            rangeDays
+          )
+    );
+  }
 
   return (
     <AdminShell
@@ -58,9 +96,7 @@ export default async function AdminAnalyticsPage({
         analyticsConfigured={analyticsResult.isConfigured}
         analyticsError={analyticsResult.loadError}
         inquiries={inquiriesResult.inquiries}
-        inquiriesAvailable={
-          inquiriesResult.isConfigured && !inquiriesResult.loadError
-        }
+        inquiriesAvailable={inquiriesAvailable}
         inquiriesConfigured={inquiriesResult.isConfigured}
         inquiriesError={inquiriesResult.loadError}
         inquiryPagination={inquiriesResult.pagination}

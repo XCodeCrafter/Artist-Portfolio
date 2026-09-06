@@ -709,9 +709,9 @@ Batch 7A.2b dormant upload-foundation verification:
 
 ## Batch 7B - Inbox V2 and Gmail delivery
 
-Status: agreed; planned after the media egress emergency
+Status: in progress; Inbox V2 implemented, Gmail delivery rollout pending
 
-- [ ] Move the existing inquiry workspace intact from Analytics to
+- [x] Move the existing inquiry workspace intact from Analytics to
       `/admin/v2/inbox`, preserving search/filter, statuses, private notes,
       archive, delivery badges, pagination, audit/security behavior, and
       `Reply by email`.
@@ -727,6 +727,52 @@ Status: agreed; planned after the media egress emergency
       receipt, and final Resend webhook status, then archive both QA records.
 - [ ] Configure Supabase Auth SMTP and recovery templates separately; admin
       password recovery is not the Contact-notification channel.
+
+### Batch 7B.1 - Inbox V2 workspace
+
+Status: implemented and verified
+
+- [x] Add `/admin/v2/inbox` to the overview, sidebar, and Contact editor without
+      removing the Classic Inbox under `/admin/analytics#inquiries`.
+- [x] Extract one shared inquiry view so Classic and V2 keep the same messages,
+      workflow statuses, private notes, mail reply, archive option, delivery
+      badges, pagination, pending buttons, delete confirmation, and
+      unsaved-change protection.
+- [x] Keep search and status filtering honest: they apply only to the currently
+      loaded page, while New, Read, Replied, Archived, and Total remain exact
+      database counts.
+- [x] Use two server-owned action wrappers and a fixed `classic | v2` route map;
+      never accept a return URL from the browser.
+- [x] Keep AAL2 authentication, exact-origin verification, strict UUID/status/
+      notes validation, service-role isolation, and audit logging ahead of
+      every mutation.
+- [x] Verify an updated or deleted row actually existed, distinguish audit-log
+      warnings from failed mutations, and revalidate both Inbox surfaces and
+      both overview pages.
+- [x] Preserve validated page/range context after a mutation, canonicalize
+      malformed and empty out-of-range pagination on both V1 and V2, and never
+      accept a browser-supplied return URL.
+- [x] Keep filtered-out forms mounted, exempt `mailto:` from draft-discard
+      navigation, cap notes at 4,000 characters, and recover the submitted
+      draft from tab-scoped session storage after a failed server action.
+- [x] Stop serializing unused source IP, raw user-agent, and Resend provider ID
+      fields into the admin client payload; select only fields rendered by the
+      Inbox.
+- [x] Fall back to the privacy-safe original inquiry columns when optional
+      intent/delivery migrations are not present; unrelated or fallback query
+      failures still fail closed instead of fabricating zeroes.
+- [x] Explain that email configuration presence is not proof of delivery and
+      that a failed notification does not mean the stored message was lost.
+- [x] Verify expanded and collapsed desktop layouts, the 390 px mobile drawer,
+      responsive message cards, sticky loaded-page filters, empty-filter state,
+      the overview/Contact entry points, and unchanged Classic behavior in an
+      authenticated browser without mutating the QA inquiry.
+- [x] Pass 476 automated tests, TypeScript, ESLint, and the production build.
+
+No migration, provider credentials, or owner action were required for this UI
+and security slice. Gmail/Resend activation remains the next part of Batch 7B
+that requires the owner-selected address, verified sending domain, deployment
+secrets, and a marked production delivery test.
 
 Acceptance:
 
