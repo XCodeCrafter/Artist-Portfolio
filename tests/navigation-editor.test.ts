@@ -399,7 +399,7 @@ describe("Admin V2 shell helpers", () => {
       "contact",
       "inbox",
       "insights",
-      "security",
+      "settings",
     ]);
     expect(getAdminV2ActiveItem("/admin/v2").key).toBe("overview");
     expect(getAdminV2ActiveItem("/admin/v2/navigation").key).toBe(
@@ -440,9 +440,13 @@ describe("Admin V2 shell helpers", () => {
     expect(getAdminV2ActiveItem("/admin/v2/insights/detail").key).toBe(
       "insights"
     );
-    expect(getAdminV2ActiveItem("/admin/v2/security").key).toBe("security");
+    expect(getAdminV2ActiveItem("/admin/v2/settings").key).toBe("settings");
+    expect(getAdminV2ActiveItem("/admin/v2/settings/detail").key).toBe(
+      "settings"
+    );
+    expect(getAdminV2ActiveItem("/admin/v2/security").key).toBe("settings");
     expect(getAdminV2ActiveItem("/admin/v2/security/audit").key).toBe(
-      "security"
+      "settings"
     );
   });
 

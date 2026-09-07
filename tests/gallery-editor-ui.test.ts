@@ -13,6 +13,10 @@ const overview = readFileSync(
   new URL("../app/admin/v2/page.tsx", import.meta.url),
   "utf8"
 );
+const overviewModel = readFileSync(
+  new URL("../lib/admin/v2-overview.ts", import.meta.url),
+  "utf8"
+);
 const shell = readFileSync(
   new URL("../lib/admin/v2-shell.ts", import.meta.url),
   "utf8"
@@ -28,7 +32,9 @@ const classicMediaPage = readFileSync(
 
 describe("Admin V2 Gallery editor UI contract", () => {
   it("is reachable from both the V2 overview and sidebar", () => {
-    expect(overview).toContain('href="/admin/v2/pages/gallery"');
+    expect(overview + overviewModel).toContain(
+      'editorHref: "/admin/v2/pages/gallery"'
+    );
     expect(shell).toContain('href: "/admin/v2/pages/gallery"');
     expect(page).toContain("<GalleryEditor");
   });

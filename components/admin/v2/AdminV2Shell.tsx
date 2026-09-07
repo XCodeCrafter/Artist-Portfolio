@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Fragment,
   useCallback,
   useEffect,
   useRef,
@@ -78,7 +79,7 @@ function iconFor(key: AdminV2NavigationKey) {
     contact: <FaEnvelope />,
     inbox: <FaInbox />,
     insights: <FaChartLine />,
-    security: <FaShieldAlt />,
+    settings: <FaShieldAlt />,
   };
   return icons[key];
 }
@@ -94,47 +95,65 @@ function V2NavLinks({
   const active = getAdminV2ActiveItem(pathname);
 
   return (
-    <nav aria-label="Admin V2 navigation" className="grid gap-1.5">
+    <nav aria-label="Admin V2 navigation" className="grid gap-1">
       {ADMIN_V2_NAVIGATION.map((item) => {
         const isActive = active.key === item.key;
+        const index = ADMIN_V2_NAVIGATION.indexOf(item);
+        const startsGroup =
+          index === 0 || ADMIN_V2_NAVIGATION[index - 1]?.group !== item.group;
         return (
-          <Link
-            aria-current={isActive ? "page" : undefined}
-            aria-label={collapsed ? item.label : undefined}
-            className={`group/nav relative flex min-h-12 items-center gap-3 rounded-2xl border px-2.5 py-2 outline-none transition focus-visible:ring-2 focus-visible:ring-white/60 ${
-              isActive
-                ? "border-white/14 bg-white/[0.1] text-white"
-                : "border-transparent text-white/56 hover:border-white/8 hover:bg-white/[0.055] hover:text-white"
-            }`}
-            href={item.href}
-            key={item.key}
-            onClick={onNavigate}
-            title={collapsed ? item.label : undefined}
-          >
-            <span
-              className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border text-sm transition ${
-                isActive
-                  ? "border-[#ff583f]/30 bg-[#ff3b1f] text-white shadow-[0_8px_24px_rgba(255,59,31,0.22)]"
-                  : "border-white/8 bg-white/[0.045] text-white/48 group-hover/nav:text-white/80"
-              }`}
-            >
-              {iconFor(item.key)}
-            </span>
-            <span className={collapsed ? "sr-only" : "min-w-0"}>
-              <span className="block text-sm font-semibold">{item.label}</span>
-              <span className="mt-0.5 block truncate text-[11px] text-white/36">
-                {item.description}
-              </span>
-            </span>
-            {collapsed ? (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-[#171719] px-2.5 py-1.5 text-[11px] font-semibold text-white opacity-0 shadow-xl transition group-hover/nav:opacity-100 group-focus-visible/nav:opacity-100"
+          <Fragment key={item.key}>
+            {startsGroup ? (
+              <div
+                aria-hidden={collapsed ? true : undefined}
+                className={
+                  collapsed
+                    ? index === 0
+                      ? "hidden"
+                      : "mx-2 my-1 h-px bg-white/8"
+                    : `${index === 0 ? "mt-0" : "mt-1"} px-3 pt-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/22`
+                }
               >
-                {item.label}
-              </span>
+                {collapsed ? null : item.group}
+              </div>
             ) : null}
-          </Link>
+            <Link
+              aria-current={isActive ? "page" : undefined}
+              aria-label={collapsed ? item.label : undefined}
+              className={`group/nav relative flex min-h-10 items-center gap-2.5 rounded-2xl border px-2.5 py-1 outline-none transition focus-visible:ring-2 focus-visible:ring-white/60 ${
+                isActive
+                  ? "border-white/14 bg-white/[0.1] text-white"
+                  : "border-transparent text-white/56 hover:border-white/8 hover:bg-white/[0.055] hover:text-white"
+              }`}
+              href={item.href}
+              onClick={onNavigate}
+              title={collapsed ? item.label : undefined}
+            >
+              <span
+                className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border text-xs transition ${
+                  isActive
+                    ? "border-[#ff583f]/30 bg-[#ff3b1f] text-white shadow-[0_8px_24px_rgba(255,59,31,0.22)]"
+                    : "border-white/8 bg-white/[0.045] text-white/48 group-hover/nav:text-white/80"
+                }`}
+              >
+                {iconFor(item.key)}
+              </span>
+              <span className={collapsed ? "sr-only" : "min-w-0"}>
+                <span className="block text-sm font-semibold">{item.label}</span>
+                <span className="mt-0.5 block truncate text-[11px] text-white/36">
+                  {item.description}
+                </span>
+              </span>
+              {collapsed ? (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-[#171719] px-2.5 py-1.5 text-[11px] font-semibold text-white opacity-0 shadow-xl transition group-hover/nav:opacity-100 group-focus-visible/nav:opacity-100"
+                >
+                  {item.label}
+                </span>
+              ) : null}
+            </Link>
+          </Fragment>
         );
       })}
     </nav>
@@ -417,22 +436,24 @@ export default function AdminV2Shell({
             <V2NavLinks collapsed={collapsed} />
           </div>
 
-          <div className="mt-4 grid gap-2 border-t border-white/8 pt-4">
-            <UtilityLink
-              collapsed={collapsed}
-              href="/admin"
-              icon={<FaChevronLeft />}
-            >
-              Classic V1
-            </UtilityLink>
-            <UtilityLink
-              collapsed={collapsed}
-              external
-              href="/"
-              icon={<FaExternalLinkAlt />}
-            >
-              Open live site
-            </UtilityLink>
+          <div className="mt-3 grid gap-2 border-t border-white/8 pt-3">
+            <div className={collapsed ? "grid gap-2" : "grid grid-cols-2 gap-2"}>
+              <UtilityLink
+                collapsed={collapsed}
+                href="/admin"
+                icon={<FaChevronLeft />}
+              >
+                Classic
+              </UtilityLink>
+              <UtilityLink
+                collapsed={collapsed}
+                external
+                href="/"
+                icon={<FaExternalLinkAlt />}
+              >
+                Live site
+              </UtilityLink>
+            </div>
             {!collapsed ? (
               <div className="mt-1 rounded-2xl border border-white/8 bg-black/25 p-2.5">
                 <p className="truncate px-1 pb-2 text-[10px] text-white/34">

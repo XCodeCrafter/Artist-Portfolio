@@ -784,14 +784,15 @@ Acceptance:
 
 ## Batch 8 - Dashboard, Analytics, and Settings V2
 
-Status: in progress; Security & access and Insights workspaces implemented
+Status: Dashboard V2 scope implemented and verified; longer-term hardening
+follow-ups remain tracked below
 
 - [x] Build a task-first `/admin/v2` overview.
-- [ ] Prioritize actionable issues, quick actions, pages, and new messages.
-- [ ] Add a `What do you want to change?` destination finder.
+- [x] Prioritize actionable issues, quick actions, pages, and new messages.
+- [x] Add a `What do you want to change?` destination finder.
 - [x] Keep traffic summaries secondary to editing tasks.
-- [ ] Move healthy technical checks out of the main dashboard.
-- [ ] Place Brand, Access, Security, and technical health under Settings.
+- [x] Move healthy technical checks out of the main dashboard.
+- [x] Place Brand, Access, Security, and technical health under Settings.
 
 ### Batch 8A - Security & access V2
 
@@ -921,6 +922,42 @@ requiring migration or owner settings remain planned
       handoff before disabling those legacy forms.
 - [ ] Add server-verified Turnstile and a bounded global limiter before Contact
       email delivery is activated; this requires owner-controlled site keys.
+
+### Batch 8D - Task-first Dashboard V2 completion
+
+Status: implemented and verified
+
+- [x] Replace the equal-weight wall of editor cards with a task-first Overview:
+      concrete next actions, quick actions, a compact portfolio page directory,
+      and secondary Reports and Settings workspaces.
+- [x] Add a functional destination finder backed by a static application-owned
+      route registry. Familiar English and Czech terms such as `photos`,
+      `fotky`, `CV`, `Spotify`, `messages`, `logo`, and `heslo` resolve to the
+      relevant editor without accepting a request-controlled URL.
+- [x] Add an admin-authenticated Inbox pulse that performs one exact head/count
+      query for new messages and never loads names, email addresses, or message
+      bodies onto the Overview.
+- [x] Prioritize new messages ahead of editor problems, produce the issue count
+      from the same deterministic issue list, include Music readiness, and keep
+      optional Contact notification setup distinct from a broken Inbox.
+- [x] Show editor readiness separately from navbar visibility so a hidden page
+      is never misreported as unavailable or deleted.
+- [x] Add `/admin/v2/settings` as the site-wide settings home. Group Brand and
+      appearance, Admin access, Protection and audit, and Advanced technical
+      health while reusing the existing Classic and Security workspaces.
+- [x] Group the desktop sidebar and mobile drawer into Start, Portfolio, Work,
+      and Settings. Keep `/admin/v2/security` highlighted under Settings and
+      preserve the collapsible desktop layout.
+- [x] Verify the authenticated Overview and Settings hub in a live browser at
+      desktop and 390 px mobile widths, including destination search, Enter
+      navigation, drawer, collapsed sidebar, Security hash routing, and a clean
+      browser console.
+- [x] Pass 58 test files / 504 tests, TypeScript, ESLint, and the production
+      build.
+
+No migration, secret, or owner action is required for this UI batch. HOME and
+Brand continue to open their clearly labelled Classic editors until their V2
+mirrors are designed.
 
 Acceptance:
 

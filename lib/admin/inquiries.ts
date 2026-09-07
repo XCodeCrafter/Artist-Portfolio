@@ -2,6 +2,7 @@ import {
   createAdminServiceClient,
   hasAdminServiceEnv,
 } from "@/lib/admin/service";
+import { requireAdmin } from "@/lib/admin/auth";
 import { normalizeAdminInquiryPage } from "@/lib/admin/inquiry-routes";
 import type { PortfolioType } from "@/lib/content";
 import {
@@ -56,6 +57,12 @@ export type InquiryPagination = {
   totalPages: number;
   from: number;
   to: number;
+};
+
+export type AdminNewInquiryCount = {
+  count: number | null;
+  isConfigured: boolean;
+  loadError?: string;
 };
 
 type BookingInquiryRow = {
@@ -170,6 +177,42 @@ function isInquiryEmailStatus(value: unknown): value is InquiryEmailStatus {
 
 function emptyPagination(page: number, pageSize: number): InquiryPagination {
   return { page, pageSize, totalPages: 0, from: 0, to: 0 };
+}
+
+/**
+ * Lightweight dashboard pulse. This intentionally reads only an exact count;
+ * names, email addresses, and message bodies stay inside the Inbox workspace.
+ */
+export async function getAdminNewInquiryCount(): Promise<AdminNewInquiryCount> {
+  await requireAdmin();
+
+  if (!hasAdminServiceEnv()) {
+    return { count: null, isConfigured: false };
+  }
+
+  const supabase = createAdminServiceClient();
+  if (!supabase) {
+    return { count: null, isConfigured: false };
+  }
+
+  const result = await supabase
+    .from("booking_inquiries")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "new");
+
+  if (result.error || result.count === null) {
+    console.error("Admin V2 new inquiry count failed.", {
+      code: result.error?.code,
+      message: result.error?.message,
+    });
+    return {
+      count: null,
+      isConfigured: true,
+      loadError: "The number of new Inbox messages is temporarily unavailable.",
+    };
+  }
+
+  return { count: result.count, isConfigured: true };
 }
 
 export async function getBookingInquiries(

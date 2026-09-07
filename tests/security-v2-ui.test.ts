@@ -17,6 +17,10 @@ const overview = readFileSync(
   new URL("../app/admin/v2/page.tsx", import.meta.url),
   "utf8"
 );
+const settingsPage = readFileSync(
+  new URL("../app/admin/v2/settings/page.tsx", import.meta.url),
+  "utf8"
+);
 const shellCatalog = readFileSync(
   new URL("../lib/admin/v2-shell.ts", import.meta.url),
   "utf8"
@@ -56,10 +60,12 @@ describe("Admin V2 Security routing", () => {
   });
 
   it("is discoverable and active in the V2 overview and shell", () => {
-    expect(overview).toContain('href="/admin/v2/security"');
-    expect(shellCatalog).toContain('href: "/admin/v2/security"');
-    expect(shellCatalog).toContain('key: "security"');
-    expect(shell).toContain("security: <FaShieldAlt />");
+    expect(overview).toContain('href="/admin/v2/settings"');
+    expect(settingsPage).toContain('href="/admin/v2/security"');
+    expect(shellCatalog).toContain('href: "/admin/v2/settings"');
+    expect(shellCatalog).toContain('key: "settings"');
+    expect(shellCatalog).toContain('normalized === "/admin/v2/security"');
+    expect(shell).toContain("settings: <FaShieldAlt />");
   });
 });
 
