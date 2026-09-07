@@ -2,7 +2,11 @@
 
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
-import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import useUnsavedChangesGuard, {
+  getGuardedFormSubmitter,
+  isGuardedFormResubmission,
+  type GuardedFormSubmitter,
+} from "@/components/admin/useUnsavedChangesGuard";
 
 import {
   useEffect,
@@ -705,6 +709,7 @@ function AdminProfileForm({
             action={revokeAdminSessions}
             onSubmit={(event) => {
               if (
+                !isGuardedFormResubmission(event.currentTarget) &&
                 !window.confirm(
                   `Revoke every active session for ${profile.email}? They will need to sign in and pass MFA again.`
                 )
@@ -732,6 +737,7 @@ function AdminProfileForm({
             action={resetAdminMfa}
             onSubmit={(event) => {
               if (
+                !isGuardedFormResubmission(event.currentTarget) &&
                 !window.confirm(
                   `Reset MFA for ${profile.email}? They will need to enroll again.`
                 )
@@ -754,6 +760,7 @@ function AdminProfileForm({
             action={deleteAdminProfile}
             onSubmit={(event) => {
               if (
+                !isGuardedFormResubmission(event.currentTarget) &&
                 !window.confirm(
                   `Delete the admin profile for ${profile.email}? This cannot be undone.`
                 )
@@ -1103,10 +1110,10 @@ export default function SecurityCenter({
 }: SecurityCenterProps) {
   const [activeSectionId, setActiveSectionId] = useState("overview");
   const {
-    clearDirty,
     confirmDiscard,
     hasUnsavedChanges,
     markDirty,
+    prepareFormSubmission,
   } = useUnsavedChangesGuard(
     "You have unsaved admin profile changes. Switch views and discard them?"
   );
@@ -1207,19 +1214,18 @@ export default function SecurityCenter({
 
   function openSection(id: string) {
     if (id === activeSection.id) return true;
-    if (!confirmDiscard()) return false;
-
-    dirtyFormsRef.current.clear();
-    setActiveSectionId(id);
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${window.location.pathname}${window.location.search}#${id}`
-    );
-    document
-      .getElementById("security-workspace")
-      ?.scrollIntoView({ block: "start" });
-    return true;
+    return confirmDiscard(() => {
+      dirtyFormsRef.current.clear();
+      setActiveSectionId(id);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}#${id}`
+      );
+      document
+        .getElementById("security-workspace")
+        ?.scrollIntoView({ block: "start" });
+    });
   }
 
   function rememberDirtyForm(target: EventTarget | null) {
@@ -1231,7 +1237,12 @@ export default function SecurityCenter({
     markDirty();
   }
 
-  function submitSecurityForm(form: HTMLFormElement) {
+  function submitSecurityForm(
+    form: HTMLFormElement,
+    submitter?: GuardedFormSubmitter
+  ) {
+    if (isGuardedFormResubmission(form)) return true;
+
     const otherDraftForms = [...dirtyFormsRef.current].filter(
       (dirtyForm) => dirtyForm !== form && dirtyForm.isConnected
     );
@@ -1246,8 +1257,7 @@ export default function SecurityCenter({
     }
 
     dirtyFormsRef.current.clear();
-    clearDirty();
-    return true;
+    return prepareFormSubmission(form, submitter);
   }
 
   function handleTabKeyDown(
@@ -1297,7 +1307,10 @@ export default function SecurityCenter({
         const form = event.target;
         if (
           form instanceof HTMLFormElement &&
-          !submitSecurityForm(form)
+          !submitSecurityForm(
+            form,
+            getGuardedFormSubmitter(event.nativeEvent)
+          )
         ) {
           event.preventDefault();
         }

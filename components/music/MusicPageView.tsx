@@ -10,6 +10,10 @@ import type {
   MusicPageViewData,
   MusicPreviewSection,
 } from "@/lib/content/music";
+import {
+  getMusicPublicSectionVisibility,
+  preparePublicMusicPageViewData,
+} from "@/lib/content/music";
 
 export const MUSIC_PREVIEW_SELECTION_MESSAGE =
   "music-preview-section-select" as const;
@@ -105,6 +109,12 @@ export default function MusicPageView({
   onSelectSection,
   selectedSection,
 }: MusicPageViewProps) {
+  const viewData =
+    mode === "public" ? preparePublicMusicPageViewData(data) : data;
+  const publicSectionVisibility = getMusicPublicSectionVisibility(viewData);
+  const showSection = (section: keyof typeof publicSectionVisibility) =>
+    mode === "preview" || publicSectionVisibility[section];
+
   const selectSection = (section: MusicPreviewSection) => {
     if (onSelectSection) {
       onSelectSection(section);
@@ -129,81 +139,87 @@ export default function MusicPageView({
         section="hero"
         selected={selectedSection === "hero"}
       >
-        <AdaptiveHero {...data.hero} />
+        <AdaptiveHero {...viewData.hero} />
       </PreviewSection>
 
       <div className="public-nav-anchor" id="music">
-        <PreviewSection
-          label="Platforms"
-          mode={mode}
-          onSelect={selectSection}
-          section="platforms"
-          selected={selectedSection === "platforms"}
-        >
-          <MusicPlatformsExt
-            cards={data.platforms}
-            interactionMode={mode}
-          />
-        </PreviewSection>
-
-        <PreviewSection
-          label="Spotify"
-          mode={mode}
-          onSelect={selectSection}
-          section="spotify"
-          selected={selectedSection === "spotify"}
-        >
-          <section
-            className="public-nav-anchor mx-auto max-w-[1400px] px-5 py-14 sm:px-8 sm:py-18"
-            id="spotify-releases"
+        {showSection("platforms") ? (
+          <PreviewSection
+            label="Platforms"
+            mode={mode}
+            onSelect={selectSection}
+            section="platforms"
+            selected={selectedSection === "platforms"}
           >
-            <h2
-              className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
-              data-reveal="up"
-            >
-              {data.spotify.heading}
-            </h2>
+            <MusicPlatformsExt
+              cards={viewData.platforms}
+              interactionMode={mode}
+            />
+          </PreviewSection>
+        ) : null}
 
-            <div className="mt-8" data-reveal="up" data-reveal-delay="140">
-              <SpotifyEmbed
-                embedUrl={data.spotify.embedUrl}
-                openUrl={data.spotify.artistUrl}
-                title="Spotify Releases"
-                heightMobile={352}
-                heightDesktop={520}
-              />
-            </div>
-          </section>
-        </PreviewSection>
-
-        <PreviewSection
-          label="SoundCloud"
-          mode={mode}
-          onSelect={selectSection}
-          section="soundcloud"
-          selected={selectedSection === "soundcloud"}
-        >
-          <section
-            className="public-nav-anchor mx-auto max-w-[1400px] px-5 pb-18 sm:px-8"
-            id="soundcloud-mixes"
+        {showSection("spotify") ? (
+          <PreviewSection
+            label="Spotify"
+            mode={mode}
+            onSelect={selectSection}
+            section="spotify"
+            selected={selectedSection === "spotify"}
           >
-            <h2
-              className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
-              data-reveal="up"
+            <section
+              className="public-nav-anchor mx-auto max-w-[1400px] px-5 py-14 sm:px-8 sm:py-18"
+              id="spotify-releases"
             >
-              {data.soundcloud.heading}
-            </h2>
+              <h2
+                className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
+                data-reveal="up"
+              >
+                {viewData.spotify.heading}
+              </h2>
 
-            <div className="mt-8">
-              <SoundcloudCarousel
-                items={data.soundcloud.tracks}
-                showTitles={false}
-                autoPlay={false}
-                interactionMode={mode}
-              />
-            </div>
-          </section>
-        </PreviewSection>
+              <div className="mt-8" data-reveal="up" data-reveal-delay="140">
+                <SpotifyEmbed
+                  embedUrl={viewData.spotify.embedUrl}
+                  openUrl={viewData.spotify.artistUrl}
+                  title="Spotify Releases"
+                  heightMobile={352}
+                  heightDesktop={520}
+                />
+              </div>
+            </section>
+          </PreviewSection>
+        ) : null}
+
+        {showSection("soundcloud") ? (
+          <PreviewSection
+            label="SoundCloud"
+            mode={mode}
+            onSelect={selectSection}
+            section="soundcloud"
+            selected={selectedSection === "soundcloud"}
+          >
+            <section
+              className="public-nav-anchor mx-auto max-w-[1400px] px-5 pb-18 sm:px-8"
+              id="soundcloud-mixes"
+            >
+              <h2
+                className="text-5xl sm:text-7xl font-semibold tracking-tight text-white"
+                data-reveal="up"
+              >
+                {viewData.soundcloud.heading}
+              </h2>
+
+              <div className="mt-8">
+                <SoundcloudCarousel
+                  items={viewData.soundcloud.tracks}
+                  showTitles={false}
+                  autoPlay={false}
+                  interactionMode={mode}
+                />
+              </div>
+            </section>
+          </PreviewSection>
+        ) : null}
 
         <PreviewOnlyInertContent mode={mode}>
           <div className="mt-16">

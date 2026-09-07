@@ -1080,8 +1080,7 @@ export default function ShowreelEditor({
   }
 
   function reloadAfterConflict() {
-    if (hasUnsavedChanges && !confirmDiscard()) return;
-    window.location.reload();
+    confirmDiscard(() => window.location.reload());
   }
 
   const inspectorProps: Omit<InspectorProps, "activeSection" | "instance"> = {

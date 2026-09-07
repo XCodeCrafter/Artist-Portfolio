@@ -981,21 +981,24 @@ Acceptance:
 
 ## Batch 10 - QA, migration, and cutover
 
-Status: planned
+Status: Batch 10A runtime and hydration cleanup implemented and verified;
+production cutover remains planned
 
 - [ ] Validate keyboard, touch, responsive layout, contrast, and reduced motion.
 - [ ] Test migration/backfill and rollback against representative data.
-- [ ] Run unit, integration, typecheck, lint, and production build checks.
+- [x] Run unit, integration, typecheck, lint, and production build checks.
 - [ ] Verify sitemap, metadata, structured data, analytics, contact, and admin auth.
-- [ ] Hide truly empty public Music sections without leaving dead anchors.
-- [ ] Avoid duplicate eager Spotify iframe loads across desktop/mobile layouts.
-- [ ] Remove the Home/Bio JSON-LD CSP nonce hydration warning.
+- [x] Hide truly empty public Music sections without leaving dead anchors.
+- [x] Avoid duplicate eager Spotify iframe loads across desktop/mobile layouts.
+- [x] Remove the Home/Bio JSON-LD CSP nonce hydration warning.
+- [x] Keep scroll-reveal bookkeeping out of server-rendered attributes so
+      streamed Admin V2 previews cannot be mutated before hydration.
 - [x] Replace the authenticated server-session user warning with verified
       claims and subject matching at the relevant Supabase boundaries (Batch
       8C).
 - [ ] Confirm the verified ImageKit cutover removes the intermittent Supabase
       image-optimizer timeout path and keep every remote-image failure graceful.
-- [ ] Consume the unsaved-change history sentinel after save/discard so the
+- [x] Consume the unsaved-change history sentinel after save/discard so the
       first Back action always navigates as expected.
 - [ ] Take a full database backup and reconcile the empty remote Supabase CLI
       migration history before allowing any `db push` workflow.
@@ -1012,6 +1015,22 @@ Status: planned
 - [ ] Make V2 the default only after owner acceptance.
 - [ ] Deprecate legacy profile fields in a later migration; retain historical
       inquiry classification where needed.
+
+Batch 10A verification (2026-09-07):
+
+- Public Music renders one responsive Spotify iframe, retains the stable
+  `#music` target, and omits the currently empty Platforms and SoundCloud
+  sections while the Admin V2 preview keeps every editor section selectable.
+- Home, Bio, public Music, and the streamed Music preview load without console
+  hydration errors. The JSON-LD payloads remain parseable and CSP nonces remain
+  attached server-side.
+- A local Music draft was discarded without saving; the first Back action left
+  the editor immediately, confirming that the guard entry was consumed.
+- History cleanup is single-flight: classic form submits wait for compaction,
+  preserve their submitter, and cannot double-submit or discard a newer edit.
+- `npm run check` passes 63 test files / 527 tests, TypeScript, ESLint, and the
+  production build.
+- No migration, secret, content publication, or owner action is required.
 
 Acceptance:
 

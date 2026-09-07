@@ -14,8 +14,11 @@ import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 type NavbarEditorSource = "navigation" | "shortcuts";
 
 type NavbarUnsavedChangesContextValue = {
-  clearSourceDirty: (source: NavbarEditorSource) => void;
-  confirmDiscard: () => boolean;
+  clearSourceDirty: (
+    source: NavbarEditorSource,
+    afterCompaction?: () => void
+  ) => void;
+  confirmDiscard: (afterDiscard?: () => void) => boolean;
   markSourceDirty: (source: NavbarEditorSource) => void;
 };
 
@@ -46,17 +49,22 @@ export function NavbarUnsavedChangesProvider({
   );
 
   const clearSourceDirty = useCallback(
-    (source: NavbarEditorSource) => {
+    (source: NavbarEditorSource, afterCompaction?: () => void) => {
       dirtySourcesRef.current.delete(source);
-      if (!dirtySourcesRef.current.size) clearGlobalDirty();
+      if (!dirtySourcesRef.current.size) {
+        clearGlobalDirty(afterCompaction);
+      } else {
+        afterCompaction?.();
+      }
     },
     [clearGlobalDirty]
   );
 
-  const confirmDiscard = useCallback(() => {
-    if (!confirmGlobalDiscard()) return false;
-    dirtySourcesRef.current.clear();
-    return true;
+  const confirmDiscard = useCallback((afterDiscard?: () => void) => {
+    return confirmGlobalDiscard(() => {
+      dirtySourcesRef.current.clear();
+      afterDiscard?.();
+    });
   }, [confirmGlobalDiscard]);
 
   const value = useMemo(
@@ -86,7 +94,8 @@ export function useNavbarUnsavedChanges(source: NavbarEditorSource) {
 
   return useMemo(
     () => ({
-      clearDirty: () => context.clearSourceDirty(source),
+      clearDirty: (afterCompaction?: () => void) =>
+        context.clearSourceDirty(source, afterCompaction),
       confirmDiscard: context.confirmDiscard,
       markDirty: () => context.markSourceDirty(source),
     }),

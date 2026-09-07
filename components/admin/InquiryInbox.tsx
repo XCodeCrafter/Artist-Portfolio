@@ -21,7 +21,11 @@ import {
 } from "@/app/admin/v2/inbox/actions";
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
-import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import useUnsavedChangesGuard, {
+  getGuardedFormSubmitter,
+  isGuardedFormResubmission,
+  type GuardedFormSubmitter,
+} from "@/components/admin/useUnsavedChangesGuard";
 import type { ContactDeliveryStatus } from "@/lib/admin/contact";
 import {
   getAdminInquiryPagePath,
@@ -237,7 +241,11 @@ function InquiryCard({
   disabled: boolean;
   inquiry: BookingInquiry;
   onDirty: (form: HTMLFormElement) => void;
-  onSubmit: (form: HTMLFormElement) => boolean;
+  onSubmit: (
+    form: HTMLFormElement,
+    submitter?: GuardedFormSubmitter,
+    onAccepted?: () => void
+  ) => boolean;
   page: number;
   rangeDays: number;
   resultStatus?: string;
@@ -334,11 +342,15 @@ function InquiryCard({
           data-initial-status={inquiry.status}
           onChangeCapture={(event) => onDirty(event.currentTarget)}
           onSubmit={(event) => {
-            if (!onSubmit(event.currentTarget)) {
+            if (
+              !onSubmit(
+                event.currentTarget,
+                getGuardedFormSubmitter(event.nativeEvent),
+                () => persistPendingDraft(surface, event.currentTarget)
+              )
+            ) {
               event.preventDefault();
-              return;
             }
-            persistPendingDraft(surface, event.currentTarget);
           }}
           ref={updateFormRef}
         >
@@ -399,15 +411,18 @@ function InquiryCard({
           className="mt-4 flex flex-col items-end gap-2 border-t border-rose-300/10 pt-4"
           onSubmit={(event) => {
             if (
-              !window.confirm(
-                `Delete the inquiry from ${inquiry.name}? This cannot be undone.`
-              ) ||
-              !onSubmit(event.currentTarget)
+              (!isGuardedFormResubmission(event.currentTarget) &&
+                !window.confirm(
+                  `Delete the inquiry from ${inquiry.name}? This cannot be undone.`
+                )) ||
+              !onSubmit(
+                event.currentTarget,
+                getGuardedFormSubmitter(event.nativeEvent),
+                () => clearPendingDraft(surface)
+              )
             ) {
               event.preventDefault();
-              return;
             }
-            clearPendingDraft(surface);
           }}
         >
           <input name="id" type="hidden" value={inquiry.id} />
@@ -436,7 +451,11 @@ export type InquiryInboxViewProps = {
   inquiryPagination: InquiryPagination;
   inquirySummary: InquirySummary;
   onDirty: (form: HTMLFormElement) => void;
-  onSubmit: (form: HTMLFormElement) => boolean;
+  onSubmit: (
+    form: HTMLFormElement,
+    submitter?: GuardedFormSubmitter,
+    onAccepted?: () => void
+  ) => boolean;
   rangeDays?: number;
   resultStatus?: string;
   surface: AdminInquirySurface;
@@ -673,7 +692,12 @@ export default function InquiryInbox({
   inquiriesError,
   status,
 }: InquiryInboxProps) {
-  const { clearDirty, hasUnsavedChanges, markDirty } =
+  const {
+    clearDirty,
+    hasUnsavedChanges,
+    markDirty,
+    prepareFormSubmission,
+  } =
     useUnsavedChangesGuard();
   const dirtyFormsRef = useRef<Set<HTMLFormElement>>(new Set());
   const deliveryIssues = inquiries.filter((inquiry) =>
@@ -695,7 +719,13 @@ export default function InquiryInbox({
     if (dirtyFormsRef.current.size === 0) clearDirty();
   }
 
-  function submitInquiryForm(form: HTMLFormElement) {
+  function submitInquiryForm(
+    form: HTMLFormElement,
+    submitter?: GuardedFormSubmitter,
+    onAccepted?: () => void
+  ) {
+    if (isGuardedFormResubmission(form)) return true;
+
     const otherDraftForms = [...dirtyFormsRef.current].filter(
       (dirtyForm) => dirtyForm !== form && dirtyForm.isConnected
     );
@@ -709,12 +739,8 @@ export default function InquiryInbox({
     }
     otherDraftForms.forEach((dirtyForm) => dirtyForm.reset());
     dirtyFormsRef.current.clear();
-    if (form.elements.namedItem("adminNotes")) {
-      dirtyFormsRef.current.add(form);
-    } else {
-      clearDirty();
-    }
-    return true;
+    onAccepted?.();
+    return prepareFormSubmission(form, submitter);
   }
 
   const message = status ? statusCopy[status] : "";

@@ -151,8 +151,7 @@ export default function NavbarSocialLinksManager({
   }
 
   function reloadSaved() {
-    if (!confirmDiscard()) return;
-    window.location.reload();
+    confirmDiscard(() => window.location.reload());
   }
 
   const statusIsError = !["idle", "saved"].includes(saveState.status);

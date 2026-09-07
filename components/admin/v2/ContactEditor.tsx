@@ -650,8 +650,7 @@ export default function ContactEditor({
   }
 
   function reloadAfterConflict() {
-    if (hasUnsavedChanges && !confirmDiscard()) return;
-    window.location.reload();
+    confirmDiscard(() => window.location.reload());
   }
 
   function closeMobileInspector() {

@@ -318,8 +318,7 @@ export default function NavigationManager({
         }
         savedDraftRef.current = draftRef.current;
         setHasUnsavedChanges(false);
-        clearDirty();
-        router.refresh();
+        clearDirty(() => router.refresh());
       }
       return result;
     },
@@ -453,8 +452,7 @@ export default function NavigationManager({
           : "All page choices save together; hidden links never delete their pages or content.";
 
   function reloadSavedNavbar() {
-    if (!confirmDiscard()) return;
-    window.location.reload();
+    confirmDiscard(() => window.location.reload());
   }
 
   return (

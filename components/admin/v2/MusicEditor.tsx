@@ -1212,8 +1212,7 @@ export default function MusicEditor({
   }
 
   function reloadAfterConflict() {
-    if (!confirmDiscard()) return;
-    window.location.reload();
+    confirmDiscard(() => window.location.reload());
   }
 
   const inspectorProps: Omit<InspectorFieldsProps, "instance"> = {

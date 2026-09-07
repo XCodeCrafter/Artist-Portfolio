@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useSyncExternalStore, type CSSProperties } from "react";
 
 type Props = {
   embedUrl: string;
@@ -23,6 +23,19 @@ function detectIOS(): boolean {
   return isAppleMobile || isIpadOS;
 }
 
+function subscribeToDeviceState() {
+  return () => {};
+}
+
+function getServerIOSSnapshot() {
+  return false;
+}
+
+type SpotifyFrameStyle = CSSProperties & {
+  "--spotify-desktop-height": string;
+  "--spotify-mobile-height": string;
+};
+
 export default function SpotifyEmbed({
   embedUrl,
   openUrl,
@@ -30,12 +43,21 @@ export default function SpotifyEmbed({
   heightDesktop = 520,
   heightMobile = 352,
 }: Props) {
-  // ✅ No effect + no setState in effect (passes strict lint rules)
-  const [isIOS] = useState<boolean>(() => detectIOS());
+  const normalizedEmbedUrl = embedUrl.trim();
+  const normalizedOpenUrl = openUrl.trim();
+  const isIOS = useSyncExternalStore(
+    subscribeToDeviceState,
+    detectIOS,
+    getServerIOSSnapshot
+  );
+  const frameStyle: SpotifyFrameStyle = {
+    "--spotify-desktop-height": `${heightDesktop}px`,
+    "--spotify-mobile-height": `${heightMobile}px`,
+  };
 
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5">
-      {isIOS || !embedUrl ? (
+      {isIOS || !normalizedEmbedUrl ? (
         // ✅ iOS fallback (reliable)
         <div className="flex items-center justify-center" style={{ height: heightMobile }}>
           <div className="mx-auto max-w-[560px] px-6 text-center">
@@ -44,19 +66,19 @@ export default function SpotifyEmbed({
             </div>
 
             <div className="mt-3 text-lg sm:text-xl font-semibold tracking-tight text-white">
-              {openUrl ? "Listen on Spotify" : "Spotify releases"}
+              {normalizedOpenUrl ? "Listen on Spotify" : "Spotify releases"}
             </div>
 
             <p className="mt-2 text-sm text-white/65">
-              {openUrl
+              {normalizedOpenUrl
                 ? "Open Spotify directly for the most reliable listening experience."
                 : "Releases will appear here when the Spotify player is connected."}
             </p>
 
-            {openUrl ? (
+            {normalizedOpenUrl ? (
               <div className="mt-5 flex justify-center">
                 <a
-                  href={openUrl}
+                  href={normalizedOpenUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-black/35 px-5 h-12 text-xs tracking-[0.22em] uppercase text-white/85 hover:text-white hover:border-white/20 hover:bg-black/45 transition"
@@ -68,30 +90,18 @@ export default function SpotifyEmbed({
           </div>
         </div>
       ) : (
-        // ✅ Desktop/Android: embed
-        <>
-          {/* Desktop */}
-          <div className="relative hidden sm:block" style={{ height: heightDesktop }}>
-            <iframe
-              src={embedUrl}
-              title={title}
-              className="absolute inset-0 h-full w-full"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="eager"
-            />
-          </div>
-
-          {/* Mobile/XS (non-iOS) */}
-          <div className="relative sm:hidden" style={{ height: heightMobile }}>
-            <iframe
-              src={embedUrl}
-              title={title}
-              className="absolute inset-0 h-full w-full"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="eager"
-            />
-          </div>
-        </>
+        <div
+          className="relative h-[var(--spotify-mobile-height)] sm:h-[var(--spotify-desktop-height)]"
+          style={frameStyle}
+        >
+          <iframe
+            src={normalizedEmbedUrl}
+            title={title}
+            className="absolute inset-0 h-full w-full"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="eager"
+          />
+        </div>
       )}
     </div>
   );

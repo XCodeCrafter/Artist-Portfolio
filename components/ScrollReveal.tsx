@@ -61,11 +61,11 @@ export default function ScrollReveal() {
         rootMargin: "0px 0px -10% 0px",
       }
     );
+    const observed = new WeakSet<RevealEl>();
 
     const observe = (el: RevealEl) => {
-      // prevent double binding
-      if (el.getAttribute("data-reveal-bound") === "1") return;
-      el.setAttribute("data-reveal-bound", "1");
+      if (observed.has(el)) return;
+      observed.add(el);
       io.observe(el);
     };
 

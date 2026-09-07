@@ -66,9 +66,9 @@ describe("Music visual editor presentation contract", () => {
     expect(publicMusicPage).toContain(
       "<MusicPageView data={selectMusicPageViewData(content)} />"
     );
-    expect(sharedMusicView).toContain('<AdaptiveHero {...data.hero} />');
-    expect(sharedMusicView).toContain("data.spotify.heading");
-    expect(sharedMusicView).toContain("data.soundcloud.heading");
+    expect(sharedMusicView).toContain('<AdaptiveHero {...viewData.hero} />');
+    expect(sharedMusicView).toContain("viewData.spotify.heading");
+    expect(sharedMusicView).toContain("viewData.soundcloud.heading");
   });
 
   it("makes every visible editable section selectable in preview mode", () => {
@@ -78,6 +78,9 @@ describe("Music visual editor presentation contract", () => {
     expect(sharedMusicView).toContain("data-music-preview-section");
     expect(sharedMusicView).toContain("onSelectSection");
     expect(sharedMusicView).toContain("MUSIC_PREVIEW_SELECTION_MESSAGE");
+    expect(sharedMusicView).toContain(
+      'mode === "preview" || publicSectionVisibility[section]'
+    );
   });
 
   it("keeps links, embeds, and carousel controls inert inside edit preview", () => {

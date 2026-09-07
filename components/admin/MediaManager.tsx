@@ -37,7 +37,10 @@ import CopyButton from "@/components/admin/CopyButton";
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
-import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import useUnsavedChangesGuard, {
+  getGuardedFormSubmitter,
+  isGuardedFormResubmission,
+} from "@/components/admin/useUnsavedChangesGuard";
 import {
   deleteMediaAsset,
   deleteMediaGalleryImage,
@@ -1377,7 +1380,10 @@ function AssetCard({
         <form
           action={deleteMediaAsset}
           onSubmit={(event) => {
-            if (!window.confirm(`Move "${asset.label}" to Trash?`)) {
+            if (
+              !isGuardedFormResubmission(event.currentTarget) &&
+              !window.confirm(`Move "${asset.label}" to Trash?`)
+            ) {
               event.preventDefault();
             }
           }}
@@ -1531,7 +1537,10 @@ function GalleryImageForm({
           action={deleteMediaGalleryImage}
           className="mt-3 flex justify-end"
           onSubmit={(event) => {
-            if (!window.confirm(`Remove "${item.title}" from public gallery?`)) {
+            if (
+              !isGuardedFormResubmission(event.currentTarget) &&
+              !window.confirm(`Remove "${item.title}" from public gallery?`)
+            ) {
               event.preventDefault();
             }
           }}
@@ -1701,7 +1710,7 @@ function StudioImageEditor({
               </ActionButton>
             </form>
           ))}
-          <form action={deleteMediaGalleryImage} onSubmit={(event) => { if (!window.confirm(`Remove "${item.title}" from the public gallery?`)) event.preventDefault(); }}>
+          <form action={deleteMediaGalleryImage} onSubmit={(event) => { if (!isGuardedFormResubmission(event.currentTarget) && !window.confirm(`Remove "${item.title}" from the public gallery?`)) event.preventDefault(); }}>
             <input name="id" type="hidden" value={item.id} />
             <ActionButton className="grid h-9 w-9 place-items-center rounded-xl border border-red-300/20 text-red-200 hover:bg-red-500/15" disabled={disabled} pendingLabel="..."><FaTrash /><span className="sr-only">Delete</span></ActionButton>
           </form>
@@ -1889,7 +1898,7 @@ function ShowreelVideoEditor({
           <div className="mt-5 flex justify-end"><ActionButton className={buttonClass} disabled={disabled} pendingLabel="Saving...">{mode === "new" ? "Add video" : "Save video"}</ActionButton></div>
         </fieldset>
       </form>
-      {mode === "edit" ? <form action={deleteShowreelVideo} className="flex justify-end border-t border-white/10 p-4" onSubmit={(event) => { if (!window.confirm(`Delete "${item.title}"?`)) event.preventDefault(); }}><input name="id" type="hidden" value={item.id} /><ActionButton className={dangerButtonClass} disabled={disabled} pendingLabel="Deleting..."><FaTrash /> Delete</ActionButton></form> : null}
+      {mode === "edit" ? <form action={deleteShowreelVideo} className="flex justify-end border-t border-white/10 p-4" onSubmit={(event) => { if (!isGuardedFormResubmission(event.currentTarget) && !window.confirm(`Delete "${item.title}"?`)) event.preventDefault(); }}><input name="id" type="hidden" value={item.id} /><ActionButton className={dangerButtonClass} disabled={disabled} pendingLabel="Deleting..."><FaTrash /> Delete</ActionButton></form> : null}
     </article>
     </AdminDisclosure>
   );
@@ -1904,7 +1913,7 @@ function ShowreelStudio({
   v2Enabled,
 }: {
   assets: MediaAsset[];
-  confirmDiscard: () => boolean;
+  confirmDiscard: (afterDiscard?: () => void) => boolean;
   content: EditablePortfolioContent;
   disabled: boolean;
   portfolioType: PortfolioType;
@@ -1922,9 +1931,7 @@ function ShowreelStudio({
 
   function openPanel(id: (typeof panels)[number]["id"]) {
     if (id === activePanel) return true;
-    if (!confirmDiscard()) return false;
-    setActivePanel(id);
-    return true;
+    return confirmDiscard(() => setActivePanel(id));
   }
 
   function handlePanelKeyDown(
@@ -2103,7 +2110,7 @@ function GalleryStudio({
 }: {
   assetListId: string;
   assets: MediaAsset[];
-  confirmDiscard: () => boolean;
+  confirmDiscard: (afterDiscard?: () => void) => boolean;
   content: EditablePortfolioContent;
   disabled: boolean;
   v2Enabled: boolean;
@@ -2124,9 +2131,7 @@ function GalleryStudio({
 
   function openPanel(id: (typeof panels)[number]["id"]) {
     if (id === activePanel) return true;
-    if (!confirmDiscard()) return false;
-    setActivePanel(id);
-    return true;
+    return confirmDiscard(() => setActivePanel(id));
   }
 
   function handlePanelKeyDown(
@@ -2402,6 +2407,7 @@ export default function MediaManager({
     confirmDiscard,
     hasUnsavedChanges,
     markDirty,
+    prepareFormSubmission,
   } = useUnsavedChangesGuard();
   const dirtyFormsRef = useRef<Set<HTMLFormElement>>(new Set());
   const previousInitialModeRef = useRef(initialMode);
@@ -2437,10 +2443,11 @@ export default function MediaManager({
   );
   const nextGallerySort = nextSort(galleryImages);
 
-  const confirmAndDiscardDrafts = useCallback(() => {
-    if (!confirmDiscard()) return false;
-    dirtyFormsRef.current.clear();
-    return true;
+  const confirmAndDiscardDrafts = useCallback((afterDiscard?: () => void) => {
+    return confirmDiscard(() => {
+      dirtyFormsRef.current.clear();
+      afterDiscard?.();
+    });
   }, [confirmDiscard]);
 
   function rememberDirtyForm(target: EventTarget | null) {
@@ -2452,7 +2459,12 @@ export default function MediaManager({
     markDirty();
   }
 
-  function submitNavigatingForm(form: HTMLFormElement) {
+  function submitNavigatingForm(
+    form: HTMLFormElement,
+    submitter?: HTMLButtonElement | HTMLInputElement
+  ) {
+    if (isGuardedFormResubmission(form)) return true;
+
     const otherDraftForms = [...dirtyFormsRef.current].filter(
       (dirtyForm) => dirtyForm !== form && dirtyForm.isConnected
     );
@@ -2467,8 +2479,7 @@ export default function MediaManager({
     }
 
     dirtyFormsRef.current.clear();
-    clearDirty();
-    return true;
+    return prepareFormSubmission(form, submitter);
   }
 
   function finishFormWithoutNavigation(form: HTMLFormElement) {
@@ -2490,25 +2501,23 @@ export default function MediaManager({
 
     previousInitialModeRef.current = initialMode;
 
-    if (!confirmAndDiscardDrafts()) {
+    const nextMode = initialMode;
+    if (!confirmAndDiscardDrafts(() => {
+      expectedRestoredModeRef.current = null;
+      window.setTimeout(() => setMode(nextMode), 0);
+    })) {
       expectedRestoredModeRef.current = mode;
       replaceMediaModeInUrl(mode);
       return;
     }
-
-    expectedRestoredModeRef.current = null;
-    const nextMode = initialMode;
-    const timeoutId = window.setTimeout(() => setMode(nextMode), 0);
-    return () => window.clearTimeout(timeoutId);
   }, [confirmAndDiscardDrafts, initialMode, mode]);
 
   function changeMode(nextMode: MediaMode) {
     if (nextMode === mode) return true;
-    if (!confirmAndDiscardDrafts()) return false;
-
-    setMode(nextMode);
-    replaceMediaModeInUrl(nextMode);
-    return true;
+    return confirmAndDiscardDrafts(() => {
+      setMode(nextMode);
+      replaceMediaModeInUrl(nextMode);
+    });
   }
 
   return (
@@ -2546,7 +2555,10 @@ export default function MediaManager({
         const form = event.target;
         if (
           form instanceof HTMLFormElement &&
-          !submitNavigatingForm(form)
+          !submitNavigatingForm(
+            form,
+            getGuardedFormSubmitter(event.nativeEvent)
+          )
         ) {
           event.preventDefault();
         }

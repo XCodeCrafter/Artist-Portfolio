@@ -34,7 +34,10 @@ import {
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
-import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import useUnsavedChangesGuard, {
+  getGuardedFormSubmitter,
+  isGuardedFormResubmission,
+} from "@/components/admin/useUnsavedChangesGuard";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
 import {
   getProfilePublicModules,
@@ -967,6 +970,8 @@ function StudioWorkspace({
 
   function activatePanel(id: string) {
     setActivePanelId(id);
+    if (hasWorkspaceDrafts) return;
+
     const hash = id === "preview" ? sectionId : id;
     window.history.replaceState(
       window.history.state,
@@ -1349,6 +1354,7 @@ function DeleteForm({
       className="mt-3 flex justify-end"
       onSubmit={(event) => {
         if (
+          !isGuardedFormResubmission(event.currentTarget) &&
           !window.confirm(
             `Delete “${id}”? This removes it from the public portfolio and cannot be undone.`
           )
@@ -3872,10 +3878,10 @@ export default function ContentEditor({
   );
   const [activeSectionId, setActiveSectionId] = useState("home");
   const {
-    clearDirty,
     confirmDiscard,
     hasUnsavedChanges,
     markDirty,
+    prepareFormSubmission,
   } = useUnsavedChangesGuard();
   const [dirtyPanelIds, setDirtyPanelIds] = useState<Set<string>>(
     () => new Set()
@@ -3948,18 +3954,19 @@ export default function ContentEditor({
 
   function openSection(id: string) {
     if (id === activeSection?.id) return;
-    if (!confirmDiscard()) return;
-    setDirtyPanelIds(new Set());
-    setDirtyForms(new Set());
-    setActiveSectionId(id);
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${window.location.pathname}${window.location.search}#${id}`
-    );
-    document
-      .getElementById("content-workspace")
-      ?.scrollIntoView({ block: "start" });
+    confirmDiscard(() => {
+      setDirtyPanelIds(new Set());
+      setDirtyForms(new Set());
+      setActiveSectionId(id);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${window.location.search}#${id}`
+      );
+      document
+        .getElementById("content-workspace")
+        ?.scrollIntoView({ block: "start" });
+    });
   }
 
   function rememberDirtyDraft(target: EventTarget | null) {
@@ -4174,12 +4181,12 @@ export default function ContentEditor({
       onSubmit={(event) => {
         if (event.defaultPrevented) return;
         const form = event.target;
-        const submittingPanelId =
-          form instanceof HTMLFormElement
-            ? form
-                .closest<HTMLElement>("[data-editor-panel-id]")
-                ?.getAttribute("data-editor-panel-id")
-            : null;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (isGuardedFormResubmission(form)) return;
+
+        const submittingPanelId = form
+          .closest<HTMLElement>("[data-editor-panel-id]")
+          ?.getAttribute("data-editor-panel-id");
         const otherDraftForms = [...dirtyForms].filter(
           (dirtyForm) => dirtyForm !== form && dirtyForm.isConnected
         );
@@ -4199,7 +4206,9 @@ export default function ContentEditor({
 
         setDirtyPanelIds(new Set());
         setDirtyForms(new Set());
-        clearDirty();
+        if (!prepareFormSubmission(form, getGuardedFormSubmitter(event.nativeEvent))) {
+          event.preventDefault();
+        }
       }}
     >
       <StatusNotice

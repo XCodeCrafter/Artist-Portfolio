@@ -1275,8 +1275,7 @@ export default function BioEditor({
   }
 
   function reloadAfterConflict() {
-    if (hasUnsavedChanges && !confirmDiscard()) return;
-    window.location.reload();
+    confirmDiscard(() => window.location.reload());
   }
 
   function closeDesktopInspector() {

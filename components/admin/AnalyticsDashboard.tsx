@@ -16,7 +16,10 @@ import {
   InquiryInboxView,
   isInquiryFormDirty,
 } from "@/components/admin/InquiryInbox";
-import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import useUnsavedChangesGuard, {
+  isGuardedFormResubmission,
+  type GuardedFormSubmitter,
+} from "@/components/admin/useUnsavedChangesGuard";
 import type { AnalyticsSummary } from "@/lib/admin/analytics";
 import {
   getAdminAnalyticsPath,
@@ -481,7 +484,13 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
   } = props;
   const isV2 = surface === "v2";
   const [activeSectionId, setActiveSectionId] = useState("overview");
-  const { clearDirty, confirmDiscard, hasUnsavedChanges, markDirty } = useUnsavedChangesGuard();
+  const {
+    clearDirty,
+    confirmDiscard,
+    hasUnsavedChanges,
+    markDirty,
+    prepareFormSubmission,
+  } = useUnsavedChangesGuard();
   const dirtyFormsRef = useRef<Set<HTMLFormElement>>(new Set());
   const unavailableAnalytics = <UnavailablePanel title="Analytics unavailable" />;
   const unavailableInquiries = <UnavailablePanel title="Inquiry inbox unavailable" />;
@@ -507,7 +516,13 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
     if (dirtyFormsRef.current.size === 0) clearDirty();
   }
 
-  function submitInquiryForm(form: HTMLFormElement) {
+  function submitInquiryForm(
+    form: HTMLFormElement,
+    submitter?: GuardedFormSubmitter,
+    onAccepted?: () => void
+  ) {
+    if (isGuardedFormResubmission(form)) return true;
+
     const otherDraftForms = [...dirtyFormsRef.current].filter(
       (dirtyForm) => dirtyForm !== form && dirtyForm.isConnected
     );
@@ -523,12 +538,8 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
 
     otherDraftForms.forEach((dirtyForm) => dirtyForm.reset());
     dirtyFormsRef.current.clear();
-    if (form.elements.namedItem("adminNotes")) {
-      dirtyFormsRef.current.add(form);
-    } else {
-      clearDirty();
-    }
-    return true;
+    onAccepted?.();
+    return prepareFormSubmission(form, submitter);
   }
 
   const classicSections: WorkspaceSection[] = [
@@ -622,13 +633,13 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
 
   function openSection(id: string) {
     if (id === activeSectionId) return true;
-    if (!confirmDiscard()) return false;
-    dirtyFormsRef.current.clear();
-    setActiveSectionId(id);
-    const currentState = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
-    window.history.replaceState({ ...currentState }, "", `${window.location.pathname}${window.location.search}#${id}`);
-    document.getElementById("analytics-workspace")?.scrollIntoView({ block: "start" });
-    return true;
+    return confirmDiscard(() => {
+      dirtyFormsRef.current.clear();
+      setActiveSectionId(id);
+      const currentState = window.history.state && typeof window.history.state === "object" ? window.history.state : {};
+      window.history.replaceState({ ...currentState }, "", `${window.location.pathname}${window.location.search}#${id}`);
+      document.getElementById("analytics-workspace")?.scrollIntoView({ block: "start" });
+    });
   }
 
   function onTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
