@@ -123,8 +123,10 @@ function ProgramPreview({
 
 export default function CncCodeShowcase({
   programs,
+  copy,
 }: {
   programs: readonly CncProgramDefinition[];
+  copy?: { eyebrow: string; title: string; body: string };
 }) {
   const visiblePrograms = useMemo(() => programs.slice(0, 3), [programs]);
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -155,16 +157,12 @@ export default function CncCodeShowcase({
 
       <div className="cnc-showcase-inner">
         <div className="cnc-showcase-copy" data-reveal="up">
-          <p className="cnc-showcase-kicker">ENGINEERING DETAIL / 01</p>
-          <h2 className={`${homeSectionHeadingClass} cnc-showcase-heading`}>
-            CODE, IN
-            <br />
-            MOTION.
+          <p className="cnc-showcase-kicker">{copy?.eyebrow ?? "ENGINEERING DETAIL / 01"}</p>
+          <h2 className={`${homeSectionHeadingClass} cnc-showcase-heading whitespace-pre-line`}>
+            {copy?.title ?? "CODE, IN\nMOTION."}
           </h2>
           <p className="cnc-showcase-intro">
-            The preview keeps HOME concise. The full viewer is built for long
-            programs, including the main sequence, M30 boundary and R/Q-driven
-            labels or subprograms below it.
+            {copy?.body ?? "The preview keeps HOME concise. The full viewer is built for long programs, including the main sequence, M30 boundary and R/Q-driven labels or subprograms below it."}
           </p>
           <div className="cnc-showcase-meta" aria-label="Code sample details">
             <span>{previewProgram.stats.sourceLines} LINES</span>

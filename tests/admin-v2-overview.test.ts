@@ -4,6 +4,7 @@ import {
   ADMIN_V2_DESTINATIONS,
   filterAdminV2Destinations,
 } from "@/lib/admin/v2-destinations";
+import { getAdminV2ActiveItem } from "@/lib/admin/v2-shell";
 
 const overviewPage = readFileSync(
   new URL("../app/admin/v2/page.tsx", import.meta.url),
@@ -38,6 +39,18 @@ const shell = readFileSync(
 );
 
 describe("Admin V2 destination finder", () => {
+  it("opens Home V2 from the finder and selects it in the sidebar", () => {
+    expect(filterAdminV2Destinations("homepage")[0]).toMatchObject({
+      id: "home",
+      href: "/admin/v2/pages/home",
+      badge: "1:1",
+    });
+    expect(getAdminV2ActiveItem("/admin/v2/pages/home").key).toBe("home");
+    expect(overviewPage).not.toContain('href="/admin/content#home"');
+    expect(overviewLoader).toContain("getAdminHomeEditorData()");
+    expect(overviewLoader).toContain("readiness: home");
+  });
+
   it("finds familiar English and Czech terms without inventing destinations", () => {
     expect(filterAdminV2Destinations("Spotify").map((item) => item.id)).toContain(
       "music"
@@ -51,9 +64,12 @@ describe("Admin V2 destination finder", () => {
     expect(filterAdminV2Destinations("heslo").map((item) => item.id)).toEqual([
       "access",
     ]);
-    expect(filterAdminV2Destinations("logo fonts").map((item) => item.id)).toEqual([
+    expect(filterAdminV2Destinations("fonts").map((item) => item.id)).toEqual([
       "brand",
     ]);
+    expect(filterAdminV2Destinations("logo").map((item) => item.id)).toEqual(["navbar"]);
+    expect(filterAdminV2Destinations("písmo")[0]).toMatchObject({ href: "/admin/v2/settings/appearance", badge: "V2" });
+    expect(filterAdminV2Destinations("jméno")[0]).toMatchObject({ href: "/admin/v2/navigation" });
     expect(filterAdminV2Destinations("hero video").map((item) => item.id)).toEqual([
       "showreel",
     ]);
@@ -157,13 +173,19 @@ describe("Admin V2 task-first overview", () => {
 });
 
 describe("Admin V2 Settings information architecture", () => {
+  it("opens the V2 Appearance editor from the overview shortcut", () => {
+    expect(overviewPage).toContain('href="/admin/v2/settings/appearance"');
+    expect(overviewPage).not.toContain('href="/admin/content#settings"');
+    expect(overviewPage).toContain('inline" /> Appearance');
+  });
+
   it("groups brand, access, security, audit, and technical health", () => {
-    expect(settingsPage).toContain("Brand &amp; appearance");
-    expect(settingsPage).toContain('href="/admin/content#settings"');
+    expect(settingsPage).toContain("Fonts &amp; appearance");
+    expect(settingsPage).toContain('href="/admin/v2/settings/appearance"');
     expect(settingsPage).toContain('href="/admin/v2/security#access"');
     expect(settingsPage).toContain('href="/admin/v2/security#activity"');
     expect(settingsPage).toContain('href="/admin/v2/security#configuration"');
-    expect(settingsPage).toContain("Classic editor");
+    expect(settingsPage).toContain("V2 · Live preview");
   });
 
   it("uses Settings as the sidebar home while keeping Security routes active", () => {

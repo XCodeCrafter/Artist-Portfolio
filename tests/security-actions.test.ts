@@ -318,4 +318,27 @@ describe("Admin Security actions", () => {
       "/admin/v2/security"
     );
   });
+
+  it("audits and refreshes a committed deactivation even if session revocation fails", async () => {
+    const service = createProfileSaveClient();
+    const rpc = vi.fn(async () => ({ error: { code: "XX000" } }));
+    actionMocks.createAdminServiceClient.mockReturnValue({ ...service.client, rpc });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expectRedirect(
+        saveAdminProfile(profileForm({ securitySurface: "v2", isActive: false })),
+        "/admin/v2/security?status=session-revoke-error#access"
+      );
+      expect(service.upsert).toHaveBeenCalledWith(expect.objectContaining({ is_active: false }));
+      expect(actionMocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+        action: "admin_profile_save", metadata: expect.objectContaining({ isActive: false }),
+      }));
+      expect(actionMocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+        action: "security_admin_session_revoke_failed",
+      }));
+      expect(actionMocks.revalidatePath).toHaveBeenCalledWith("/admin/v2/security");
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });

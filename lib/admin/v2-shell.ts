@@ -17,6 +17,13 @@ export const ADMIN_V2_NAVIGATION = [
     group: "Portfolio",
   },
   {
+    key: "home",
+    href: "/admin/v2/pages/home",
+    label: "Home page",
+    description: "Sections, order and content",
+    group: "Portfolio",
+  },
+  {
     key: "bio",
     href: "/admin/v2/pages/bio",
     label: "Bio page",
@@ -64,6 +71,13 @@ export const ADMIN_V2_NAVIGATION = [
     label: "Insights",
     description: "Traffic and engagement",
     group: "Work",
+  },
+  {
+    key: "appearance",
+    href: "/admin/v2/settings/appearance",
+    label: "Appearance",
+    description: "Fonts and footer light",
+    group: "Settings",
   },
   {
     key: "settings",

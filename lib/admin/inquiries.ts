@@ -39,6 +39,7 @@ export type BookingInquiry = {
   emailStatus: InquiryEmailStatus;
   emailStatusChangedAt: string;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type InquirySummary = {
@@ -78,12 +79,13 @@ type BookingInquiryRow = {
   email_status?: string | null;
   email_status_changed_at?: string | null;
   created_at: string;
+  updated_at?: string;
 };
 
 const INQUIRY_SELECT =
-  "id,name,email,message,portfolio_type,inquiry_type,inquiry_intent,status,admin_notes,email_status,email_status_changed_at,created_at";
+  "id,name,email,message,portfolio_type,inquiry_type,inquiry_intent,status,admin_notes,email_status,email_status_changed_at,created_at,updated_at";
 const LEGACY_INQUIRY_SELECT =
-  "id,name,email,message,portfolio_type,inquiry_type,status,admin_notes,created_at";
+  "id,name,email,message,portfolio_type,inquiry_type,status,admin_notes,created_at,updated_at";
 const OPTIONAL_INQUIRY_COLUMNS = [
   "inquiry_intent",
   "email_status",
@@ -126,6 +128,7 @@ function mapInquiry(row: BookingInquiryRow): BookingInquiry {
     inquiryIntent: normalizeStoredInquiryIntent(row.inquiry_intent),
     status: row.status,
     adminNotes: row.admin_notes,
+    updatedAt: row.updated_at || "",
     emailStatus: isInquiryEmailStatus(row.email_status)
       ? row.email_status
       : "unknown",

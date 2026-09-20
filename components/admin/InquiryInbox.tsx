@@ -21,6 +21,7 @@ import {
 } from "@/app/admin/v2/inbox/actions";
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
+import VersionedDraftNotice from "@/components/admin/VersionedDraftNotice";
 import useUnsavedChangesGuard, {
   getGuardedFormSubmitter,
   isGuardedFormResubmission,
@@ -39,6 +40,14 @@ import type {
   InquiryStatus,
 } from "@/lib/admin/inquiries";
 import { getStoredInquiryLabel } from "@/lib/inquiries";
+import {
+  createInquiryFormDraft,
+  discardInquiryFormDraft,
+  isInquiryDraftDiscardRequested,
+  parsePendingInquiryDraft,
+  pendingInquiryMatchesSaved,
+  type PendingInquiryDraft,
+} from "@/lib/admin/inquiry-drafts";
 
 const statusCopy: Record<string, string> = {
   deleted: "Inquiry deleted.",
@@ -48,6 +57,7 @@ const statusCopy: Record<string, string> = {
   invalid: "The inquiry update is invalid.",
   "missing-service": "Server-side Supabase admin access is unavailable.",
   "not-found": "That inquiry no longer exists. The Inbox has been refreshed.",
+  "write-conflict": "This inquiry changed or was removed in another session. Nothing was overwritten. Your draft was kept; compare it with the current saved notes before saving again.",
   saved: "Inquiry saved.",
   "saved-audit-warning":
     "Inquiry saved, but its audit record could not be verified. Review Security activity.",
@@ -67,13 +77,6 @@ const buttonClass =
 const dangerButtonClass =
   "inline-flex min-h-10 items-center justify-center rounded-xl border border-rose-300/22 px-4 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/12 disabled:cursor-not-allowed disabled:opacity-45";
 
-type PendingInquiryDraft = {
-  adminNotes: string;
-  id: string;
-  status: InquiryStatus;
-};
-
-const inquiryStatuses: InquiryStatus[] = ["new", "read", "replied", "archived"];
 const successfulInquiryNotices = new Set([
   "saved",
   "saved-audit-warning",
@@ -90,15 +93,20 @@ function persistPendingDraft(
   form: HTMLFormElement
 ) {
   const data = new FormData(form);
-  const id = String(data.get("id") || "");
-  const status = String(data.get("status") || "");
-  const adminNotes = String(data.get("adminNotes") || "");
-  if (!id || !inquiryStatuses.includes(status as InquiryStatus)) return;
+  const draft = parsePendingInquiryDraft({
+    id: String(data.get("id") || ""),
+    expectedUpdatedAt: String(data.get("expectedUpdatedAt") || ""),
+    status: String(data.get("status") || ""),
+    adminNotes: String(data.get("adminNotes") || ""),
+    initialStatus: form.dataset.initialStatus,
+    initialAdminNotes: form.dataset.initialAdminNotes,
+  });
+  if (!draft) return;
 
   try {
     window.sessionStorage.setItem(
       pendingDraftKey(surface),
-      JSON.stringify({ id, status, adminNotes })
+      JSON.stringify(draft)
     );
   } catch {
     // The in-page dirty guard still protects the draft if session storage is unavailable.
@@ -119,16 +127,12 @@ function readPendingDraft(
   try {
     const raw = window.sessionStorage.getItem(pendingDraftKey(surface));
     if (!raw) return null;
-    const draft = JSON.parse(raw) as Partial<PendingInquiryDraft>;
-    if (
-      typeof draft.id !== "string" ||
-      typeof draft.adminNotes !== "string" ||
-      !inquiryStatuses.includes(draft.status as InquiryStatus)
-    ) {
+    const draft = parsePendingInquiryDraft(JSON.parse(raw));
+    if (!draft) {
       clearPendingDraft(surface);
       return null;
     }
-    return draft as PendingInquiryDraft;
+    return draft;
   } catch {
     clearPendingDraft(surface);
     return null;
@@ -257,8 +261,8 @@ function InquiryCard({
   const deleteAction =
     surface === "v2" ? deleteV2Inquiry : deleteClassicInquiry;
   const updateFormRef = useRef<HTMLFormElement | null>(null);
-  const workflowStatusRef = useRef<HTMLSelectElement | null>(null);
-  const adminNotesRef = useRef<HTMLTextAreaElement | null>(null);
+  const [draft, setDraft] = useState(() => createInquiryFormDraft(inquiry));
+  const recoveredDraftRef = useRef(false);
   const onDirtyRef = useRef(onDirty);
 
   useEffect(() => {
@@ -269,34 +273,29 @@ function InquiryCard({
     if (updateFormRef.current) {
       onDirtyRef.current(updateFormRef.current);
     }
-  }, []);
+  }, [draft]);
 
   useEffect(() => {
-    if (resultStatus && successfulInquiryNotices.has(resultStatus)) {
-      clearPendingDraft(surface);
-      if (workflowStatusRef.current) {
-        workflowStatusRef.current.value = inquiry.status;
-      }
-      if (adminNotesRef.current) {
-        adminNotesRef.current.value = inquiry.adminNotes;
-      }
-      if (updateFormRef.current) {
-        onDirtyRef.current(updateFormRef.current);
-      }
-      return;
-    }
+    // Recover once with the draft's ORIGINAL version. A refresh or an old
+    // ?status=saved URL must never pair unsaved fields with newer server data.
+    if (recoveredDraftRef.current) return;
+    recoveredDraftRef.current = true;
     const recoveredDraft = readPendingDraft(surface);
     if (recoveredDraft?.id !== inquiry.id) return;
-    if (workflowStatusRef.current) {
-      workflowStatusRef.current.value = recoveredDraft.status;
+    if (resultStatus && successfulInquiryNotices.has(resultStatus) && pendingInquiryMatchesSaved(recoveredDraft, inquiry)) {
+      clearPendingDraft(surface);
+      return;
     }
-    if (adminNotesRef.current) {
-      adminNotesRef.current.value = recoveredDraft.adminNotes;
-    }
-    if (updateFormRef.current) {
-      onDirtyRef.current(updateFormRef.current);
-    }
-  }, [inquiry.adminNotes, inquiry.id, inquiry.status, resultStatus, surface]);
+    // Session storage is browser-only; hydrate its complete draft/version pair
+    // once after SSR, never in response to refreshed server props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDraft(recoveredDraft);
+  }, [inquiry, resultStatus, surface]);
+
+  function loadLatest() {
+    if (readPendingDraft(surface)?.id === inquiry.id) clearPendingDraft(surface);
+    setDraft(createInquiryFormDraft(inquiry));
+  }
 
   return (
     <AdminDisclosure
@@ -338,9 +337,16 @@ function InquiryCard({
         <form
           action={updateAction}
           className="mt-4"
-          data-initial-admin-notes={inquiry.adminNotes}
-          data-initial-status={inquiry.status}
+          data-initial-admin-notes={draft.initialAdminNotes}
+          data-initial-status={draft.initialStatus}
           onChangeCapture={(event) => onDirty(event.currentTarget)}
+          onReset={(event) => {
+            // React also resets forms after actions that redirect to a conflict
+            // or error. Only a confirmed explicit discard may clear the draft.
+            event.preventDefault();
+            if (!isInquiryDraftDiscardRequested(event.currentTarget)) return;
+            setDraft((current) => ({ ...current, status: current.initialStatus, adminNotes: current.initialAdminNotes }));
+          }}
           onSubmit={(event) => {
             if (
               !onSubmit(
@@ -356,6 +362,7 @@ function InquiryCard({
         >
           <fieldset disabled={disabled}>
             <input name="id" type="hidden" value={inquiry.id} />
+            <input name="expectedUpdatedAt" type="hidden" value={draft.expectedUpdatedAt} />
             <input name="page" type="hidden" value={page} />
             <input name="rangeDays" type="hidden" value={rangeDays} />
             <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
@@ -363,9 +370,9 @@ function InquiryCard({
                 <span className={labelClass}>Workflow status</span>
                 <select
                   className={inputClass}
-                  defaultValue={inquiry.status}
+                  value={draft.status}
                   name="status"
-                  ref={workflowStatusRef}
+                  onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as InquiryStatus }))}
                 >
                   <option value="new">New</option>
                   <option value="read">Read</option>
@@ -377,16 +384,22 @@ function InquiryCard({
                 <span className={labelClass}>Private notes</span>
                 <textarea
                   className={textareaClass}
-                  defaultValue={inquiry.adminNotes}
+                  value={draft.adminNotes}
                   maxLength={4000}
                   name="adminNotes"
-                  ref={adminNotesRef}
+                  onChange={(event) => setDraft((current) => ({ ...current, adminNotes: event.target.value }))}
                 />
                 <span className="mt-1 block text-[10px] text-white/30">
                   Only dashboard admins can see this note.
                 </span>
               </label>
             </div>
+            {draft.expectedUpdatedAt !== (inquiry.updatedAt || "") || resultStatus === "write-conflict" ? <aside className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/5 p-4 text-xs leading-5 text-amber-100/80">
+              <p className="font-semibold">Currently saved: {inquiry.status}</p>
+              <p className="mt-2 whitespace-pre-wrap break-words">{inquiry.adminNotes || "No saved private notes."}</p>
+              <p className="mt-2 mb-4">Your draft is in the fields above. Copy any changes you want to keep before loading the latest version.</p>
+              <VersionedDraftNotice onReload={loadLatest} />
+            </aside> : null}
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <a
                 className="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/10 px-4 text-sm font-semibold text-white/64 transition hover:bg-white hover:text-black"
@@ -426,6 +439,7 @@ function InquiryCard({
           }}
         >
           <input name="id" type="hidden" value={inquiry.id} />
+          <input name="expectedUpdatedAt" type="hidden" value={draft.expectedUpdatedAt} />
           <input name="page" type="hidden" value={page} />
           <input name="rangeDays" type="hidden" value={rangeDays} />
           <p className="max-w-sm text-right text-[10px] leading-4 text-white/28">
@@ -477,14 +491,6 @@ export function InquiryInboxView({
     "all"
   );
 
-  useEffect(() => {
-    if (
-      resultStatus &&
-      (successfulInquiryNotices.has(resultStatus) || resultStatus === "not-found")
-    ) {
-      clearPendingDraft(surface);
-    }
-  }, [resultStatus, surface]);
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return inquiries.filter((inquiry) => {
@@ -737,7 +743,7 @@ export default function InquiryInbox({
     ) {
       return false;
     }
-    otherDraftForms.forEach((dirtyForm) => dirtyForm.reset());
+    otherDraftForms.forEach(discardInquiryFormDraft);
     dirtyFormsRef.current.clear();
     onAccepted?.();
     return prepareFormSubmission(form, submitter);

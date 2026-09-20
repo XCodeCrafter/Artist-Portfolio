@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getPortfolioContent } from "@/lib/content";
+import { getPublishedHomeDraft } from "@/lib/content/home.server";
+import { withHomeSeoContent } from "@/lib/content/home-seo";
 import { getSeoIdentity } from "@/lib/seo";
 
 export const runtime = "edge";
@@ -8,7 +10,8 @@ export const contentType = "image/png";
 
 export default async function TwitterImage() {
   const content = await getPortfolioContent();
-  const { brandName, description, personName } = getSeoIdentity(content);
+  const home = await getPublishedHomeDraft(content);
+  const { brandName, description, personName } = getSeoIdentity(withHomeSeoContent(content, home));
 
   return new ImageResponse(
     (

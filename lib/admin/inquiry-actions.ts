@@ -15,14 +15,19 @@ import {
 } from "@/lib/admin/inquiry-routes";
 import { createAdminServiceClient } from "@/lib/admin/service";
 
+const expectedVersion = z.string().max(64).refine(
+  (value) => /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value))
+);
 const inquirySchema = z.object({
   id: z.string().uuid(),
+  expectedUpdatedAt: expectedVersion,
   status: z.enum(["new", "read", "replied", "archived"]),
   adminNotes: z.string().trim().max(4000),
 });
 
 const deleteSchema = z.object({
   id: z.string().uuid(),
+  expectedUpdatedAt: expectedVersion,
 });
 
 function formValue(formData: FormData, key: string) {
@@ -96,6 +101,7 @@ export async function updateInquiryOnSurface(
   const navigation = getNavigationContext(formData);
   const parsed = inquirySchema.safeParse({
     id: formValue(formData, "id"),
+    expectedUpdatedAt: formValue(formData, "expectedUpdatedAt"),
     status: formValue(formData, "status"),
     adminNotes: formValue(formData, "adminNotes"),
   });
@@ -110,6 +116,7 @@ export async function updateInquiryOnSurface(
       admin_notes: parsed.data.adminNotes,
     })
     .eq("id", parsed.data.id)
+    .eq("updated_at", parsed.data.expectedUpdatedAt)
     .select("id")
     .maybeSingle();
 
@@ -117,7 +124,7 @@ export async function updateInquiryOnSurface(
     console.error(result.error);
     redirectToStatus(surface, "save-error", navigation);
   }
-  if (!result.data) redirectToStatus(surface, "not-found", navigation);
+  if (!result.data) redirectToStatus(surface, "write-conflict", navigation);
 
   const auditOk = await writeInquiryAudit({
     actorId: admin.id,
@@ -142,6 +149,7 @@ export async function deleteInquiryOnSurface(
   const navigation = getNavigationContext(formData);
   const parsed = deleteSchema.safeParse({
     id: formValue(formData, "id"),
+    expectedUpdatedAt: formValue(formData, "expectedUpdatedAt"),
   });
 
   if (!parsed.success) redirectToStatus(surface, "invalid", navigation);
@@ -151,6 +159,7 @@ export async function deleteInquiryOnSurface(
     .from("booking_inquiries")
     .delete()
     .eq("id", parsed.data.id)
+    .eq("updated_at", parsed.data.expectedUpdatedAt)
     .select("id")
     .maybeSingle();
 
@@ -158,7 +167,7 @@ export async function deleteInquiryOnSurface(
     console.error(result.error);
     redirectToStatus(surface, "delete-error", navigation);
   }
-  if (!result.data) redirectToStatus(surface, "not-found", navigation);
+  if (!result.data) redirectToStatus(surface, "write-conflict", navigation);
 
   const auditOk = await writeInquiryAudit({
     actorId: admin.id,

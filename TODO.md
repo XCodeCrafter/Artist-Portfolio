@@ -477,7 +477,7 @@ Acceptance:
 ## Batch 7A - Provider-neutral media delivery and Media Optimizer V2
 
 Status: Batch 7A.2e isolated ImageKit V2 authority core complete; authenticated
-issuance, migration 0037, and atomic finalization pending
+issuance, the lifecycle migration, and atomic finalization pending
 
 ### Batch 7A.1 - Immediate traffic and persistence foundation
 
@@ -553,7 +553,7 @@ Small, reviewable rollout steps:
       overwrite=false, public-delivery policy, and expiry for one future v2
       database intent. ImageKit marks Upload V2 as beta, so the adapter remains
       unreferenced by live server actions and UI while Supabase stays active.
-- [ ] **7A.2f — migration 0037 and authenticated lifecycle:** add canonical
+- [ ] **7A.2f — lifecycle migration and authenticated lifecycle:** add canonical
       MIME-specific extensions and service-only prepare/resolve/cancel/fail
       RPCs; issue the V2 authority only after AAL2 admin, exact-origin,
       same-account, intent, and rate-limit checks. Resolve ImageKit
@@ -605,7 +605,7 @@ Batch 7A.2d-2e verification:
   wiring remains pending.
 - The existing Admin Media Library still calls only Supabase
   `uploadToSignedUrl`. `IMAGEKIT_PILOT_UPLOAD_ENABLED` stays false until
-  same-account preflight, migration `0037`, authenticated issuance, server-side
+  same-account preflight, the lifecycle migration, authenticated issuance, server-side
   byte verification, atomic finalization, and orphan cleanup are complete.
 
 ### Batch 7A.3 - Media Optimizer workspace
@@ -966,18 +966,97 @@ Acceptance:
 
 ## Batch 9 - HOME cleanup and 1:1 editor
 
-Status: deferred by agreement
+Status: HOME V2 implementation verified on 2026-09-20; manual migration 0037
+and a live save/refresh test remain pending.
 
-- [ ] Inventory Hero, About, CNC, Interlude, Stories, Gallery teaser, Music teaser,
-      and Footer responsibilities.
+Implemented: HOME V2 preview/inspector with independent visibility and order
+for Hero, About, CNC / Code in motion, video feature, and Stories; editable copy
+and Media Library selection. Hiding a section keeps its content. The shared
+Footer remains in global settings and CNC program files keep their existing
+manager. Preserve current content and ordering during the migration.
+
+Resume afterwards: ImageKit Batch 7A.2f (authenticated upload lifecycle), then
+7A.2g pilot, optimizer, and controlled media cutover. Gmail notifications in
+Batch 7B remain pending; neither provider configuration nor delivery has been
+activated by this HOME work. Migration 0037 is now allocated to HOME; the
+previously planned ImageKit migration remains unnumbered until implementation.
+Migration 0038 is now allocated to the admin hardening follow-up below.
+
+- [x] Inventory the current five rendered HOME sections: Hero, About, CNC,
+      Interlude, and Stories. Footer remains global; unused legacy update/teaser
+      fields remain intact and do not appear as misleading editor controls.
 - [ ] Remove duplicate or obsolete HOME concepts only after content review.
-- [ ] Build the HOME editor from the accepted V2 visual-editor pattern.
-- [ ] Keep the public layout coherent throughout the cleanup.
+- [x] Build the HOME editor from the accepted V2 visual-editor pattern with
+      shared public/preview components, desktop/mobile preview, a contextual
+      inspector, and section-scoped save/discard.
+- [x] Add visibility switches and keyboard-accessible order buttons. Hiding
+      content never erases it; hidden media remain reference-protected.
+- [x] Add editable Hero media/copy, About photo/copy, CNC presentation, feature
+      video/poster/copy, and all four Stories images/texts.
+- [x] Add optimistic page versions, service-only validated save RPCs, audit,
+      strict preview messaging, and a Classic HOME write handoff.
+- [x] Keep the public layout working with legacy data until migration 0037.
+- [x] Verify 592 unit/integration tests (69 files), TypeScript, ESLint and
+      production build. Execute migration 0037 and its read-only checks on an
+      isolated in-memory PostgreSQL engine (PGlite), including repeat rollout,
+      conflict rejection, role permissions, input validation and media references.
+- [x] Verify authenticated desktop preview selection, responsive 390 px mobile
+      inspector, Escape/focus return, missing-migration notice and clean browser
+      error/warning console. No production content was saved during browser QA.
+- [ ] Apply `0037_home_page_editor.sql` manually, then run
+      `supabase/checks/0037_home_page_editor.sql` (all checks should be true).
+      Do not use `supabase db push` while CLI migration history is unreconciled.
+- [ ] After migration, test a reversible HOME hide/reorder/edit/save/refresh in
+      the authenticated browser and confirm the public page reflects it.
 
 Acceptance:
 
 - HOME has an agreed section order and a single clear editing workflow.
 - No legacy HOME content is deleted without explicit approval.
+
+## Batch 9B - Admin hardening, owner name and Appearance V2
+
+Status: implemented 2026-09-20; local validation recorded in
+`docs/admin-audit-2026-09-20.md`. No remote SQL, publication, provider setup,
+account revocation, or GitHub push was performed by this batch.
+
+- [x] Add owner/artist name editor directly to Navbar with scoped save,
+      canonical response, stale-write rejection and shared unsaved-change guard.
+- [x] Add dedicated Appearance V2 page, sidebar entry, Settings and search links:
+      Display/Body/UI font choices plus actual white-soul/red-light footer preview.
+- [x] Require admin + MFA + Origin verification and strict allowlists on writes.
+- [x] Update vulnerable runtime/tooling dependencies; npm audit reports zero.
+- [x] Prepare migration 0038 for live-session checks in server auth and RLS,
+      atomic single recovery-challenge issuance and a visible pre-migration warning.
+- [x] Protect logout origin/audit and rate-limit MFA enrollment.
+- [x] Close Classic write bypasses into active Bio/Music/Gallery/social V2 editors.
+- [x] Add version checks for Classic settings, Inbox updates/deletes and media metadata.
+- [x] Keep legacy draft values and timestamps coherent across server refreshes;
+      preserve rejected drafts from React action resets; explicit confirmed reload
+      is the only way legacy forms adopt a changed version.
+- [x] Bind upload finalization to signed expiring per-admin proof; never delete
+      existing storage objects after a failed/replayed finalize request.
+- [x] Check all main V2 pages and retained V1 dashboard/content/media/analytics/security
+      in the authenticated browser without publishing test content.
+- [x] Verify desktop/mobile Navbar and Appearance, explicit discard, sidebar,
+      navigation Escape/focus, 777 tests in 78 files, TypeScript, ESLint,
+      production build, zero npm audit findings and isolated PostgreSQL 0037/0038 checks.
+- [ ] Apply 0037 (HOME) if still pending, then 0038 (admin hardening); run both
+      matching files in `supabase/checks/`. Do not use `db push` while remote CLI
+      history is unreconciled. Browser confirmed both are pending in this environment.
+- [ ] After deployment, verify actual save/refresh/public reflection for owner name,
+      Appearance and HOME with owner-approved content; verify revocation using a
+      disposable second admin session, not the owner's only active session.
+- [ ] Complete browser-native discard-dialog confirmation test; in-app browser
+      control became unresponsive in that test tab after opening the native prompt.
+- [ ] Continue ImageKit 7A.2f, then its pilot/optimizer/cutover; leave the provider
+      on Supabase and pilot disabled until validated. Allocate next free migration number.
+- [ ] Resume Gmail notification delivery (7B); configure client-owned Resend sender,
+      Gmail recipient, webhook, retention scheduler and deep-health monitor secrets.
+- [ ] Finish production Auth settings review and eventual retirement of broad
+      active-admin legacy direct writes after V1 cutover (Batch 10).
+- [ ] Add bounded ownership-proven orphan-upload cleanup; failed finalizations now
+      safely retain files instead of guessing which object can be deleted.
 
 ## Batch 10 - QA, migration, and cutover
 

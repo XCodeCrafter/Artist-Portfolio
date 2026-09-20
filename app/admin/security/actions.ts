@@ -161,13 +161,6 @@ export async function saveAdminProfile(formData: FormData) {
     redirectToStatus("save-error", surface);
   }
 
-  if (
-    !parsed.data.isActive &&
-    !(await revokeSessions(supabase, admin.id, parsed.data.userId))
-  ) {
-    redirectToStatus("session-revoke-error", surface);
-  }
-
   const auditResult = await writeAuditLog({
     actorId: admin.id,
     action: "admin_profile_save",
@@ -181,6 +174,15 @@ export async function saveAdminProfile(formData: FormData) {
   });
 
   revalidateSecurityViews();
+  // Deactivation has already committed. Preserve its audit entry and refresh
+  // the displayed profile even when the subsequent Auth revocation fails.
+  if (
+    !parsed.data.isActive &&
+    !(await revokeSessions(supabase, admin.id, parsed.data.userId))
+  ) {
+    redirectToStatus("session-revoke-error", surface);
+  }
+
   redirectToStatus(
     auditResult.ok ? "saved" : "saved-audit-warning",
     surface
@@ -280,8 +282,9 @@ export async function resetAdminMfa(formData: FormData) {
   });
   if (factors.error) redirectToStatus("mfa-reset-error", surface);
 
-  // Revoke first: if the database RPC is unavailable, no factor is removed
-  // while an existing aal2 session remains usable.
+  // Revoke first: if the RPC is unavailable, leave all factors intact. The
+  // 0038 live-session boundary makes this immediate for subsequent requests;
+  // pending that migration, existing signed JWTs may last until expiry.
   const revokedSessions = await supabase.rpc("revoke_admin_user_sessions", {
     target_user_id: parsed.data.userId,
   });

@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminBioEditorData } from "@/lib/admin/bio";
 import { getAdminContactEditorData } from "@/lib/admin/contact";
 import { getAdminGalleryEditorData } from "@/lib/admin/gallery";
+import { getAdminHomeEditorData } from "@/lib/admin/home";
 import { getAdminNewInquiryCount } from "@/lib/admin/inquiries";
 import { getAdminMusicEditorData } from "@/lib/admin/music";
 import { getAdminNavigationData } from "@/lib/admin/navigation";
@@ -58,7 +59,7 @@ type EditorReadiness = {
 };
 
 type EditorDefinition = {
-  key: Exclude<AdminV2PageSummary["key"], "home">;
+  key: AdminV2PageSummary["key"];
   label: string;
   description: string;
   editorHref: string;
@@ -116,9 +117,10 @@ function sortIssues(issues: AdminV2OverviewIssue[]) {
 export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
   await requireAdmin();
 
-  const [navigation, bio, gallery, showreel, music, contact, inbox] =
+  const [navigation, home, bio, gallery, showreel, music, contact, inbox] =
     await Promise.all([
       getAdminNavigationData(),
+      getAdminHomeEditorData(),
       getAdminBioEditorData(),
       getAdminGalleryEditorData(),
       getAdminShowreelEditorData(),
@@ -154,6 +156,16 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
   };
 
   const editors: EditorDefinition[] = [
+    {
+      key: "home",
+      label: "Home",
+      description: "Section order, visibility, text, and images.",
+      editorHref: "/admin/v2/pages/home",
+      publicHref: "/",
+      migrationLabel: "The Home V2 database migration (0037)",
+      readiness: home,
+      navigationKey: "home",
+    },
     {
       key: "bio",
       label: "Bio",
@@ -290,28 +302,17 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
     });
   }
 
-  const pages: AdminV2PageSummary[] = [
-    {
-      key: "home",
-      label: "Home",
-      description: "Homepage hero and all landing-page sections.",
-      editorHref: "/admin/content#home",
-      publicHref: "/",
-      editorState: "classic",
-      navbarState: navbarStateFor("home"),
-    },
-    ...editors.map(
-      (editor): AdminV2PageSummary => ({
-        key: editor.key,
-        label: editor.label,
-        description: editor.description,
-        editorHref: editor.editorHref,
-        publicHref: editor.publicHref,
-        editorState: getEditorState(editor.readiness),
-        navbarState: navbarStateFor(editor.navigationKey),
-      })
-    ),
-  ];
+  const pages: AdminV2PageSummary[] = editors.map(
+    (editor): AdminV2PageSummary => ({
+      key: editor.key,
+      label: editor.label,
+      description: editor.description,
+      editorHref: editor.editorHref,
+      publicHref: editor.publicHref,
+      editorState: getEditorState(editor.readiness),
+      navbarState: navbarStateFor(editor.navigationKey),
+    })
+  );
 
   return {
     issues: sortIssues(issues),

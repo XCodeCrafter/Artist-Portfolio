@@ -5,6 +5,8 @@ import { updateSession } from "@/lib/supabase/proxy";
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const previewRoutes = new Set([
+    "/admin/v2-preview/home",
+    "/admin/v2-preview/home/",
     "/admin/v2-preview/bio",
     "/admin/v2-preview/bio/",
     "/admin/v2-preview/gallery",

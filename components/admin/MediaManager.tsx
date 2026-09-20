@@ -37,6 +37,8 @@ import CopyButton from "@/components/admin/CopyButton";
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
+import VersionedDraftNotice from "@/components/admin/VersionedDraftNotice";
+import useVersionedFormSnapshot from "@/components/admin/useVersionedFormSnapshot";
 import useUnsavedChangesGuard, {
   getGuardedFormSubmitter,
   isGuardedFormResubmission,
@@ -158,6 +160,7 @@ const statusCopy: Record<string, string> = {
   "upload-error": "Upload failed.",
   uploaded: "Media uploaded.",
   updated: "Media updated.",
+  "media-write-conflict": "This media item changed or moved to trash in another session. Nothing was overwritten. Review the latest item and try again.",
 };
 
 const sectionClass =
@@ -1264,6 +1267,8 @@ function AssetCard({
   portfolioType: PortfolioType;
   usage: string[];
 }) {
+  const { snapshot: metadata, revision, hasNewVersion, loadLatest } = useVersionedFormSnapshot(asset);
+
   return (
     <article className={cardClass}>
       <div className="relative aspect-video overflow-hidden rounded-[20px] border border-white/10 bg-black/40">
@@ -1316,6 +1321,7 @@ function AssetCard({
         title="Edit details & placement"
         variant="advanced"
       >
+      {hasNewVersion ? <VersionedDraftNotice onReload={loadLatest} /> : null}
       {asset.deletedAt ? (
         <div className="flex flex-col gap-4 rounded-2xl border border-amber-300/15 bg-amber-300/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1337,24 +1343,25 @@ function AssetCard({
         </div>
       ) : (
       <>
-      <form action={updateMediaAsset}>
+      <form action={updateMediaAsset} key={revision} onReset={(event) => event.preventDefault()}>
+        <input name="expectedUpdatedAt" type="hidden" value={metadata.updatedAt} />
         <fieldset disabled={disabled}>
           <input name="id" type="hidden" value={asset.id} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Label">
-              <TextInput defaultValue={asset.label} name="label" required />
+              <TextInput defaultValue={metadata.label} name="label" required />
             </Field>
             <Field label="Alt text">
-              <TextInput defaultValue={asset.alt} name="alt" />
+              <TextInput defaultValue={metadata.alt} name="alt" />
             </Field>
             <Field label="Internal note" wide>
-              <TextInput defaultValue={asset.usageKey} name="usageKey" />
+              <TextInput defaultValue={metadata.usageKey} name="usageKey" />
             </Field>
           </div>
           <div className="mt-4">
             <PublishedAndOrder
-              isPublished={asset.isPublished}
-              sortOrder={asset.sortOrder}
+              isPublished={metadata.isPublished}
+              sortOrder={metadata.sortOrder}
             />
           </div>
           <div className="mt-5 flex justify-end">
@@ -1696,6 +1703,13 @@ function StudioImageEditor({
             </label>
           </div>
           <Field label="Story order"><TextInput defaultValue={item.freelanceStoryOrder} name="freelanceStoryOrder" type="number" /></Field>
+          <p className="mt-3 text-xs leading-5 text-white/45">
+            Freelancer story selection here applies to legacy Home. Once Home V2
+            is set up, manage its story images in{" "}
+            <Link className="text-white underline underline-offset-4" href="/admin/v2/pages/home">
+              Home V2
+            </Link>.
+          </p>
           <div className="mt-4 flex justify-end"><ActionButton className={buttonClass} disabled={disabled} pendingLabel="Saving...">Save frame</ActionButton></div>
         </fieldset>
       </form>

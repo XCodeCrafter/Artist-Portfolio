@@ -45,6 +45,29 @@ export async function startMfaEnrollment(
     return { ok: false, message: "Your sign-in session expired. Sign in again." };
   }
 
+  const rateLimit = await enforceAuthRateLimit("mfa-enrollment", admin.email);
+  if (!rateLimit.allowed) {
+    if (rateLimit.firstDenied) {
+      await writeAuditLog({
+        actorId: admin.id,
+        action: "security_admin_mfa_rate_limited",
+        tableName: "security_events",
+        recordId: admin.id,
+        metadata: {
+          ...rateLimit.auditMetadata,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        },
+      });
+    }
+
+    return {
+      ok: false,
+      message: rateLimit.configured
+        ? "Too many authenticator setup attempts. Wait a few minutes and try again."
+        : "Admin verification security is not configured.",
+    };
+  }
+
   const supabase = await createClient();
   const factors = await supabase.auth.mfa.listFactors();
   if (factors.error) {
@@ -60,7 +83,10 @@ export async function startMfaEnrollment(
 
   for (const factor of factors.data.all) {
     if (factor.factor_type === "totp" && factor.status === "unverified") {
-      await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      const removed = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      if (removed.error) {
+        return { ok: false, message: "Authenticator setup could not be started." };
+      }
     }
   }
 

@@ -13,6 +13,8 @@ import { hasProductionSiteUrl } from "@/lib/site-url";
 import { probeDatabaseRateLimit } from "@/lib/security/rate-limit";
 import { NAVIGATION_DESTINATION_KEYS } from "@/lib/content/navigation";
 import { getMediaUploadConfigSummary } from "@/lib/admin/media-upload-config";
+import { parseHomeEditorSnapshot } from "@/lib/admin/home-editor";
+import { probeAdminSessionBoundary } from "@/lib/admin/session-security";
 
 export type ReadinessCheck = {
   id: string;
@@ -153,6 +155,7 @@ async function inspectSupabase() {
       settingsResult,
       navigationManagerResult,
       navbarSocialLinksResult,
+      homeEditorResult,
       musicEditorResult,
       bioEditorResult,
       galleryEditorResult,
@@ -183,6 +186,7 @@ async function inspectSupabase() {
       supabase.rpc("get_navbar_social_links_v2_snapshot", {
         p_site_id: "main",
       }),
+      supabase.rpc("get_home_page_v2_snapshot", { p_site_id: "main" }),
       supabase.rpc("get_music_page_v2_snapshot", { p_site_id: "main" }),
       supabase.rpc("get_bio_page_v2_snapshot", { p_site_id: "main" }),
       supabase.rpc("get_gallery_page_v2_snapshot", { p_site_id: "main" }),
@@ -274,6 +278,7 @@ async function inspectSupabase() {
       settingsResult,
       navigationManagerResult,
       navbarSocialLinksResult,
+      homeEditorResult,
       musicEditorResult,
       bioEditorResult,
       galleryEditorResult,
@@ -288,6 +293,7 @@ async function inspectSupabase() {
       recoveryResult,
     ].every((result) => !result.error) &&
       navigationCatalogOk &&
+      Boolean(parseHomeEditorSnapshot(homeEditorResult.data)) &&
       contactSaveRpcsOk &&
       mediaPipelineRpcOk;
 
@@ -326,7 +332,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
   const authConfigured = hasSupabaseBrowserEnv();
   const serviceConfigured = hasAdminServiceEnv();
   const externalMedia = getExternalMediaDeliveryReadiness();
-  const [supabase, publicSignupDisabled] = await Promise.all([
+  const [supabase, publicSignupDisabled, sessionBoundaryReady] = await Promise.all([
     serviceConfigured
       ? inspectSupabase()
       : Promise.resolve({
@@ -336,6 +342,7 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
           rateLimitOk: false,
         }),
     inspectAuthSettings(),
+    probeAdminSessionBoundary(),
   ]);
 
   const checks: ReadinessCheck[] = [
@@ -372,11 +379,11 @@ export async function getProductionReadiness(): Promise<ProductionReadiness> {
     {
       id: "database-schema",
       label: "Database migrations",
-      ok: supabase.schemaOk,
+      ok: supabase.schemaOk && sessionBoundaryReady,
       critical: true,
-      detail: supabase.schemaOk
+      detail: supabase.schemaOk && sessionBoundaryReady
         ? "Required tables and columns are available."
-        : "Apply all current Supabase migrations through 0035.",
+        : "Apply all current Supabase migrations through 0038, including Home V2 and admin session hardening.",
       href: "/admin/security#health",
     },
     {

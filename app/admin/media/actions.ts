@@ -9,6 +9,7 @@ import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { requireAdmin } from "@/lib/admin/auth";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { createAdminServiceClient } from "@/lib/admin/service";
+import { hasAuthSecuritySecret, keyedDigest, safeDigestEqual } from "@/lib/admin/security-secret";
 import {
   ensureMediaBucket,
   getMediaKind,
@@ -448,17 +449,12 @@ async function getWriteContext() {
   return { admin, supabase };
 }
 
-type PrepareMediaUploadInput = {
-  id?: string;
-  label: string;
-  alt: string;
-  usageKey: string;
-  sortOrder: number;
-  isPublished: boolean;
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-};
+const prepareUploadSchema = uploadMetadataSchema.extend({
+  label: z.string().trim().max(220),
+  fileName: z.string().trim().min(1).max(260),
+  fileSize: z.number().int().positive().safe(),
+  mimeType: z.string().trim().min(1).max(120),
+});
 
 const finalizeUploadSchema = z.object({
   id: idValue,
@@ -472,9 +468,30 @@ const finalizeUploadSchema = z.object({
   fileName: z.string().trim().min(1).max(260),
   fileSize: z.coerce.number().int().positive(),
   mimeType: z.string().trim().min(1).max(120),
+  uploadExpiresAt: z.number().int().positive().safe(),
+  uploadProof: z.string().regex(/^[a-f0-9]{64}$/),
 });
 
-export async function prepareMediaUpload(input: PrepareMediaUploadInput) {
+function uploadProof(adminId: string, ticket: {
+  id: string; storagePath: string; mimeType: string; fileSize: number;
+  mediaType: string; uploadExpiresAt: number;
+}) {
+  return keyedDigest("media-upload-finalization-v1", JSON.stringify([
+    adminId, MEDIA_BUCKET, ticket.id, ticket.storagePath, ticket.mimeType,
+    ticket.fileSize, ticket.mediaType, ticket.uploadExpiresAt,
+  ]));
+}
+
+export async function prepareMediaUpload(value: unknown) {
+  const { admin, supabase } = await getWriteContext();
+  if (!hasAuthSecuritySecret()) {
+    return { ok: false as const, error: "Secure upload signing is not configured." };
+  }
+  const preparation = prepareUploadSchema.safeParse(value);
+  if (!preparation.success) {
+    return { ok: false as const, error: "Upload details need attention." };
+  }
+  const input = preparation.data;
   const mediaKind = getMediaKind(input.mimeType);
   if (!mediaKind) {
     return { ok: false as const, error: "Unsupported file type." };
@@ -501,19 +518,14 @@ export async function prepareMediaUpload(input: PrepareMediaUploadInput) {
     return { ok: false as const, error: "Media metadata needs attention." };
   }
 
-  const { supabase } = await getWriteContext();
   const bucketResult = await ensureMediaBucket(supabase);
   if (bucketResult.error) {
     console.error(bucketResult.error);
     return { ok: false as const, error: "Storage bucket could not be prepared." };
   }
 
-  const id =
-    parsed.data.id ||
-    `${slugify(parsed.data.label || input.fileName, "media")}-${randomUUID().slice(
-      0,
-      8
-    )}`;
+  // A caller can name an upload, but can never claim an existing object key.
+  const id = `${slugify(parsed.data.id || parsed.data.label || input.fileName, "media").slice(0, 60)}-${randomUUID()}`;
   const extension = getExtension(input.mimeType);
   const storagePath = `${mediaKind}/${id}.${extension}`;
   const signedUpload = await supabase.storage
@@ -525,6 +537,11 @@ export async function prepareMediaUpload(input: PrepareMediaUploadInput) {
     return { ok: false as const, error: "Secure upload could not be prepared." };
   }
 
+  const uploadExpiresAt = Date.now() + 60 * 60 * 1000;
+  const proof = uploadProof(admin.id, {
+    id, storagePath, mimeType: input.mimeType, fileSize: input.fileSize,
+    mediaType: mediaKind, uploadExpiresAt,
+  });
   return {
     ok: true as const,
     ticket: {
@@ -541,26 +558,34 @@ export async function prepareMediaUpload(input: PrepareMediaUploadInput) {
       fileSize: input.fileSize,
       mimeType: input.mimeType,
       token: signedUpload.data.token,
+      uploadExpiresAt,
+      uploadProof: proof,
     },
   };
 }
 
 export async function finalizeMediaUpload(input: unknown) {
+  const { admin, supabase } = await getWriteContext();
   const parsed = finalizeUploadSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false as const, error: "Uploaded media metadata is invalid." };
   }
 
-  const expectedPrefix = `${parsed.data.mediaType}/${parsed.data.id}.`;
   if (
-    !parsed.data.storagePath.startsWith(expectedPrefix) ||
+    parsed.data.uploadExpiresAt <= Date.now() ||
+    !safeDigestEqual(parsed.data.uploadProof, uploadProof(admin.id, parsed.data))
+  ) {
+    return { ok: false as const, error: "This upload ticket is invalid or expired. Start the upload again." };
+  }
+  const expectedPath = `${parsed.data.mediaType}/${parsed.data.id}.${getExtension(parsed.data.mimeType)}`;
+  if (
+    parsed.data.storagePath !== expectedPath ||
     getMediaKind(parsed.data.mimeType) !== parsed.data.mediaType ||
     parsed.data.fileSize > getMediaSizeLimit(parsed.data.mimeType)
   ) {
     return { ok: false as const, error: "Uploaded media path is invalid." };
   }
 
-  const { admin, supabase } = await getWriteContext();
   const pathParts = parsed.data.storagePath.split("/");
   const fileName = pathParts.pop() || "";
   const folder = pathParts.join("/");
@@ -604,7 +629,8 @@ export async function finalizeMediaUpload(input: unknown) {
     verifiedMimeType !== parsed.data.mimeType ||
     getMediaKind(verifiedMimeType) !== parsed.data.mediaType
   ) {
-    await supabase.storage.from(MEDIA_BUCKET).remove([parsed.data.storagePath]);
+    // Do not physically delete from a failure path: this ticket may be a replay
+    // of a successfully registered upload. Cleanup needs durable ownership.
     await writeAuditLog({
       actorId: admin.id,
       action: "security_admin_media_upload_rejected",
@@ -639,7 +665,8 @@ export async function finalizeMediaUpload(input: unknown) {
   });
 
   if (insertResult.error) {
-    await supabase.storage.from(MEDIA_BUCKET).remove([parsed.data.storagePath]);
+    // An insert can fail after another retry has already registered this file.
+    // Retain the object; permanent cleanup must prove it is still unreferenced.
     console.error("Media asset insert failed after upload verification.", {
       code: insertResult.error.code || "unknown",
       message: insertResult.error.message,
@@ -668,7 +695,12 @@ export async function finalizeMediaUpload(input: unknown) {
 }
 
 export async function updateMediaAsset(formData: FormData) {
-  const parsed = mediaMetadataSchema.safeParse({
+  const parsed = mediaMetadataSchema.extend({
+    expectedUpdatedAt: z.string().max(64).refine(
+      (value) => /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value))
+    ),
+  }).safeParse({
+    expectedUpdatedAt: formValue(formData, "expectedUpdatedAt"),
     id: formValue(formData, "id"),
     label: formValue(formData, "label"),
     alt: formValue(formData, "alt"),
@@ -689,12 +721,17 @@ export async function updateMediaAsset(formData: FormData) {
       sort_order: parsed.data.sortOrder,
       is_published: parsed.data.isPublished,
     })
-    .eq("id", parsed.data.id);
+    .eq("id", parsed.data.id)
+    .eq("updated_at", parsed.data.expectedUpdatedAt)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (result.error) {
     console.error(result.error);
     redirectToStatus("save-error", "library");
   }
+  if (!result.data) redirectToStatus("media-write-conflict", "library");
 
   await writeAuditLog({
     actorId: admin.id,

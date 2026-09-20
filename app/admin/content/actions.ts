@@ -9,6 +9,11 @@ import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { requireAdmin } from "@/lib/admin/auth";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { createAdminServiceClient } from "@/lib/admin/service";
+import { parseHomeEditorSnapshot } from "@/lib/admin/home-editor";
+import { parseBioEditorSnapshot } from "@/lib/admin/bio-editor";
+import { parseMusicEditorSnapshot } from "@/lib/admin/music-editor";
+import { parseGalleryEditorSnapshot } from "@/lib/admin/gallery-editor";
+import { parseNavbarSocialLinksSnapshot } from "@/lib/admin/navbar-social-links-editor";
 import {
   PAGE_SLUGS,
   getProfilePublicModules,
@@ -647,6 +652,60 @@ async function handOffLegacyContactWrite(supabase: SupabaseClient) {
   }
 }
 
+async function handOffLegacyHomeWrite(
+  supabase: SupabaseClient,
+  section: string
+) {
+  const { data, error } = await supabase.rpc("get_home_page_v2_snapshot", {
+    p_site_id: "main",
+  });
+  if (error) {
+    const message = [error.message, error.details, error.hint]
+      .filter(Boolean)
+      .join(" ");
+    const missingSnapshot =
+      error.code === "PGRST202" ||
+      (error.code === "42883" && /get_home_page_v2_snapshot/i.test(message));
+    if (missingSnapshot) return;
+    redirectToStatus("home-v2-unavailable", section);
+  }
+
+  if (!parseHomeEditorSnapshot(data)) {
+    redirectToStatus("home-v2-unavailable", section);
+  }
+  redirect("/admin/v2/pages/home?from=classic");
+}
+
+async function handOffLegacyV2Write(
+  supabase: SupabaseClient,
+  editor: "bio" | "music" | "gallery" | "socials",
+  section: string
+) {
+  const definitions = {
+    bio: { rpc: "get_bio_page_v2_snapshot", href: "/admin/v2/pages/bio", parse: parseBioEditorSnapshot },
+    music: { rpc: "get_music_page_v2_snapshot", href: "/admin/v2/pages/music", parse: parseMusicEditorSnapshot },
+    gallery: { rpc: "get_gallery_page_v2_snapshot", href: "/admin/v2/pages/gallery", parse: parseGalleryEditorSnapshot },
+    socials: { rpc: "get_navbar_social_links_v2_snapshot", href: "/admin/v2/navigation", parse: parseNavbarSocialLinksSnapshot },
+  };
+  const target = definitions[editor];
+  const { data, error } = await supabase.rpc(target.rpc, { p_site_id: "main" });
+  if (error) {
+    const message = [error.message, error.details, error.hint].filter(Boolean).join(" ");
+    if (error.code === "PGRST202" || (error.code === "42883" && message.includes(target.rpc))) return;
+    redirectToStatus("v2-unavailable", section);
+  }
+  if (!target.parse(data)) redirectToStatus("v2-unavailable", section);
+  redirect(`${target.href}?from=classic`);
+}
+
+function settingsVersion(formData: FormData, section: string) {
+  const parsed = z.string().max(64).refine(
+    (value) => /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value))
+  ).safeParse(formValue(formData, "expectedUpdatedAt"));
+  if (!parsed.success) redirectToStatus("settings-write-conflict", section);
+  return parsed.data;
+}
+
 async function assertMutation(
   result: { error: { message?: string } | null },
   section: string
@@ -688,18 +747,16 @@ export async function updateBrandIdentitySettings(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-brand-settings", section);
 
   const { admin, supabase } = await getWriteContext(section);
-  const result = await supabase.from("site_settings").upsert(
-    {
-      id: "main",
+  const expectedUpdatedAt = settingsVersion(formData, section);
+  const result = await supabase.from("site_settings").update({
       portfolio_type: parsed.data.portfolioType,
       artist_name: parsed.data.artistName,
       tagline: parsed.data.tagline,
       description: parsed.data.description,
-    },
-    { onConflict: "id" }
-  );
+    }).eq("id", "main").eq("updated_at", expectedUpdatedAt).select("id").maybeSingle();
 
   await assertMutation(result, section);
+  if (!result.data) redirectToStatus("settings-write-conflict", section);
   await writeAuditLog({
     actorId: admin.id,
     action: "content_update",
@@ -723,6 +780,7 @@ export async function updateTypographySettings(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-brand-settings", section);
 
   const { admin, supabase } = await getWriteContext(section);
+  const expectedUpdatedAt = settingsVersion(formData, section);
   const result = await supabase
     .from("site_settings")
     .update({
@@ -731,6 +789,7 @@ export async function updateTypographySettings(formData: FormData) {
       ui_font: parsed.data.uiFont,
     })
     .eq("id", "main")
+    .eq("updated_at", expectedUpdatedAt)
     .select("id")
     .maybeSingle();
 
@@ -739,7 +798,7 @@ export async function updateTypographySettings(formData: FormData) {
   }
 
   await assertMutation(result, section);
-  if (!result.data) redirectToStatus("settings-required", section);
+  if (!result.data) redirectToStatus("settings-write-conflict", section);
 
   await writeAuditLog({
     actorId: admin.id,
@@ -762,10 +821,12 @@ export async function updateFooterEffectSettings(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-brand-settings", section);
 
   const { admin, supabase } = await getWriteContext(section);
+  const expectedUpdatedAt = settingsVersion(formData, section);
   const result = await supabase
     .from("site_settings")
     .update({ footer_effect: parsed.data.footerEffect })
     .eq("id", "main")
+    .eq("updated_at", expectedUpdatedAt)
     .select("id")
     .maybeSingle();
 
@@ -774,7 +835,7 @@ export async function updateFooterEffectSettings(formData: FormData) {
   }
 
   await assertMutation(result, section);
-  if (!result.data) redirectToStatus("settings-required", section);
+  if (!result.data) redirectToStatus("settings-write-conflict", section);
 
   await writeAuditLog({
     actorId: admin.id,
@@ -799,6 +860,7 @@ export async function updateContactSettings(formData: FormData) {
 
   const { admin, supabase } = await getWriteContext(section);
   await handOffLegacyContactWrite(supabase);
+  const expectedUpdatedAt = settingsVersion(formData, section);
   const result = await supabase
     .from("site_settings")
     .update({
@@ -806,11 +868,12 @@ export async function updateContactSettings(formData: FormData) {
       contact_blurb: parsed.data.contactBlurb,
     })
     .eq("id", "main")
+    .eq("updated_at", expectedUpdatedAt)
     .select("id")
     .maybeSingle();
 
   await assertMutation(result, section);
-  if (!result.data) redirectToStatus("settings-required", section);
+  if (!result.data) redirectToStatus("settings-write-conflict", section);
 
   await writeAuditLog({
     actorId: admin.id,
@@ -834,6 +897,8 @@ export async function updateMusicSettings(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid-music-settings", section);
 
   const { admin, supabase } = await getWriteContext(section);
+  await handOffLegacyV2Write(supabase, "music", section);
+  const expectedUpdatedAt = settingsVersion(formData, section);
   const result = await supabase
     .from("site_settings")
     .update({
@@ -841,11 +906,12 @@ export async function updateMusicSettings(formData: FormData) {
       spotify_embed_url: parsed.data.spotifyEmbedUrl,
     })
     .eq("id", "main")
+    .eq("updated_at", expectedUpdatedAt)
     .select("id")
     .maybeSingle();
 
   await assertMutation(result, section);
-  if (!result.data) redirectToStatus("settings-required", section);
+  if (!result.data) redirectToStatus("settings-write-conflict", section);
 
   await writeAuditLog({
     actorId: admin.id,
@@ -976,11 +1042,17 @@ export async function updatePageHero(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", returnSection);
 
   const { admin, supabase } = await getWriteContext(returnSection);
+  if (parsed.data.pageSlug === "home") {
+    await handOffLegacyHomeWrite(supabase, returnSection);
+  }
   if (parsed.data.pageSlug === "video") {
     await handOffLegacyShowreelWrite(supabase);
   }
   if (parsed.data.pageSlug === "booking") {
     await handOffLegacyContactWrite(supabase);
+  }
+  if (["bio", "music", "gallery"].includes(parsed.data.pageSlug)) {
+    await handOffLegacyV2Write(supabase, parsed.data.pageSlug as "bio" | "music" | "gallery", returnSection);
   }
   const result = await supabase.from("page_heroes").upsert({
     page_slug: parsed.data.pageSlug,
@@ -1021,6 +1093,7 @@ export async function updateAboutHome(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", section);
 
   const { admin, supabase } = await getWriteContext(section);
+  await handOffLegacyHomeWrite(supabase, section);
   const result = await supabase.from("about_home").upsert({
     id: "main",
     heading: parsed.data.heading,
@@ -1079,6 +1152,7 @@ export async function updateHomePresentation(formData: FormData) {
   });
   if (!parsed.success) redirectToStatus("invalid", returnSection);
   const { admin, supabase } = await getWriteContext(returnSection);
+  await handOffLegacyHomeWrite(supabase, returnSection);
   const result = await supabase.from("media_assets").upsert({
     id: "home-studio-settings",
     label: "Home Studio settings",
@@ -1111,6 +1185,7 @@ export async function updateBioProfile(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", section);
 
   const { admin, supabase } = await getWriteContext(section);
+  await handOffLegacyV2Write(supabase, "bio", section);
   const result = await supabase.from("bio_profile").upsert({
     id: "main",
     top_label: parsed.data.topLabel,
@@ -1252,6 +1327,7 @@ export async function saveSocialLink(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", "socials-links");
 
   const { admin, supabase } = await getWriteContext("socials-links");
+  await handOffLegacyV2Write(supabase, "socials", "socials-links");
   const iconKey = detectSocialPlatform(
     parsed.data.iconKey,
     parsed.data.platform,
@@ -1296,6 +1372,7 @@ export async function saveMusicPlatformLink(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", "music-platforms");
 
   const { admin, supabase } = await getWriteContext("music-platforms");
+  await handOffLegacyV2Write(supabase, "music", "music-platforms");
   const result = await supabase.from("music_platform_links").upsert({
     id: parsed.data.id,
     title: parsed.data.title,
@@ -1332,6 +1409,7 @@ export async function saveSoundcloudTrack(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", "tracks");
 
   const { admin, supabase } = await getWriteContext("tracks");
+  await handOffLegacyV2Write(supabase, "music", "tracks");
   const result = await supabase.from("soundcloud_tracks").upsert({
     id: parsed.data.id,
     title: parsed.data.title,
@@ -1365,6 +1443,7 @@ export async function saveBioGalleryImage(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", "bio-gallery");
 
   const { admin, supabase } = await getWriteContext("bio-gallery");
+  await handOffLegacyV2Write(supabase, "bio", "bio-gallery");
   const result = await supabase.from("bio_gallery_images").upsert({
     id: parsed.data.id,
     src: parsed.data.src,
@@ -1401,6 +1480,7 @@ export async function saveGalleryImage(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", "gallery-images");
 
   const { admin, supabase } = await getWriteContext("gallery-images");
+  await handOffLegacyV2Write(supabase, "gallery", "gallery-images");
   const result = await supabase.from("gallery_images").upsert({
     id: parsed.data.id,
     title: parsed.data.title,
@@ -1437,6 +1517,7 @@ export async function saveBioParagraph(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", "bio-paragraphs-panel");
 
   const { admin, supabase } = await getWriteContext("bio-paragraphs-panel");
+  await handOffLegacyV2Write(supabase, "bio", "bio-paragraphs-panel");
   const result = await supabase.from("bio_paragraphs").upsert({
     id: parsed.data.id,
     body: parsed.data.body,
@@ -1481,6 +1562,7 @@ export async function saveBioParagraphs(formData: FormData) {
   }
 
   const { admin, supabase } = await getWriteContext("bio-paragraphs");
+  await handOffLegacyV2Write(supabase, "bio", "bio-paragraphs-panel");
   const existing = await supabase.from("bio_paragraphs").select("id");
   await assertMutation(existing, "bio-paragraphs");
 
@@ -1583,6 +1665,7 @@ export async function updateActorResume(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", "actor-resume");
 
   const { admin, supabase } = await getWriteContext("actor-resume");
+  await handOffLegacyV2Write(supabase, "bio", "actor-resume");
   const result = await supabase.from("actor_resume").upsert({
     id: "main",
     headline: parsed.data.headline,
@@ -1628,6 +1711,7 @@ export async function saveActorCredit(formData: FormData) {
   if (!parsed.success) redirectToStatus("invalid", "actor-credits");
 
   const { admin, supabase } = await getWriteContext("actor-credits");
+  await handOffLegacyV2Write(supabase, "bio", "actor-credits");
   const result = await supabase.from("actor_credits").upsert({
     id: parsed.data.id,
     credit_type: parsed.data.creditType,
@@ -1665,6 +1749,18 @@ async function deleteById(
   const { admin, supabase } = await getWriteContext(section);
   if (tableName === "videos") {
     await handOffLegacyShowreelWrite(supabase);
+  }
+  if (["bio_gallery_images", "bio_paragraphs", "actor_credits"].includes(tableName)) {
+    await handOffLegacyV2Write(supabase, "bio", section);
+  }
+  if (["music_platform_links", "soundcloud_tracks"].includes(tableName)) {
+    await handOffLegacyV2Write(supabase, "music", section);
+  }
+  if (tableName === "gallery_images") {
+    await handOffLegacyV2Write(supabase, "gallery", section);
+  }
+  if (tableName === "social_links") {
+    await handOffLegacyV2Write(supabase, "socials", section);
   }
   const result = await supabase.from(tableName).delete().eq("id", parsed.data);
 

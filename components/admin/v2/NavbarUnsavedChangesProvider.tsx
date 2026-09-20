@@ -11,7 +11,7 @@ import {
 } from "react";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 
-type NavbarEditorSource = "navigation" | "shortcuts";
+type NavbarEditorSource = "navigation" | "shortcuts" | "name";
 
 type NavbarUnsavedChangesContextValue = {
   clearSourceDirty: (
@@ -36,7 +36,7 @@ export function NavbarUnsavedChangesProvider({
     confirmDiscard: confirmGlobalDiscard,
     markDirty: markGlobalDirty,
   } = useUnsavedChangesGuard(
-    "You have unsaved navbar or platform shortcut changes. Leave and discard them?",
+    "You have unsaved owner name, navbar, or platform shortcut changes. Leave and discard them?",
     true
   );
 

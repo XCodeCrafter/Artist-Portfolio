@@ -7,6 +7,7 @@ import {
 } from "@/lib/admin/service";
 import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminSessionActive } from "@/lib/admin/session-security";
 
 export type AdminRole = "admin" | "owner";
 
@@ -111,21 +112,8 @@ export async function isAllowedAdmin(user: User | null) {
 }
 
 export const getCurrentAdmin = cache(async (): Promise<AdminUser | null> => {
-  const admin = await getCurrentAdminCandidate();
-  if (!admin) return null;
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
-
-  if (
-    error ||
-    data?.claims.sub !== admin.id ||
-    data.claims.aal !== "aal2"
-  ) {
-    return null;
-  }
-
-  return admin;
+  const context = await getCurrentAdminContext();
+  return context?.aal === "aal2" ? context.admin : null;
 });
 
 /**
@@ -133,6 +121,13 @@ export const getCurrentAdmin = cache(async (): Promise<AdminUser | null> => {
  * Only MFA enrollment, MFA verification, and password recovery may use this.
  */
 export const getCurrentAdminCandidate = cache(async (): Promise<AdminUser | null> => {
+  return (await getCurrentAdminContext())?.admin || null;
+});
+
+const getCurrentAdminContext = cache(async (): Promise<{
+  admin: AdminUser;
+  aal: string;
+} | null> => {
   if (!hasSupabaseBrowserEnv()) {
     return null;
   }
@@ -144,6 +139,17 @@ export const getCurrentAdminCandidate = cache(async (): Promise<AdminUser | null
   } = await supabase.auth.getUser();
 
   if (error || !user) {
+    return null;
+  }
+
+  const claimsResult = await supabase.auth.getClaims();
+  const claims = claimsResult.data?.claims;
+  if (
+    claimsResult.error ||
+    claims?.sub !== user.id ||
+    typeof claims.session_id !== "string" ||
+    !(await isAdminSessionActive(user.id, claims.session_id))
+  ) {
     return null;
   }
 
@@ -160,10 +166,13 @@ export const getCurrentAdminCandidate = cache(async (): Promise<AdminUser | null
   }
 
   return {
-    id: user.id,
-    email: user.email || "",
-    role: profile?.role || "admin",
-    hasActiveProfile: Boolean(profile),
+    admin: {
+      id: user.id,
+      email: user.email || "",
+      role: profile?.role || "admin",
+      hasActiveProfile: Boolean(profile),
+    },
+    aal: typeof claims.aal === "string" ? claims.aal : "aal1",
   };
 });
 

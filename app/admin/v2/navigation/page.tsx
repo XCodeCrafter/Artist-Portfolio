@@ -1,5 +1,7 @@
 import NavigationManager from "@/components/admin/v2/NavigationManager";
 import NavbarSocialLinksManager from "@/components/admin/v2/NavbarSocialLinksManager";
+import NavbarNameEditor from "@/components/admin/v2/NavbarNameEditor";
+import { getAdminAppearanceData } from "@/lib/admin/site-appearance";
 import { NavbarUnsavedChangesProvider } from "@/components/admin/v2/NavbarUnsavedChangesProvider";
 import { getAdminNavigationData } from "@/lib/admin/navigation";
 import { getAdminNavbarSocialLinksData } from "@/lib/admin/navbar-social-links";
@@ -9,9 +11,10 @@ export const metadata = { title: "Navbar · Admin V2" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminV2NavigationPage() {
-  const [data, socialLinks] = await Promise.all([
+  const [data, socialLinks, appearance] = await Promise.all([
     getAdminNavigationData(),
     getAdminNavbarSocialLinksData(),
+    getAdminAppearanceData(),
   ]);
   const model = createNavigationEditorModel(data.navigation);
   const unsupportedVersion = data.configVersion === "unsupported";
@@ -47,6 +50,7 @@ export default async function AdminV2NavigationPage() {
       </header>
 
       <NavbarUnsavedChangesProvider>
+        <NavbarNameEditor {...appearance} />
         <NavigationManager
           artistName={data.artistName}
           availability={data.availability}

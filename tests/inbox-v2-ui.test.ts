@@ -137,7 +137,7 @@ describe("Shared Inbox UI contract", () => {
     expect(inbox).toContain("hidden={!visibleIds.has(inquiry.id)}");
     expect(inbox).toContain("window.sessionStorage.setItem");
     expect(inbox).toContain("isInquiryFormDirty");
-    expect(inbox).toContain("dirtyForm.reset()");
+    expect(inbox).toContain("otherDraftForms.forEach(discardInquiryFormDraft)");
     expect(inbox).toContain('aria-live="polite"');
   });
 
@@ -168,9 +168,10 @@ describe("Shared Inbox UI contract", () => {
     expect(inquiryLoader).not.toContain("userAgent:");
     expect(inquiryLoader).not.toContain("resendEmailId:");
     expect(inquiryLoader).toContain(
-      '"id,name,email,message,portfolio_type,inquiry_type,inquiry_intent,status,admin_notes,email_status,email_status_changed_at,created_at"'
+      '"id,name,email,message,portfolio_type,inquiry_type,inquiry_intent,status,admin_notes,email_status,email_status_changed_at,created_at,updated_at"'
     );
     expect(inquiryLoader).toContain("LEGACY_INQUIRY_SELECT");
-    expect(inquiryLoader).not.toContain("updatedAt:");
+    expect(inquiryLoader).toContain('updatedAt: row.updated_at || ""');
+    expect(inbox).toContain('name="expectedUpdatedAt"');
   });
 });

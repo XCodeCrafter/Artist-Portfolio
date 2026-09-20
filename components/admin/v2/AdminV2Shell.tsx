@@ -24,6 +24,7 @@ import {
   FaListUl,
   FaMagic,
   FaMusic,
+  FaPalette,
   FaShieldAlt,
   FaUserAlt,
   FaTimes,
@@ -72,6 +73,7 @@ function iconFor(key: AdminV2NavigationKey) {
   const icons: Record<AdminV2NavigationKey, ReactNode> = {
     overview: <FaHome />,
     navigation: <FaListUl />,
+    home: <FaHome />,
     bio: <FaUserAlt />,
     gallery: <FaImages />,
     showreel: <FaVideo />,
@@ -79,6 +81,7 @@ function iconFor(key: AdminV2NavigationKey) {
     contact: <FaEnvelope />,
     inbox: <FaInbox />,
     insights: <FaChartLine />,
+    appearance: <FaPalette />,
     settings: <FaShieldAlt />,
   };
   return icons[key];

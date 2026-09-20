@@ -392,6 +392,7 @@ describe("Admin V2 shell helpers", () => {
     expect(ADMIN_V2_NAVIGATION.map((item) => item.key)).toEqual([
       "overview",
       "navigation",
+      "home",
       "bio",
       "gallery",
       "showreel",
@@ -399,6 +400,7 @@ describe("Admin V2 shell helpers", () => {
       "contact",
       "inbox",
       "insights",
+      "appearance",
       "settings",
     ]);
     expect(getAdminV2ActiveItem("/admin/v2").key).toBe("overview");
@@ -408,6 +410,8 @@ describe("Admin V2 shell helpers", () => {
     expect(getAdminV2ActiveItem("/admin/v2/navigation/history").key).toBe(
       "navigation"
     );
+    expect(getAdminV2ActiveItem("/admin/v2/pages/home").key).toBe("home");
+    expect(getAdminV2ActiveItem("/admin/v2/pages/home/history").key).toBe("home");
     expect(getAdminV2ActiveItem("/admin/v2/pages/bio").key).toBe("bio");
     expect(getAdminV2ActiveItem("/admin/v2/pages/bio/history").key).toBe(
       "bio"
@@ -441,6 +445,8 @@ describe("Admin V2 shell helpers", () => {
       "insights"
     );
     expect(getAdminV2ActiveItem("/admin/v2/settings").key).toBe("settings");
+    expect(getAdminV2ActiveItem("/admin/v2/settings/appearance").key).toBe("appearance");
+    expect(getAdminV2ActiveItem("/admin/v2/settings/appearance/").key).toBe("appearance");
     expect(getAdminV2ActiveItem("/admin/v2/settings/detail").key).toBe(
       "settings"
     );

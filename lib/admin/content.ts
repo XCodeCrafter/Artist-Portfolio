@@ -85,7 +85,7 @@ export type EditableVideoItem = VideoItem & PublishableMeta;
 export type EditableActorCredit = ActorCredit & PublishableMeta;
 
 export type EditablePortfolioContent = {
-  settings: SiteSettings;
+  settings: SiteSettings & { updatedAt?: string };
   navigation: NavigationConfig;
   heroes: EditableHeroContent[];
   homeUpdates: EditableHomeUpdate[];
@@ -111,6 +111,7 @@ export type EditablePortfolioContent = {
 };
 
 type SiteSettingsRow = {
+  updated_at?: string;
   portfolio_type?: string | null;
   navigation_config_version?: number | null;
   hidden_nav_page_slugs_actor?: unknown;
@@ -334,12 +335,13 @@ function getFallbackEditableContent(): EditablePortfolioContent {
   };
 }
 
-function mapSettings(row?: SiteSettingsRow): SiteSettings {
+function mapSettings(row?: SiteSettingsRow): EditablePortfolioContent["settings"] {
   if (!row) return FALLBACK_CONTENT.settings;
 
   const portfolioType = normalizePortfolioType(row.portfolio_type);
 
   return {
+    updatedAt: row.updated_at || "",
     portfolioType,
     navigationConfigVersion: normalizeNavigationConfigVersion(
       row.navigation_config_version

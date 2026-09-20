@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createAdminServiceClient: vi.fn<() => unknown>(),
   cookieGet: vi.fn(),
   cookieSet: vi.fn(),
+  isAdminSessionActive: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -24,6 +25,11 @@ vi.mock("next/headers", () => ({
     get: mocks.cookieGet,
     set: mocks.cookieSet,
   })),
+}));
+
+vi.mock("@/lib/admin/session-security", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/admin/session-security")>(),
+  isAdminSessionActive: mocks.isAdminSessionActive,
 }));
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -68,6 +74,7 @@ function issueService(options: { invalidationError?: unknown } = {}) {
     getInsertedPayload: () => insertedPayload,
     insert,
     invalidate,
+    rpc: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST202" } }),
   };
 }
 
@@ -88,6 +95,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("AUTH_SECURITY_SECRET", "s".repeat(48));
   mocks.cookieGet.mockReturnValue({ value: "recovery-cookie-token" });
+  mocks.isAdminSessionActive.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -95,6 +103,42 @@ afterEach(() => {
 });
 
 describe("admin recovery session binding", () => {
+  it("rejects a signed recovery token from a revoked session", async () => {
+    mocks.createClient.mockResolvedValue(claimsClient({ sub: USER_ID, session_id: SESSION_ID }));
+    const service = issueService();
+    mocks.createAdminServiceClient.mockReturnValue(service);
+    mocks.isAdminSessionActive.mockResolvedValue(false);
+    await expect(issueAdminRecoveryChallenge(USER_ID, "signed-access-token")).resolves.toBe(false);
+    expect(service.rpc).not.toHaveBeenCalled();
+    expect(service.from).not.toHaveBeenCalled();
+  });
+
+  it("uses the atomic replacement RPC when 0038 is deployed", async () => {
+    mocks.createClient.mockResolvedValue(claimsClient({ sub: USER_ID, session_id: SESSION_ID }));
+    const service = issueService();
+    service.rpc.mockResolvedValue({ data: "44444444-4444-4444-8444-444444444444", error: null });
+    mocks.createAdminServiceClient.mockReturnValue(service);
+    await expect(issueAdminRecoveryChallenge(USER_ID, "signed-access-token")).resolves.toBe(true);
+    expect(service.rpc).toHaveBeenCalledWith("issue_admin_recovery_challenge", {
+      p_user_id: USER_ID,
+      p_token_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      p_session_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      p_expires_at: expect.any(String),
+    });
+    expect(service.from).not.toHaveBeenCalled();
+    expect(mocks.cookieSet).toHaveBeenCalledOnce();
+  });
+
+  it.each(["42501", "23505", "XX000", "42883"])("does not fall back after atomic RPC failure %s", async (code) => {
+    mocks.createClient.mockResolvedValue(claimsClient({ sub: USER_ID, session_id: SESSION_ID }));
+    const service = issueService();
+    service.rpc.mockResolvedValue({ data: null, error: { code } });
+    mocks.createAdminServiceClient.mockReturnValue(service);
+    await expect(issueAdminRecoveryChallenge(USER_ID, "signed-access-token")).resolves.toBe(false);
+    expect(service.from).not.toHaveBeenCalled();
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
+  });
+
   it("rejects a recovery token whose verified subject is a different admin", async () => {
     const auth = claimsClient({
       sub: OTHER_USER_ID,

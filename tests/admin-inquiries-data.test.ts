@@ -24,6 +24,7 @@ const row = {
   email_status: "delivered",
   email_status_changed_at: "2026-09-06T12:30:00.000Z",
   created_at: "2026-09-06T12:00:00.000Z",
+  updated_at: "2026-09-06T12:30:00.123456Z",
 };
 
 function rowSource(result: { data: unknown; error: unknown }) {
@@ -146,7 +147,7 @@ describe("admin inquiry data", () => {
     const result = await getBookingInquiries({ page: 2, pageSize: 25 });
 
     expect(service.firstSelect).toHaveBeenCalledWith(
-      "id,name,email,message,portfolio_type,inquiry_type,inquiry_intent,status,admin_notes,email_status,email_status_changed_at,created_at"
+      "id,name,email,message,portfolio_type,inquiry_type,inquiry_intent,status,admin_notes,email_status,email_status_changed_at,created_at,updated_at"
     );
     expect(result.isConfigured).toBe(true);
     expect(result.loadError).toBeUndefined();
@@ -180,6 +181,7 @@ describe("admin inquiry data", () => {
         emailStatus: "delivered",
         emailStatusChangedAt: row.email_status_changed_at,
         createdAt: row.created_at,
+        updatedAt: row.updated_at,
       },
     ]);
     expect(service.from).toHaveBeenCalledTimes(8);
@@ -206,7 +208,7 @@ describe("admin inquiry data", () => {
     const result = await getBookingInquiries();
 
     expect(service.fallbackSelect).toHaveBeenCalledWith(
-      "id,name,email,message,portfolio_type,inquiry_type,status,admin_notes,created_at"
+      "id,name,email,message,portfolio_type,inquiry_type,status,admin_notes,created_at,updated_at"
     );
     expect(service.from).toHaveBeenCalledTimes(9);
     expect(result.loadError).toBeUndefined();

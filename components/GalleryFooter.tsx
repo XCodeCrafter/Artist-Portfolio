@@ -28,6 +28,8 @@ type GalleryFooterProps = {
   footerEffect?: FooterEffect;
   socialLinks: SocialLink[];
   tagline?: string;
+  /** Keep the real rendering and pointer effect, but disable links in admin previews. */
+  preview?: boolean;
 };
 
 type FooterPointerStyles = CSSProperties & {
@@ -48,6 +50,7 @@ export default function GalleryFooter({
   footerEffect = "soul",
   socialLinks,
   tagline,
+  preview = false,
 }: GalleryFooterProps) {
   const footerRef = useRef<HTMLElement>(null);
   const lightFrameRef = useRef<number | null>(null);
@@ -120,7 +123,7 @@ export default function GalleryFooter({
 
   function moveLight(event: PointerEvent<HTMLElement>) {
     const footer = footerRef.current;
-    if (!footer || event.pointerType === "touch") return;
+    if (!footer || event.pointerType === "touch" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const bounds = footer.getBoundingClientRect();
     const light = lightPositionRef.current;
@@ -223,7 +226,7 @@ export default function GalleryFooter({
         }}
       />
 
-      <div className="relative mx-auto max-w-[1540px]">
+      <div className="relative mx-auto max-w-[1540px]" inert={preview || undefined} aria-hidden={preview || undefined}>
         <div className="flex min-h-[96px] flex-col justify-center gap-5 border-b border-white/10 py-7 text-xs sm:flex-row sm:items-center sm:justify-between sm:py-0">
           <div className="flex items-center gap-4">
             <span className="h-2 w-2 rounded-full bg-[#ff3826] shadow-[0_0_18px_rgba(255,56,38,0.7)]" />

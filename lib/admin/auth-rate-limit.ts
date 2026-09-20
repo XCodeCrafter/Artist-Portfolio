@@ -5,7 +5,7 @@ import { keyedDigest } from "@/lib/admin/security-secret";
 import { getClientIp } from "@/lib/security/request";
 import { consumeDatabaseRateLimit } from "@/lib/security/rate-limit";
 
-type AuthRateLimitKind = "login" | "password-reset" | "mfa";
+type AuthRateLimitKind = "login" | "password-reset" | "mfa" | "mfa-enrollment";
 
 type AuthRateLimitResult = {
   allowed: boolean;
@@ -20,6 +20,10 @@ type AuthRateLimitResult = {
 };
 
 function limitsFor(kind: AuthRateLimitKind) {
+  if (kind === "mfa-enrollment") {
+    return { account: 3, ip: 10, windowSeconds: 10 * 60 };
+  }
+
   if (kind === "password-reset") {
     return { account: 3, ip: 8, windowSeconds: 60 * 60 };
   }

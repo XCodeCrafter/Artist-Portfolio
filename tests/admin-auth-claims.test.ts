@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMocks = vi.hoisted(() => ({
   createClient: vi.fn<() => Promise<unknown>>(),
+  createAdminServiceClient: vi.fn<() => unknown>(),
+  hasAdminServiceEnv: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -13,8 +15,8 @@ vi.mock("@/lib/supabase/env", () => ({
 }));
 
 vi.mock("@/lib/admin/service", () => ({
-  createAdminServiceClient: vi.fn(() => null),
-  hasAdminServiceEnv: vi.fn(() => false),
+  createAdminServiceClient: authMocks.createAdminServiceClient,
+  hasAdminServiceEnv: authMocks.hasAdminServiceEnv,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -29,6 +31,7 @@ function authClient(options: {
   aal?: "aal1" | "aal2";
   claimsError?: unknown;
   subject?: string;
+  sessionId?: string | null;
 }) {
   const getUser = vi.fn(async () => ({
     data: {
@@ -46,6 +49,9 @@ function authClient(options: {
           claims: {
             aal: options.aal || "aal2",
             sub: options.subject || USER_ID,
+            session_id: options.sessionId === undefined
+              ? "33333333-3333-4333-8333-333333333333"
+              : options.sessionId,
           },
         },
     error: options.claimsError || null,
@@ -59,6 +65,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("NODE_ENV", "development");
   vi.stubEnv("ADMIN_EMAILS", "owner@example.com");
+  authMocks.createAdminServiceClient.mockReturnValue(null);
+  authMocks.hasAdminServiceEnv.mockReturnValue(false);
 });
 
 afterEach(() => {
@@ -103,5 +111,27 @@ describe("verified admin assurance claims", () => {
     const { getCurrentAdmin } = await import("@/lib/admin/auth");
 
     await expect(getCurrentAdmin()).resolves.toBeNull();
+  });
+
+  it("rejects even an MFA candidate without a verifiable session identity", async () => {
+    const client = authClient({ sessionId: null });
+    authMocks.createClient.mockResolvedValue(client);
+    const { getCurrentAdminCandidate } = await import("@/lib/admin/auth");
+    await expect(getCurrentAdminCandidate()).resolves.toBeNull();
+  });
+
+  it("denies admin and MFA candidate access after the session was revoked", async () => {
+    authMocks.createClient.mockResolvedValue(authClient({ aal: "aal2" }));
+    authMocks.hasAdminServiceEnv.mockReturnValue(true);
+    const rpc = vi.fn(async () => ({ data: false, error: null }));
+    const from = vi.fn();
+    authMocks.createAdminServiceClient.mockReturnValue({ rpc, from });
+    const { getCurrentAdmin, getCurrentAdminCandidate } = await import("@/lib/admin/auth");
+    await expect(getCurrentAdmin()).resolves.toBeNull();
+    await expect(getCurrentAdminCandidate()).resolves.toBeNull();
+    expect(rpc).toHaveBeenCalledWith("is_admin_session_active", {
+      p_user_id: USER_ID, p_session_id: "33333333-3333-4333-8333-333333333333",
+    });
+    expect(from).not.toHaveBeenCalled();
   });
 });

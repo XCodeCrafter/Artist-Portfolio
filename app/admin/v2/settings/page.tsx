@@ -64,25 +64,24 @@ export default function AdminV2SettingsPage() {
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <Link className={cardClass} href="/admin/content#settings">
+          <Link className={cardClass} href="/admin/v2/settings/appearance">
             <div className="flex items-start justify-between gap-3">
               <span className="grid h-11 w-11 place-items-center rounded-2xl border border-violet-200/14 bg-violet-400/8 text-violet-100/70">
                 <FaPalette />
               </span>
               <span className="rounded-full border border-white/9 px-2.5 py-1 text-[9px] uppercase tracking-[0.12em] text-white/36">
-                Classic editor
+                V2 · Live preview
               </span>
             </div>
             <h3 className="heading-ui mt-5 text-xl font-semibold text-white">
-              Brand &amp; appearance
+              Fonts &amp; appearance
             </h3>
             <p className="mt-2 text-xs leading-5 text-white/38">
-              Artist name, tagline, description, typography, and the footer
-              interaction. This opens the existing editor until its V2 mirror
-              is designed.
+              Choose headline, body, and UI fonts, then preview the white-soul
+              or red-light footer effect before publishing.
             </p>
             <span className="mt-5 inline-flex items-center gap-2 text-[11px] font-semibold text-white/48 transition group-hover:text-white">
-              Edit brand <FaArrowRight className="text-[9px]" />
+              Edit appearance <FaArrowRight className="text-[9px]" />
             </span>
           </Link>
 

@@ -16,6 +16,7 @@ import {
   InquiryInboxView,
   isInquiryFormDirty,
 } from "@/components/admin/InquiryInbox";
+import { discardInquiryFormDraft } from "@/lib/admin/inquiry-drafts";
 import useUnsavedChangesGuard, {
   isGuardedFormResubmission,
   type GuardedFormSubmitter,
@@ -536,7 +537,7 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
       return false;
     }
 
-    otherDraftForms.forEach((dirtyForm) => dirtyForm.reset());
+    otherDraftForms.forEach(discardInquiryFormDraft);
     dirtyFormsRef.current.clear();
     onAccepted?.();
     return prepareFormSubmission(form, submitter);

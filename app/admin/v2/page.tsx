@@ -282,16 +282,16 @@ export default async function AdminV2OverviewPage() {
           </Link>
           <Link
             className="group rounded-[22px] border border-white/9 bg-[#101012] p-4 outline-none transition hover:border-[#ff674f]/28 hover:bg-[#121214] focus-visible:ring-2 focus-visible:ring-white/70"
-            href="/admin/content#home"
+            href="/admin/v2/pages/home"
           >
             <div className="flex items-start justify-between gap-3">
               <FaHome className="text-white/52" />
               <span className="rounded-full border border-white/8 px-2 py-0.5 text-[9px] uppercase tracking-[0.1em] text-white/32">
-                Classic
+                1:1
               </span>
             </div>
             <p className="mt-5 text-sm font-semibold text-white">Edit Home</p>
-            <p className="mt-1 text-[11px] text-white/34">Current editor</p>
+            <p className="mt-1 text-[11px] text-white/34">Sections and content</p>
           </Link>
           <Link
             className="group rounded-[22px] border border-white/9 bg-[#101012] p-4 outline-none transition hover:border-[#ff674f]/28 hover:bg-[#121214] focus-visible:ring-2 focus-visible:ring-white/70"
@@ -388,9 +388,9 @@ export default async function AdminV2OverviewPage() {
           <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
             <Link
               className="rounded-full border border-white/8 bg-black/18 px-3 py-2 text-white/44 transition hover:text-white"
-              href="/admin/content#settings"
+              href="/admin/v2/settings/appearance"
             >
-              <FaPalette className="mr-1.5 inline" /> Brand
+              <FaPalette className="mr-1.5 inline" /> Appearance
             </Link>
             <Link
               className="rounded-full border border-white/8 bg-black/18 px-3 py-2 text-white/44 transition hover:text-white"

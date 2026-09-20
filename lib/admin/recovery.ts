@@ -8,6 +8,10 @@ import {
   keyedDigest,
 } from "@/lib/admin/security-secret";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isAdminSessionActive,
+  isMissingAdminHardeningRpc,
+} from "@/lib/admin/session-security";
 
 const RECOVERY_TTL_SECONDS = 10 * 60;
 const RECOVERY_COOKIE =
@@ -55,7 +59,10 @@ async function getVerifiedSessionIdentity(accessToken?: string) {
     const userId = data?.claims.sub;
     const sessionId = data?.claims.session_id;
 
-    if (error || !isUuid(userId) || !isUuid(sessionId)) return null;
+    if (
+      error || !isUuid(userId) || !isUuid(sessionId) ||
+      !(await isAdminSessionActive(userId, sessionId))
+    ) return null;
     return { sessionId, userId };
   } catch {
     return null;
@@ -81,6 +88,26 @@ export async function issueAdminRecoveryChallenge(
   const expiresAt = new Date(
     now.getTime() + RECOVERY_TTL_SECONDS * 1000
   ).toISOString();
+
+  try {
+    const result = await supabase.rpc("issue_admin_recovery_challenge", {
+      p_user_id: userId,
+      p_token_hash: tokenHash,
+      p_session_hash: sessionHash,
+      p_expires_at: expiresAt,
+    });
+    if (!result.error) {
+      if (!isUuid(result.data)) return false;
+      const cookieStore = await cookies();
+      cookieStore.set(RECOVERY_COOKIE, token, recoveryCookieOptions());
+      return true;
+    }
+    // Only installations awaiting 0038 may use the previous flow. Never turn
+    // a failed transaction, revoked permission, or outage into a weaker retry.
+    if (!isMissingAdminHardeningRpc(result.error, "issue_admin_recovery_challenge")) return false;
+  } catch {
+    return false;
+  }
 
   await supabase
     .from("admin_recovery_challenges")

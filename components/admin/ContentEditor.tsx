@@ -34,6 +34,8 @@ import {
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
+import VersionedDraftNotice from "@/components/admin/VersionedDraftNotice";
+import useVersionedFormSnapshot from "@/components/admin/useVersionedFormSnapshot";
 import useUnsavedChangesGuard, {
   getGuardedFormSubmitter,
   isGuardedFormResubmission,
@@ -123,6 +125,10 @@ type ContentEditorProps = {
   cncPrograms: EditableCncProgram[];
   content: EditablePortfolioContent;
   contactV2Enabled: boolean;
+  homeV2Enabled: boolean;
+  bioV2Enabled: boolean;
+  musicV2Enabled: boolean;
+  socialV2Enabled: boolean;
   isConfigured: boolean;
   loadError?: string;
   status?: string;
@@ -153,6 +159,12 @@ const statusCopy: Record<string, string> = {
   "saved-hero": "Hero saved.",
   "saved-home": "Homepage about block saved.",
   "saved-home-presentation": "Homepage section text and media saved.",
+  "home-v2-unavailable":
+    "Home V2 could not be verified. Nothing was saved. Open Home V2 to review its status and try again.",
+  "v2-unavailable":
+    "The active V2 editor could not be verified. Nothing was saved. Open Admin V2 to review its status and try again.",
+  "settings-write-conflict":
+    "Site settings changed or this form is out of date. Nothing was overwritten. Reload the editor before saving again.",
   "saved-music-link": "Music link saved.",
   "saved-navigation": "Navigation visibility saved.",
   "navigation-managed-in-v2":
@@ -1433,6 +1445,9 @@ function SiteSettingsForm({
   disabled: boolean;
   mode?: "brand" | "contact" | "music";
 }) {
+  const { snapshot: settings, revision, hasNewVersion, loadLatest } = useVersionedFormSnapshot(content.settings);
+  const versionNotice = hasNewVersion ? <VersionedDraftNotice onReload={loadLatest} /> : null;
+
   if (mode === "brand") {
     return (
       <div className="grid gap-3">
@@ -1445,12 +1460,14 @@ function SiteSettingsForm({
           id="settings-identity"
           title="Brand identity & text"
         >
-          <form action={updateBrandIdentitySettings}>
+          {versionNotice}
+          <form action={updateBrandIdentitySettings} key={revision} onReset={(event) => event.preventDefault()}>
+            <input name="expectedUpdatedAt" type="hidden" value={settings.updatedAt || ""} />
             <fieldset disabled={disabled}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Artist name">
                   <TextInput
-                    defaultValue={content.settings.artistName}
+                    defaultValue={settings.artistName}
                     maxLength={220}
                     name="artistName"
                     required
@@ -1459,7 +1476,7 @@ function SiteSettingsForm({
                 <input
                   name="portfolioType"
                   type="hidden"
-                  value={content.settings.portfolioType}
+                  value={settings.portfolioType}
                 />
                 <div className="rounded-[16px] border border-white/9 bg-black/22 px-4 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
@@ -1474,14 +1491,14 @@ function SiteSettingsForm({
                 </div>
                 <Field label="Tagline / discipline" wide>
                   <TextInput
-                    defaultValue={content.settings.tagline}
+                    defaultValue={settings.tagline}
                     maxLength={220}
                     name="tagline"
                   />
                 </Field>
                 <Field label="Site description" wide>
                   <TextArea
-                    defaultValue={content.settings.description}
+                    defaultValue={settings.description}
                     maxLength={1000}
                     name="description"
                     rows={4}
@@ -1502,13 +1519,15 @@ function SiteSettingsForm({
           id="settings-typography"
           title="Typography"
         >
-          <form action={updateTypographySettings}>
+          {versionNotice}
+          <form action={updateTypographySettings} key={revision} onReset={(event) => event.preventDefault()}>
+            <input name="expectedUpdatedAt" type="hidden" value={settings.updatedAt || ""} />
             <fieldset disabled={disabled}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Display / headings">
                   <select
                     className={inputClass}
-                    defaultValue={content.settings.displayFont}
+                    defaultValue={settings.displayFont}
                     name="displayFont"
                   >
                     {DISPLAY_FONT_OPTIONS.map((font) => (
@@ -1521,7 +1540,7 @@ function SiteSettingsForm({
                 <Field label="Body / paragraphs">
                   <select
                     className={inputClass}
-                    defaultValue={content.settings.bodyFont}
+                    defaultValue={settings.bodyFont}
                     name="bodyFont"
                   >
                     {BODY_FONT_OPTIONS.map((font) => (
@@ -1534,7 +1553,7 @@ function SiteSettingsForm({
                 <Field label="UI / navigation and buttons" wide>
                   <select
                     className={inputClass}
-                    defaultValue={content.settings.uiFont}
+                    defaultValue={settings.uiFont}
                     name="uiFont"
                   >
                     {UI_FONT_OPTIONS.map((font) => (
@@ -1559,10 +1578,12 @@ function SiteSettingsForm({
           id="settings-footer-effect"
           title="Footer interaction"
         >
-          <form action={updateFooterEffectSettings}>
+          {versionNotice}
+          <form action={updateFooterEffectSettings} key={revision} onReset={(event) => event.preventDefault()}>
+            <input name="expectedUpdatedAt" type="hidden" value={settings.updatedAt || ""} />
             <fieldset disabled={disabled}>
               <FooterEffectPicker
-                defaultValue={content.settings.footerEffect}
+                defaultValue={settings.footerEffect}
               />
               <SaveRow disabled={disabled} label="Save interaction" />
             </fieldset>
@@ -1597,21 +1618,23 @@ function SiteSettingsForm({
       id={`${mode}-settings`}
       title={copy.title}
     >
-      <form action={action}>
+      {versionNotice}
+      <form action={action} key={revision} onReset={(event) => event.preventDefault()}>
+        <input name="expectedUpdatedAt" type="hidden" value={settings.updatedAt || ""} />
         <fieldset disabled={disabled}>
           <div className="grid gap-4 sm:grid-cols-2">
             {isContact ? (
             <>
               <Field label="Location">
                 <TextInput
-                  defaultValue={content.settings.location}
+                  defaultValue={settings.location}
                   maxLength={220}
                   name="location"
                 />
               </Field>
               <Field label="Contact introduction" wide>
                 <TextArea
-                  defaultValue={content.settings.contactBlurb}
+                  defaultValue={settings.contactBlurb}
                   maxLength={1000}
                   name="contactBlurb"
                   rows={5}
@@ -1622,7 +1645,7 @@ function SiteSettingsForm({
             <>
               <Field label="Spotify artist URL" wide>
                 <TextInput
-                  defaultValue={content.settings.spotifyArtistUrl}
+                  defaultValue={settings.spotifyArtistUrl}
                   maxLength={1200}
                   name="spotifyArtistUrl"
                   pattern="https://.*"
@@ -1632,7 +1655,7 @@ function SiteSettingsForm({
               </Field>
               <Field label="Spotify embed URL" wide>
                 <TextInput
-                  defaultValue={content.settings.spotifyEmbedUrl}
+                  defaultValue={settings.spotifyEmbedUrl}
                   maxLength={1200}
                   name="spotifyEmbedUrl"
                   pattern="https://.*"
@@ -3406,6 +3429,15 @@ type ContentWorkspaceSection = {
   node: ReactNode;
 };
 
+function V2EditorHandoff({ label, href }: { label: string; href: string }) {
+  return <section className="rounded-[24px] border border-[#ff5a42]/22 bg-[#111113] p-6 sm:p-8">
+    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ff715b]">{label} moved to V2</p>
+    <h2 className="heading-ui mt-3 text-2xl font-semibold text-white">Edit {label} in Admin V2</h2>
+    <p className="mt-3 max-w-2xl text-sm leading-6 text-white/46">The V2 editor keeps your saved content and checks for changes from other admin sessions before publishing. Continue there to edit this section.</p>
+    <Link className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white" href={href}>Open {label} V2 <FaExternalLinkAlt /></Link>
+  </section>;
+}
+
 export default function ContentEditor({
   assets,
   cncIsConfigured,
@@ -3414,6 +3446,10 @@ export default function ContentEditor({
   cncPrograms,
   content,
   contactV2Enabled,
+  homeV2Enabled,
+  bioV2Enabled,
+  musicV2Enabled,
+  socialV2Enabled,
   isConfigured,
   loadError,
   status,
@@ -3436,7 +3472,43 @@ export default function ContentEditor({
         description:
           "Hero, About, CNC programs, Interlude, and Freelancer Life in public page order.",
         count: 5,
-        node: (
+        node: homeV2Enabled ? (
+          <div className="grid gap-6">
+            <section className="rounded-[24px] border border-[#ff5a42]/22 bg-[radial-gradient(circle_at_85%_10%,rgba(255,59,31,0.16),transparent_42%),#111113] p-6 sm:p-8">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ff715b]">
+                Home moved to V2
+              </p>
+              <h2 className="heading-ui mt-3 text-2xl font-semibold text-white">
+                Choose the sections and edit the real Home page
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/46">
+                Change section order, visibility, text, and images in the Home V2
+                preview. Its saved content now controls Home, including story
+                images; changes to the old Home fields or Gallery story selection
+                no longer update it. CNC source programs can still be edited below.
+              </p>
+              <Link
+                className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white"
+                href="/admin/v2/pages/home"
+              >
+                Open Home V2 <FaExternalLinkAlt />
+              </Link>
+            </section>
+            <div data-editor-panel-id="home-cnc">
+              <CncProgramsSection
+                disabled={cncDisabled}
+                items={cncPrograms}
+                key={
+                  cncPrograms
+                    .map((program) => `${program.id}:${program.updatedAt}`)
+                    .join("|") || "cnc-programs-empty"
+                }
+                loadError={cncLoadError}
+                migrationRequired={cncMigrationRequired}
+              />
+            </div>
+          </div>
+        ) : (
           <StudioWorkspace
             description="Live content, rendered as a compact page mirror"
             label="Home page"
@@ -3527,7 +3599,7 @@ export default function ContentEditor({
         kicker: "Public page",
         description: "Hero, portraits, biography, resume, and credits in page order.",
         count: content.bio.galleryImages.length + content.bio.paragraphs.length,
-        node: (
+        node: bioV2Enabled ? <V2EditorHandoff label="Bio" href="/admin/v2/pages/bio" /> : (
           <StudioWorkspace
             description="Portraits and story, in the same order visitors see them"
             label="Bio page"
@@ -3633,7 +3705,7 @@ export default function ContentEditor({
               count:
                 content.musicPlatforms.length +
                 content.soundcloudTracks.length,
-              node: (
+              node: musicV2Enabled ? <V2EditorHandoff label="Music" href="/admin/v2/pages/music" /> : (
                 <StudioWorkspace
                   description="Music destinations, releases, and listening sequence"
                   label="Music page"
@@ -3837,7 +3909,7 @@ export default function ContentEditor({
         description:
           "Social destinations, visibility, icons, and display order.",
         count: content.socialLinks.length,
-        node: (
+        node: socialV2Enabled ? <V2EditorHandoff label="Platform shortcuts" href="/admin/v2/navigation" /> : (
           <StudioWorkspace
             description="Shared across the bottom of every portfolio page"
             label="Shared footer"
@@ -3871,6 +3943,10 @@ export default function ContentEditor({
       cncPrograms,
       content,
       contactV2Enabled,
+      homeV2Enabled,
+      bioV2Enabled,
+      musicV2Enabled,
+      socialV2Enabled,
       disabled,
       musicEnabled,
       portfolioType,

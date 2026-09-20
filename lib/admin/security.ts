@@ -9,6 +9,7 @@ import {
 } from "@/lib/admin/service";
 import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
 import { probeDatabaseRateLimit } from "@/lib/security/rate-limit";
+import { probeAdminSessionBoundary } from "@/lib/admin/session-security";
 
 export type AdminProfile = {
   userId: string;
@@ -306,7 +307,8 @@ function getSecurityChecks(
   databaseRateLimitReady: boolean,
   auditReadReady = false,
   latestAuditAt = "",
-  authDirectoryReady = false
+  authDirectoryReady = false,
+  sessionBoundaryReady = false
 ): SecurityCheck[] {
   const allowedEmails = getAllowedAdminEmails();
   const hasServiceKey = hasAdminServiceEnv();
@@ -354,6 +356,14 @@ function getSecurityChecks(
           : hasServiceKey
             ? "Create at least one active owner in admin_profiles."
             : "Production admin access requires a service key and an active owner profile.",
+    },
+    {
+      label: "Immediate Session Revocation",
+      ok: sessionBoundaryReady,
+      verification: "runtime",
+      detail: sessionBoundaryReady
+        ? "Admin requests check live sessions in the database. Revoked sessions are denied on subsequent requests; recovery challenges are issued atomically."
+        : "Apply and verify migration 0038. Until then, session revocation can take until the existing access token expires, and recovery uses the previous issuance flow.",
     },
     {
       label: "Database Rate Limit",
@@ -532,6 +542,7 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
     securityLogsResult,
     rateLimitResult,
     authDirectoryResult,
+    sessionBoundaryReady,
   ] = await Promise.all([
     supabase
       .from("admin_profiles")
@@ -547,6 +558,7 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
     getSecurityEventLogs(),
     probeDatabaseRateLimit(supabase),
     supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    probeAdminSessionBoundary(supabase),
   ]);
 
   const authDirectoryReady = !authDirectoryResult.error;
@@ -583,7 +595,8 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
       rateLimitResult,
       !logsResult.error,
       auditLogs[0]?.createdAt || "",
-      authDirectoryReady
+      authDirectoryReady,
+      sessionBoundaryReady
     ),
     allowedEmails,
     isConfigured: true,

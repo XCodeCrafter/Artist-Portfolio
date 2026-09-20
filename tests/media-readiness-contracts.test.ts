@@ -20,7 +20,7 @@ describe("Batch 7A media configuration readiness", () => {
       'mediaPipelineResult.error.code === "23503"'
     );
     expect(readinessSource).toContain(
-      '"Apply all current Supabase migrations through 0035."'
+      '"Apply all current Supabase migrations through 0038, including Home V2 and admin session hardening."'
     );
     expect(readinessSource).not.toContain(
       '.from("media_physical_objects")'

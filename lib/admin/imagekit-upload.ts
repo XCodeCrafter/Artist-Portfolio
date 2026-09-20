@@ -103,9 +103,9 @@ function isImageKitPilotMimeType(
  * Every multipart field returned in uploadParams is represented byte-for-byte
  * in the signed payload. The caller must append only `file` and `token` beyond
  * these values. A V2 token is one-shot even after a failed request: never issue
- * this twice for one intent; 0037 must cancel/fail it and allocate a new intent
+ * this twice for one intent; the lifecycle migration must cancel/fail it and allocate a new intent
  * and object key before retrying. V2 is currently beta, so this adapter must
- * not be wired before the 0037 resolver/finalizer.
+ * not be wired before the Batch 7A.2f resolver/finalizer.
  */
 export function createImageKitUploadAuthority(
   input: CreateImageKitUploadAuthorityInput

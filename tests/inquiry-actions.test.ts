@@ -55,6 +55,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const INQUIRY_ID = "22222222-2222-4222-8222-222222222222";
+const VERSION = "2026-09-21T12:00:00.123456Z";
 
 function updateForm(
   overrides: Partial<{
@@ -73,6 +74,7 @@ function updateForm(
   };
   const formData = new FormData();
   formData.set("id", values.id);
+  formData.set("expectedUpdatedAt", VERSION);
   formData.set("status", values.status);
   formData.set("adminNotes", values.adminNotes);
   if (values.page !== undefined) formData.set("page", String(values.page));
@@ -88,6 +90,7 @@ function deleteForm(
 ) {
   const formData = new FormData();
   formData.set("id", id);
+  formData.set("expectedUpdatedAt", VERSION);
   if (context.page !== undefined) formData.set("page", String(context.page));
   if (context.rangeDays !== undefined) {
     formData.set("rangeDays", String(context.rangeDays));
@@ -105,7 +108,8 @@ function createMutationClient(options: {
   };
   const maybeSingle = vi.fn(async () => result);
   const select = vi.fn(() => ({ maybeSingle }));
-  const eq = vi.fn(() => ({ select }));
+  const eq = vi.fn();
+  eq.mockReturnValue({ select, eq });
   const update = vi.fn(() => ({ eq }));
   const deleteRow = vi.fn(() => ({ eq }));
   const from = vi.fn(() => ({ delete: deleteRow, update }));
@@ -181,6 +185,7 @@ describe("admin inquiry actions", () => {
       admin_notes: "Follow up next week.",
     });
     expect(service.eq).toHaveBeenCalledWith("id", INQUIRY_ID);
+    expect(service.eq).toHaveBeenCalledWith("updated_at", VERSION);
     expect(service.select).toHaveBeenCalledWith("id");
     expect(service.maybeSingle).toHaveBeenCalledTimes(1);
     expect(actionMocks.writeAuditLog).toHaveBeenCalledWith({
@@ -206,7 +211,7 @@ describe("admin inquiry actions", () => {
 
     await expectRedirect(
       updateClassicInquiry(updateForm()),
-      "/admin/analytics?status=not-found#inquiries"
+      "/admin/analytics?status=write-conflict#inquiries"
     );
 
     expect(actionMocks.writeAuditLog).not.toHaveBeenCalled();
@@ -274,6 +279,7 @@ describe("admin inquiry actions", () => {
     );
 
     expect(service.deleteRow).toHaveBeenCalledTimes(1);
+    expect(service.eq).toHaveBeenCalledWith("updated_at", VERSION);
     expect(service.select).toHaveBeenCalledWith("id");
     expect(actionMocks.writeAuditLog).toHaveBeenCalledWith({
       actorId: "11111111-1111-4111-8111-111111111111",
@@ -291,6 +297,21 @@ describe("admin inquiry actions", () => {
       "/admin/v2/inbox?status=missing-service#messages"
     );
 
+    expect(actionMocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("rejects browser forms without a saved version before accessing the database", async () => {
+    const stale = updateForm();
+    stale.delete("expectedUpdatedAt");
+    await expectRedirect(updateV2Inquiry(stale), "/admin/v2/inbox?status=invalid#messages");
+    expect(actionMocks.createAdminServiceClient).not.toHaveBeenCalled();
+  });
+
+  it("cannot delete a message changed since the confirmation was shown", async () => {
+    const service = createMutationClient({ data: null });
+    actionMocks.createAdminServiceClient.mockReturnValue(service.client);
+    await expectRedirect(deleteV2Inquiry(deleteForm()), "/admin/v2/inbox?status=write-conflict#messages");
+    expect(service.eq).toHaveBeenCalledWith("updated_at", VERSION);
     expect(actionMocks.writeAuditLog).not.toHaveBeenCalled();
   });
 });

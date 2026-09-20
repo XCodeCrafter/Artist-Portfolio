@@ -106,10 +106,10 @@ Pilot sequence:
    proof. If quota reporting later needs Account Management read access, use a
    separate read-only key instead of widening the upload key.
 4. Migration `0036` was applied successfully on 2026-09-06. Keep
-   `MEDIA_UPLOAD_PROVIDER=supabase` until migration `0037`, the atomic
+   `MEDIA_UPLOAD_PROVIDER=supabase` until the Batch 7A.2f lifecycle migration, the atomic
    finalizer, and a real image/video pilot have all passed.
 5. Keep `IMAGEKIT_PILOT_UPLOAD_ENABLED=false` until the payload-bound V2
-   authority, migration `0037`, resolver/finalizer, orphan cleanup, and the
+   authority, lifecycle migration, resolver/finalizer, orphan cleanup, and the
    disposable Admin V2 pilot panel are complete. ImageKit currently marks
    [Upload V2](https://imagekit.io/docs/api-reference/upload-file/upload-file-v2)
    as beta, so this boundary remains isolated and fail-closed.
@@ -409,13 +409,45 @@ reservations and was applied successfully on 2026-09-06. The isolated ImageKit
 Upload V2 adapter signs the exact target path, name, size, MIME type, overwrite
 policy, privacy, and expiry into a short-lived JWT. It is not imported by the
 live Admin UI, and the pilot remains disabled until same-account preflight,
-migration `0037`, authenticated issuance, atomic finalization, and bounded
+the Batch 7A.2f lifecycle migration, authenticated issuance, atomic finalization, and bounded
 orphan cleanup are complete. None of these migrations activates an external
 storage provider by itself.
 
+Migration `0037_home_page_editor.sql` adds the HOME V2 configuration and
+service-only snapshot/save functions. It copies the current public HOME once,
+preserves all legacy rows, and never resets an existing HOME V2 configuration.
+Apply the file manually after `0036`; it has not been deployed by the agent.
+Until then `/admin/v2/pages/home` provides a read-only preview and the public
+homepage continues to use its existing content. After rollout, Sections & order
+controls visibility and order for Hero, About, Code in motion, the video
+interlude, and Stories. Every content section has its own inspector; disabling
+one retains its text and media. The shared Footer stays in site settings and
+CNC source programs retain their existing manager. Saves publish only the active
+section, reject concurrent stale snapshots, and protect even hidden media from
+accidental deletion. Classic HOME writes hand off to V2 once its snapshot is
+available. Migration `0038` is allocated to admin session hardening; assign
+ImageKit's still-planned lifecycle migration the next available number when implemented.
+
+Migration `0038_admin_session_hardening.sql` adds service-only session-liveness
+and atomic recovery-challenge RPCs and strengthens existing admin RLS against
+revoked-session replay. Apply manually after `0037`, then run
+`supabase/checks/0038_admin_session_hardening.sql`; every check should be true.
+It preserves portfolio data, accounts, MFA factors and active sessions. Only
+obsolete duplicate recovery challenges are removed, retaining the newest usable
+challenge. It has not been deployed by the agent. Until applied, a missing RPC
+retains the previous session behavior and Security Center shows a warning;
+real RPC errors fail closed. Immediate revocation applies to subsequent requests,
+not already-running operations.
+
+Admin V2 now edits the shared owner name in `/admin/v2/navigation` and the
+three font roles plus white-soul/red-light footer in
+`/admin/v2/settings/appearance`, with local previews and explicit publish.
+These settings use existing columns and need no additional migration.
+See `docs/admin-audit-2026-09-20.md` for hardening coverage and rollout checks.
+
 The new dashboard shell lives at `/admin/v2`; its navigation workspace is
 `/admin/v2/navigation`. The 1:1 page editors live at `/admin/v2/pages/music`,
-`/admin/v2/pages/bio`, `/admin/v2/pages/gallery`,
+`/admin/v2/pages/home`, `/admin/v2/pages/bio`, `/admin/v2/pages/gallery`,
 `/admin/v2/pages/showreel`, and `/admin/v2/pages/contact`; each shares
 presentation components with its public
 page, provides 1440 px and 390 px preview viewports, and saves one visible
@@ -460,7 +492,7 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. All Supabase migrations through `0035_media_pipeline_integrity_guards.sql` are applied
+1. All Supabase migrations through `0038_admin_session_hardening.sql` are applied
    manually on the currently linked project. Take a full backup and reconcile
    the pre-existing empty CLI history before using `db push`.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP

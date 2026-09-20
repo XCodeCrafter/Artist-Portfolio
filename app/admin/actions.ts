@@ -336,21 +336,26 @@ export async function updateAdminPassword(
 }
 
 export async function logoutAdmin() {
+  // This endpoint is callable without a session. Validate the origin without
+  // writing a security event before performing any Auth or audit operation.
+  if (!(await verifyPublicAuthActionOrigin("logout"))) {
+    redirect("/admin");
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user && !(await verifyAdminActionOrigin(user.id, "logout"))) {
-    redirect("/admin");
-  }
-
+  const approved = user && (await isAllowedAdmin(user));
   await supabase.auth.signOut();
-  await writeAuditLog({
-    actorId: user?.id,
-    action: "admin_logout",
-    metadata: { email: user?.email },
-  });
+  if (approved && user) {
+    await writeAuditLog({
+      actorId: user.id,
+      action: "admin_logout",
+      metadata: { email: user.email },
+    });
+  }
 
   redirect("/admin/login");
 }

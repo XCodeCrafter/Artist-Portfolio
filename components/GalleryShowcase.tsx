@@ -29,6 +29,8 @@ type GalleryShowcaseProps = {
   interludeVideoSrc?: string;
   presentation: GalleryPresentation;
   mode?: "gallery" | "narrative";
+  narrativeSection?: "all" | "feature" | "stories";
+  staticPreview?: boolean;
   interludeCtaHref?: string;
   interludeCtaLabel?: string;
   interludeBody?: string;
@@ -409,6 +411,8 @@ type FreelanceStoryProps = {
   motto: string;
   onOpen: (image: GalleryImage) => void;
   sectionTitle: string;
+  label?: string;
+  scrollLabel?: string;
 };
 
 function StoryIntro({
@@ -495,6 +499,8 @@ function FreelanceStory({
   motto,
   onOpen,
   sectionTitle,
+  label,
+  scrollLabel,
 }: FreelanceStoryProps) {
   const storyRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = useReducedMotion();
@@ -511,6 +517,7 @@ function FreelanceStory({
   if (reduceMotion) {
     return (
       <section className="mt-20 border-t border-white/10 pt-16 sm:mt-28 sm:pt-24">
+        {label ? <p className="mb-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">{label}</p> : null}
         <div className="grid gap-14">
           {storyImages.map((image, index) => (
             <article className="grid items-center gap-7 lg:grid-cols-[0.82fr_1.18fr] lg:gap-14" key={`${image.id}-reduced-story-frame`}>
@@ -534,6 +541,12 @@ function FreelanceStory({
 
   return (
     <section className="mt-20 border-t border-white/10 pt-16 sm:mt-28 sm:pt-24">
+      {label || scrollLabel ? (
+        <div className="mb-8 flex flex-wrap justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/45">
+          <p>{label}</p>
+          {scrollLabel ? <p className="hidden lg:block">{scrollLabel}</p> : null}
+        </div>
+      ) : null}
       <div
         className="hidden lg:block"
         ref={storyRef}
@@ -606,6 +619,10 @@ function GalleryInterlude({
   title,
   videoSrc,
   flushTop = false,
+  staticPreview = false,
+  label,
+  meta,
+  eyebrow,
 }: {
   body: string;
   ctaHref?: string;
@@ -614,6 +631,10 @@ function GalleryInterlude({
   title: string;
   videoSrc: string;
   flushTop?: boolean;
+  staticPreview?: boolean;
+  label?: string;
+  meta?: string;
+  eyebrow?: string;
 }) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -638,13 +659,13 @@ function GalleryInterlude({
     const video = videoRef.current;
     if (!video) return;
 
-    if (reduceMotion) {
+    if (reduceMotion || staticPreview) {
       video.pause();
       return;
     }
 
     void video.play().catch(() => setIsPlaying(false));
-  }, [reduceMotion, videoSrc]);
+  }, [reduceMotion, staticPreview, videoSrc]);
 
   function togglePlayback() {
     const video = videoRef.current;
@@ -669,7 +690,9 @@ function GalleryInterlude({
         className="absolute -inset-y-[12%] inset-x-0"
         style={{ scale: mediaScale, y: mediaY }}
       >
-        <video
+        {staticPreview || !videoSrc ? (
+          posterSrc ? <Image alt="" className="object-cover" fill sizes="100vw" src={posterSrc} /> : null
+        ) : <video
           autoPlay={!reduceMotion}
           className="h-full w-full object-cover"
           loop
@@ -681,15 +704,21 @@ function GalleryInterlude({
           preload="metadata"
           ref={videoRef}
           src={videoSrc}
-        />
+        />}
       </motion.div>
 
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.5)_0%,rgba(0,0,0,0.08)_40%,rgba(0,0,0,0.78)_100%)]" />
       <div className="pointer-events-none absolute inset-0 bg-black/10" />
 
       <div className="relative z-10 mx-auto flex h-full max-w-[1500px] flex-col justify-end px-5 py-8 sm:px-8 sm:py-11 lg:px-12 lg:py-14">
+        {label || meta ? (
+          <div className="mb-auto flex flex-wrap justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
+            <p>{label}</p><p>{meta}</p>
+          </div>
+        ) : null}
         <div className="flex items-end justify-between gap-6">
           <div className="max-w-5xl">
+            {eyebrow ? <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">{eyebrow}</p> : null}
             <h2
               className={`${homeSectionHeadingClass} text-[var(--accent)]`}
             >
@@ -707,7 +736,7 @@ function GalleryInterlude({
             />
           </div>
 
-          <button
+          {videoSrc && !staticPreview ? <button
             aria-label={isPlaying ? "Pause interlude" : "Play interlude"}
             className="mb-1 grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/20 bg-black/35 text-sm text-white backdrop-blur transition hover:border-white/45 hover:bg-white hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/50"
             onClick={togglePlayback}
@@ -715,7 +744,7 @@ function GalleryInterlude({
             type="button"
           >
             {isPlaying ? <FaPause aria-hidden="true" /> : <FaPlay aria-hidden="true" />}
-          </button>
+          </button> : null}
         </div>
       </div>
     </section>
@@ -731,6 +760,8 @@ export default function GalleryShowcase({
   interludeTitle,
   interludeVideoSrc = "/media/hero-loop.mp4",
   mode = "gallery",
+  narrativeSection = "all",
+  staticPreview = false,
   presentation,
   storyCtaHref,
   storyCtaLabel,
@@ -851,9 +882,9 @@ export default function GalleryShowcase({
     <section
       className={cx(
         "public-nav-anchor relative overflow-x-clip px-5 sm:px-8",
-        mode === "gallery" ? "py-16 sm:py-24" : "pb-16 sm:pb-24"
+        mode === "gallery" ? "py-16 sm:py-24" : narrativeSection === "feature" ? "" : "pb-16 sm:pb-24"
       )}
-      id={mode === "gallery" ? "gallery" : "home-stories"}
+      id={mode === "gallery" ? "gallery" : narrativeSection === "feature" ? "home-feature" : "home-stories"}
     >
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent_24%,rgba(255,59,31,0.045)_62%,transparent)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
@@ -926,24 +957,30 @@ export default function GalleryShowcase({
           </>
         ) : (
           <>
-            <GalleryInterlude
-              body={interludeBody || presentation.interludeEyebrow}
+            {narrativeSection !== "stories" ? <GalleryInterlude
+              body={interludeBody ?? presentation.interludeEyebrow}
               ctaHref={interludeCtaHref}
               ctaLabel={interludeCtaLabel}
               flushTop
               posterSrc={interludePosterSrc}
-              title={interludeTitle || presentation.interludeTitle}
+              title={interludeTitle ?? presentation.interludeTitle}
               videoSrc={interludeVideoSrc}
-            />
+              staticPreview={staticPreview}
+              label={narrativeSection === "feature" ? presentation.interludeLabel : undefined}
+              meta={narrativeSection === "feature" ? presentation.interludeMeta : undefined}
+              eyebrow={narrativeSection === "feature" ? presentation.interludeEyebrow : undefined}
+            /> : null}
 
-            <FreelanceStory
+            {narrativeSection !== "feature" ? <FreelanceStory
               ctaHref={storyCtaHref}
               ctaLabel={storyCtaLabel}
               images={storyImages}
-              motto={storyBody || presentation.storyScrollLabel}
+              motto={storyBody ?? presentation.storyScrollLabel}
               onOpen={(image) => openImage(image, "story")}
-              sectionTitle={storyTitle || presentation.storyLabel}
-            />
+              sectionTitle={storyTitle ?? presentation.storyLabel}
+              label={narrativeSection === "stories" ? presentation.storyLabel : undefined}
+              scrollLabel={narrativeSection === "stories" ? presentation.storyScrollLabel : undefined}
+            /> : null}
           </>
         )}
       </div>
