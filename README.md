@@ -492,9 +492,13 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. All Supabase migrations through `0038_admin_session_hardening.sql` are applied
-   manually on the currently linked project. Take a full backup and reconcile
-   the pre-existing empty CLI history before using `db push`.
+1. The owner has confirmed manual rollout through `0045_contact_optional_copy.sql`
+   on the currently linked project, including the matching read-only checks for
+   migrations `0039`–`0045`. For another deployment, apply only missing forward
+   migrations in order and run their corresponding `supabase/checks/` scripts;
+   never replay older migrations over newer functions or registries. Take a full
+   backup and reconcile the pre-existing empty CLI history before using `db push`.
+   `TODO.md` records remaining rollout, browser-audit and production gates.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare
@@ -508,7 +512,7 @@ consistent in the admin content.
 5. For security-sensitive deployments, enable a session time-box, inactivity
    timeout, and single-session mode in Supabase Auth settings.
 6. Sign in once per admin and complete TOTP enrollment.
-7. Confirm all checks pass in `/admin`, then test recovery, MFA, upload, and
+7. Review the checks in `/admin/v2/security`, then test recovery, MFA, upload, and
    contact delivery.
 8. Monitor `GET /api/health`. Anonymous requests receive a cheap cached
    liveness response. Set `HEALTHCHECK_SECRET` and send it as
