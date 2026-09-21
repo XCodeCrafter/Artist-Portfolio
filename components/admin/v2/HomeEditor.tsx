@@ -6,6 +6,7 @@ import { FaArrowDown, FaArrowUp, FaCheck, FaDesktop, FaExternalLinkAlt, FaMobile
 import { saveHomeSectionV2 } from "@/app/admin/v2/pages/home/actions";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
 import HomePreviewFrame, { type HomePreviewDevice } from "@/components/admin/v2/HomePreviewFrame";
 import {
   HOME_EDITOR_SECTIONS, HOME_SECTION_LABELS, INITIAL_HOME_SAVE_STATE,
@@ -77,7 +78,7 @@ function ContentInspector({ section, draft, assets, errors, instance, onChange }
   if (section === "cnc") return <div className="grid gap-5">
     <p className="rounded-2xl bg-white/5 p-4 text-xs leading-5 text-white/55">This optional section shows your code programs. Turn it off in Page sections if it does not belong in this portfolio.</p>
     {field("eyebrow", "Small label", false, 220)}{field("title", "Heading", true, 220)}{field("body", "Description", true, 5000)}
-    <Link className={buttonClass} href="/admin/content#home-cnc">Manage code programs <FaExternalLinkAlt /></Link>
+    <Link className={buttonClass} href="/admin/v2/pages/home/programs">Manage code programs <FaExternalLinkAlt /></Link>
   </div>;
   if (section === "feature") return <div className="grid gap-5">
     {field("title", "Heading", true, 220)}{field("body", "Description", true, 5000)}
@@ -125,9 +126,8 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
   const { markDirty, clearDirty, confirmDiscard } = useUnsavedChangesGuard("You have unsaved Home changes. Leave and discard them?", true);
 
   const clientAction = useCallback(async (previous: HomeSaveState, formData: FormData) => {
-    try {
-      const result = await saveHomeSectionV2(previous, formData);
-      if (result.status === "saved" && result.section && result.canonicalSection && result.versions) {
+    return runEditorSave(previous, () => saveHomeSectionV2(previous, formData), (result) => {
+      if (result.status === "saved" && result.section === formData.get("section") && result.section && result.canonicalSection && result.versions) {
         const parsed = parseHomeSectionSubmission(result.section, result.canonicalSection, result.versions);
         if (parsed.success) {
           const next = { ...draftRef.current, [result.section]: parsed.data.payload } as HomeEditorDraft;
@@ -137,19 +137,18 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
           setDraft(next); setBaseline(saved); setVersions(parsed.data.versions as HomeEditorVersions);
           if (!getDirtyHomeSections(saved, next).length) clearDirty();
           setAnnouncement(`${HOME_SECTION_LABELS[result.section]} saved and published.`);
+          return true;
         }
       }
-      return result;
-    } catch {
-      return { status: "error", message: "The save could not be confirmed. Your draft is kept. Reload before trying again.", eventId: crypto.randomUUID() } as HomeSaveState;
-    }
+      return false;
+    });
   }, [clearDirty]);
   const [saveState, formAction, pending] = useActionState(clientAction, INITIAL_HOME_SAVE_STATE);
   const dirty = getDirtyHomeSections(baseline, draft);
   const validation = parseHomeSectionSubmission(activeSection, draft[activeSection], versions);
-  const visibleResponse = Boolean(saveState.eventId && saveState.eventId !== dismissedEvent);
+  const visibleResponse = needsEditorReload(saveState) || Boolean(saveState.eventId && saveState.eventId !== dismissedEvent);
   const errors: FieldErrors = { ...(!validation.success ? validation.fieldErrors : {}), ...(visibleResponse && saveState.section === activeSection ? saveState.fieldErrors : {}) };
-  const locked = disabled || pending;
+  const locked = disabled || pending || needsEditorReload(saveState);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -206,9 +205,9 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
           <button type="button" className={`${buttonClass} px-2.5`} disabled={index === 0} aria-label={`Move ${HOME_SECTION_LABELS[item.id]} up`} onClick={() => move(index, -1)}><FaArrowUp /></button>
           <button type="button" className={`${buttonClass} px-2.5`} disabled={index === draft.layout.length - 1} aria-label={`Move ${HOME_SECTION_LABELS[item.id]} down`} onClick={() => move(index, 1)}><FaArrowDown /></button>
         </div>
-        <div className="mt-2 flex items-center justify-between pl-7 text-xs"><span className={item.enabled ? "text-emerald-200/60" : "text-white/35"}>{item.enabled ? "Visible on Home" : "Hidden · content kept"}</span><button type="button" className="min-h-9 px-2 text-white/65 underline underline-offset-4" onClick={() => select(item.id)}>Edit content</button></div>
+        <div className="mt-2 flex items-center justify-between pl-7 text-xs"><span className={item.enabled ? "text-emerald-200/60" : "text-white/35"}>{item.enabled ? "Enabled · shown when content is ready" : "Hidden · content kept"}</span><button type="button" className="min-h-9 px-2 text-white/65 underline underline-offset-4" onClick={() => select(item.id)}>Edit content</button></div>
       </li>)}</ol>
-      <p className="text-xs leading-5 text-white/40">At least one section stays visible. The shared footer is managed in site settings.</p>
+      <p className="text-xs leading-5 text-white/40">At least one section stays enabled. Empty sections may stay hidden until you add their content. The shared footer is managed in site settings.</p>
       <Link href="/admin/v2/settings" className={buttonClass}>Site settings <FaExternalLinkAlt /></Link>
     </> : <>
       {!draft.layout.find((row) => row.id === activeSection)?.enabled ? <p className="rounded-2xl bg-amber-300/5 p-3 text-xs leading-5 text-amber-100/70">This section is hidden. You can still edit its content. Enable it in Page sections when ready.</p> : null}
@@ -238,7 +237,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
     <div className={`grid items-start gap-4 ${inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_380px]" : ""}`}>
       <section className="min-w-0">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-white/40">{draft.layout.filter((row) => row.enabled).length} of {draft.layout.length} sections visible · click to edit</p>
+          <p className="text-xs text-white/40">{draft.layout.filter((row) => row.enabled).length} of {draft.layout.length} sections enabled · empty sections may not appear</p>
           <div className="flex gap-2">
             <button type="button" className={buttonClass} aria-label="Desktop preview" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")}><FaDesktop /></button>
             <button type="button" className={buttonClass} aria-label="Mobile preview" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")}><FaMobileAlt /></button>
@@ -254,7 +253,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
     </div>
     {visibleResponse ? <div role="status" className={`mt-4 rounded-2xl border p-4 text-sm ${saveState.status === "saved" ? "border-emerald-300/15 text-emerald-100/80" : "border-red-300/20 text-red-100/80"}`}>
       {saveState.message}
-      {saveState.status === "conflict" || saveState.status === "error" ? <button type="button" className={`${buttonClass} ml-3`} onClick={() => confirmDiscard(() => window.location.reload())}>Reload saved Home</button> : null}
+      {needsEditorReload(saveState) || saveState.status === "error" ? <button type="button" className={`${buttonClass} ml-3`} onClick={() => confirmDiscard(() => window.location.reload())}>Reload saved Home</button> : null}
     </div> : null}
     <footer className={`${panelClass} sticky bottom-3 z-20 mt-4 flex flex-wrap items-center justify-between gap-4 p-4 shadow-xl`}>
       <div><p className="text-sm font-semibold text-white/85">{disabled ? "Review-only editor" : dirty.length ? `${dirty.length} unsaved ${dirty.length === 1 ? "section" : "sections"}` : "All Home changes saved"}</p>

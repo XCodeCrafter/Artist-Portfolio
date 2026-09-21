@@ -44,7 +44,6 @@ import useUnsavedChangesGuard, {
   isGuardedFormResubmission,
 } from "@/components/admin/useUnsavedChangesGuard";
 import {
-  deleteMediaAsset,
   deleteMediaGalleryImage,
   deleteShowreelVideo,
   finalizeMediaUpload,
@@ -1384,27 +1383,9 @@ function AssetCard({
           inGallery={inGallery}
           portfolioType={portfolioType}
         />
-        <form
-          action={deleteMediaAsset}
-          onSubmit={(event) => {
-            if (
-              !isGuardedFormResubmission(event.currentTarget) &&
-              !window.confirm(`Move "${asset.label}" to Trash?`)
-            ) {
-              event.preventDefault();
-            }
-          }}
-        >
-          <input name="id" type="hidden" value={asset.id} />
-          <ActionButton
-            className={dangerButtonClass}
-            disabled={disabled || usage.length > 0}
-            pendingLabel="Moving..."
-          >
-            <FaTrash />
-            {usage.length ? "Remove usage first" : "Move to Trash"}
-          </ActionButton>
-        </form>
+        <Link className={dangerButtonClass} href="/admin/v2/media">
+          <FaTrash /> Manage removal in V2
+        </Link>
       </div>
       </>
       )}

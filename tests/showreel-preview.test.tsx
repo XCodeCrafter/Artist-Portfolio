@@ -64,6 +64,14 @@ const pageData: ShowreelPageViewData = {
 };
 
 describe("Showreel inert preview regression", () => {
+  it.each(["public", "preview"] as const)("renders an empty %s catalog without demo players", (mode) => {
+    const markup = renderToStaticMarkup(<ShowreelWorks mode={mode} presentation={presentation} videos={[]} />);
+    expect(markup).toContain(presentation.emptyText);
+    expect(markup).not.toContain("<video");
+    expect(markup).not.toContain("<iframe");
+    expect(markup).not.toContain("Direct reel");
+  });
+
   it("does not mount video or iframe resources inside editor preview regions", () => {
     const markup = renderToStaticMarkup(
       <ShowreelWorks
@@ -103,6 +111,16 @@ describe("Showreel inert preview regression", () => {
       new URL("../components/ShowreelWorks.tsx", import.meta.url),
       "utf8"
     )).toContain("<iframe");
+  });
+  it("constrains mobile grid tracks instead of deriving width from cinematic minimum height", () => {
+    const markup = renderToStaticMarkup(<ShowreelWorks presentation={presentation} videos={videos} />);
+    // 18rem × 16/7 previously forced a ~658px intrinsic track on a 390px phone.
+    expect(markup).toContain("grid grid-cols-1 gap-x-5");
+    expect(markup.match(/<article class="min-w-0 /g)).toHaveLength(videos.length);
+    expect(markup).toContain("aspect-video lg:aspect-[16/7] lg:min-h-72");
+    expect(markup).not.toContain("aspect-[16/7] min-h-72");
+    expect(markup).toContain('preload="metadata"');
+    expect(markup).toContain("playsInline");
   });
 
   it("does not offer an unbounded Other embed provider in the V2 inspector", () => {

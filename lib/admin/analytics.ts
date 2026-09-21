@@ -6,6 +6,7 @@ import {
   getAnalyticsPageLabel,
   type AnalyticsRangeDays,
 } from "@/lib/admin/analytics-shared";
+import { ANALYTICS_COLLECTION_VERSION } from "@/lib/analytics-session";
 
 export {
   ANALYTICS_RANGE_DAYS,
@@ -37,6 +38,8 @@ export type AnalyticsSummary = {
   bookingSubmits: number;
   bookingPageViews: number;
   uniqueSessions: number;
+  legacyEvents: number;
+  matchingEvents: number | null;
   topPages: Array<{ label: string; value: number }>;
   topTargets: Array<{ label: string; value: number; href: string }>;
   topSources: Array<{ label: string; value: number }>;
@@ -64,7 +67,7 @@ export type AnalyticsSummary = {
   recentEvents: AnalyticsEvent[];
 };
 
-type AnalyticsEventRow = {
+export type AnalyticsEventRow = {
   id: string;
   event_name: string;
   page_path: string;
@@ -102,6 +105,8 @@ export function emptyAnalyticsSummary(
     bookingSubmits: 0,
     bookingPageViews: 0,
     uniqueSessions: 0,
+    legacyEvents: 0,
+    matchingEvents: null,
     topPages: [],
     topTargets: [],
     topSources: [],
@@ -168,16 +173,7 @@ function metadataString(event: AnalyticsEvent, key: string) {
 }
 
 function getSourceLabel(event: AnalyticsEvent) {
-  const coarse = metadataString(event, "referrerDomain");
-  if (coarse) return coarse;
-
-  const legacy = metadataString(event, "referrer");
-  if (!legacy) return "Direct / unknown";
-  try {
-    return new URL(legacy).hostname.replace(/^www\./, "") || "Direct / unknown";
-  } catch {
-    return "Direct / unknown";
-  }
+  return metadataString(event, "acquisitionSource") || "Direct / unknown";
 }
 
 function getDeviceLabel(event: AnalyticsEvent) {
@@ -205,7 +201,8 @@ const ENGAGEMENT_LABELS: Record<string, string> = {
   gallery_open: "Gallery opens",
   video_open: "Video opens",
   video_play: "Video plays",
-  contact_start: "Contact starts",
+  contact_open: "Contact link opens",
+  contact_start: "Contact forms started",
 };
 
 function getVitalRating(
@@ -231,12 +228,16 @@ function getVitalRating(
       : "poor";
 }
 
-function buildSummary(
+export function buildAnalyticsSummary(
   rows: AnalyticsEventRow[],
   rangeDays: AnalyticsRangeDays,
-  isCapped = false
+  isCapped = false,
+  matchingEvents: number | null = null
 ): AnalyticsSummary {
-  const events = rows.map(mapEvent);
+  // Previous algorithms cannot be repaired retrospectively. Keep their rows
+  // in storage, but never present them as consented, corrected measurements.
+  const legacyEvents = rows.filter((row) => row.metadata?.collectionVersion !== ANALYTICS_COLLECTION_VERSION).length;
+  const events = rows.filter((row) => row.metadata?.collectionVersion === ANALYTICS_COLLECTION_VERSION).map(mapEvent);
   const currentLabels = getRecentDayLabels(rangeDays);
   const previousLabels = getRecentDayLabels(rangeDays, rangeDays);
   const currentLabelSet = new Set(currentLabels);
@@ -265,16 +266,15 @@ function buildSummary(
     const daily = dailyMap.get(day) || { ...EMPTY_PERIOD };
     const isCurrent = currentLabelSet.has(day);
 
-    if (isCurrent) {
-      const sessionId = metadataString(event, "sessionId");
-      if (sessionId) sessionIds.add(sessionId);
-    }
-
     if (event.eventName === "page_view") {
       daily.pageViews += 1;
       if (isCurrent) {
         increment(pageMap, getAnalyticsPageLabel(event.pagePath));
-        increment(sourceMap, getSourceLabel(event));
+        const sessionId = metadataString(event, "sessionId");
+        if (sessionId && !sessionIds.has(sessionId)) {
+          sessionIds.add(sessionId);
+          increment(sourceMap, getSourceLabel(event));
+        }
         increment(deviceMap, getDeviceLabel(event));
         increment(browserMap, getBrowserLabel(event));
         if (event.pagePath === "/booking") bookingPageViews += 1;
@@ -282,7 +282,7 @@ function buildSummary(
     } else if (event.eventName === "outbound_click") {
       daily.outboundClicks += 1;
       if (isCurrent) {
-        const label = event.targetLabel || "External link";
+        const label = metadataString(event, "destination") || "External link";
         const existing = targetMap.get(label) || { value: 0, href: "" };
         existing.value += 1;
         targetMap.set(label, existing);
@@ -339,6 +339,8 @@ function buildSummary(
     bookingSubmits: currentPeriod.bookingSubmits,
     bookingPageViews,
     uniqueSessions: sessionIds.size,
+    legacyEvents,
+    matchingEvents,
     topPages: topEntries(pageMap),
     topTargets,
     topSources: topEntries(sourceMap),
@@ -378,9 +380,9 @@ export async function getAnalyticsSummary(
   since.setUTCHours(0, 0, 0, 0);
   since.setUTCDate(since.getUTCDate() - rangeDays * 2 + 1);
 
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from("analytics_events")
-    .select("*")
+    .select("*", { count: "exact" })
     .gte("created_at", since.toISOString())
     .order("created_at", { ascending: false })
     .limit(5000)
@@ -395,7 +397,7 @@ export async function getAnalyticsSummary(
   }
 
   return {
-    summary: buildSummary(data || [], rangeDays, (data || []).length >= 5000),
+    summary: buildAnalyticsSummary(data || [], rangeDays, typeof count !== "number" || count > (data || []).length, count ?? null),
     isConfigured: true,
   };
 }

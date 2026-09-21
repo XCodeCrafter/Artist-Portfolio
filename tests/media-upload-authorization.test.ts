@@ -20,7 +20,16 @@ const details = {
   sortOrder: 0, isPublished: true, fileName: "portrait.png", fileSize: 8, mimeType: "image/png",
 };
 function setupClient() {
-  const insert = vi.fn(async () => ({ error: null as null | { code: string; message: string } }));
+  const insert = vi.fn<(row: Record<string, unknown>) => Promise<{
+    error: null | { code: string; message: string };
+  }>>().mockResolvedValue({ error: null });
+  const maybeSingle = vi.fn(async () => ({
+    data: null as Record<string, unknown> | null,
+    error: null as { code: string; message: string } | null,
+  }));
+  const lookup = { select: vi.fn(), eq: vi.fn(), maybeSingle };
+  lookup.select.mockReturnValue(lookup);
+  lookup.eq.mockReturnValue(lookup);
   const storage = {
     createSignedUploadUrl: vi.fn(async () => ({ data: { token: "signed-upload" }, error: null })),
     list: vi.fn(async (_folder: string, options: { search: string }) => ({ data: [{ name: options.search, metadata: { size: 8 } }], error: null })),
@@ -28,11 +37,11 @@ function setupClient() {
     remove: vi.fn(),
   };
   const client = {
-    from: vi.fn(() => ({ insert })),
+    from: vi.fn(() => ({ insert, ...lookup })),
     storage: { listBuckets: vi.fn(async () => ({ data: [{ name: "portfolio-media" }], error: null })), from: vi.fn(() => storage) },
   };
   mocks.createClient.mockReturnValue(client);
-  return { client, storage, insert };
+  return { client, storage, insert, lookup };
 }
 async function prepare() {
   const result = await prepareMediaUpload(details);
@@ -91,12 +100,52 @@ describe("Supabase upload finalization authority", () => {
     expect(storage.list).not.toHaveBeenCalled();
   });
 
-  it("does not delete a registered file when a successful finalization is replayed", async () => {
-    const { storage, insert } = setupClient();
+  it("reconciles an exact registered object when a successful finalization is replayed", async () => {
+    const { storage, insert, lookup } = setupClient();
     const ticket = await prepare();
     expect((await finalizeMediaUpload(ticket)).ok).toBe(true);
+    const registered = { ...insert.mock.calls[0][0], deleted_at: null };
+    lookup.maybeSingle.mockResolvedValue({ data: registered, error: null });
+    insert.mockResolvedValue({ error: { code: "23505", message: "duplicate key" } });
+    // Metadata may legitimately differ since the first finalization. Replays
+    // must not overwrite a renamed, hidden or differently described asset.
+    expect(await finalizeMediaUpload({ ...ticket, label: "Stale client title", isPublished: false })).toEqual({ ok: true });
+    expect(lookup.eq).toHaveBeenCalledWith("id", ticket.id);
+    expect(mocks.audit).toHaveBeenCalledTimes(1);
+    expect(storage.remove).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["id", "another-id"], ["src", "https://elsewhere.invalid/photo.png"],
+    ["storage_bucket", "another-bucket"], ["storage_path", "image/another.png"],
+    ["file_size", 99], ["mime_type", "image/jpeg"], ["media_type", "video"],
+    ["deleted_at", "2026-09-20T10:00:00Z"],
+  ])("never accepts a duplicate with mismatched %s or revives trash", async (key, value) => {
+    const { storage, insert, lookup } = setupClient();
+    const ticket = await prepare();
+    expect((await finalizeMediaUpload(ticket)).ok).toBe(true);
+    const registered = { ...insert.mock.calls[0][0], deleted_at: null, [key]: value };
+    lookup.maybeSingle.mockResolvedValue({ data: registered, error: null });
     insert.mockResolvedValue({ error: { code: "23505", message: "duplicate key" } });
     expect(await finalizeMediaUpload(ticket)).toEqual({ ok: false, error: "Uploaded media could not be added to the library." });
+    expect(storage.remove).not.toHaveBeenCalled();
+  });
+
+  it.each([null, { code: "network", message: "lookup failed" }])("fails closed when a duplicate cannot be verified", async (error) => {
+    const { storage, insert, lookup } = setupClient();
+    const ticket = await prepare();
+    insert.mockResolvedValue({ error: { code: "23505", message: "duplicate key" } });
+    lookup.maybeSingle.mockResolvedValue({ data: null, error });
+    expect((await finalizeMediaUpload(ticket)).ok).toBe(false);
+    expect(storage.remove).not.toHaveBeenCalled();
+  });
+
+  it("does not swallow other insert errors as idempotent success", async () => {
+    const { storage, insert, lookup } = setupClient();
+    const ticket = await prepare();
+    insert.mockResolvedValue({ error: { code: "23514", message: "check constraint failed" } });
+    expect((await finalizeMediaUpload(ticket)).ok).toBe(false);
+    expect(lookup.maybeSingle).not.toHaveBeenCalled();
     expect(storage.remove).not.toHaveBeenCalled();
   });
 

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import BookingForm from "@/components/BookingForm";
 import ContactPreviewFrame, {
   CONTACT_PREVIEW_VIEWPORTS,
 } from "@/components/admin/v2/ContactPreviewFrame";
@@ -41,6 +42,26 @@ const runtimeSource = readFileSync(
 const proxySource = readFileSync(new URL("../proxy.ts", import.meta.url), "utf8");
 
 describe("Admin V2 Contact preview", () => {
+  it.each(["public", "preview"] as const)("hides explicitly cleared details in %s without hiding the form", (mode) => {
+    const html = renderToStaticMarkup(<ContactPageView data={{ ...draft, details: { location: " \t ", contactBlurb: " \n " } }} mode={mode} />);
+    expect(html).not.toContain("Based in:");
+    expect(html).not.toContain("Collaboration:");
+    expect(html).not.toContain("For acting, music, productions, bookings, and creative collaborations.");
+    expect(html).toContain('id="contact-form"');
+    expect(html).toContain("Send a message");
+  });
+  it("keeps backwards-compatible defaults only for missing fields", () => {
+    const html = renderToStaticMarkup(<BookingForm />);
+    expect(html).toContain("EU / Worldwide");
+    expect(html).toContain("For acting, music, productions, bookings, and creative collaborations.");
+    const locationOnly = renderToStaticMarkup(<BookingForm contactBlurb="" location="Prague" />);
+    expect(locationOnly).toContain("Based in:");
+    expect(locationOnly).toContain("Prague");
+    expect(locationOnly).not.toContain("Collaboration:");
+    const blurbOnly = renderToStaticMarkup(<BookingForm contactBlurb="Bookings" location="" />);
+    expect(blurbOnly).toContain("Collaboration:");
+    expect(blurbOnly).not.toContain("Based in:");
+  });
   it("renders selectable Hero and Contact regions while keeping the real form inert", () => {
     const preview = renderToStaticMarkup(
       <ContactPageView

@@ -198,7 +198,7 @@ describe("public Music runtime", () => {
     );
   });
 
-  it("server-renders one responsive eager Spotify iframe", () => {
+  it("keeps responsive Spotify space but makes no iframe request before consent", () => {
     const markup = renderToStaticMarkup(
       createElement(SpotifyEmbed, {
         embedUrl: "https://open.spotify.com/embed/artist/example",
@@ -208,8 +208,8 @@ describe("public Music runtime", () => {
       })
     );
 
-    expect(markup.match(/<iframe/g)).toHaveLength(1);
-    expect(markup).toContain("loading=\"eager\"");
+    expect(markup).not.toContain("<iframe");
+    expect(markup).toContain("Allow external players");
     expect(markup).toContain("--spotify-mobile-height:352px");
     expect(markup).toContain("--spotify-desktop-height:520px");
   });

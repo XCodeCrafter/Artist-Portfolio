@@ -32,6 +32,13 @@ const REVALIDATE_PATHS = [
   "/admin",
   MEDIA_PATH,
   "/admin/content",
+  "/admin/v2/media",
+  "/admin/v2/pages/home",
+  "/admin/v2/pages/bio",
+  "/admin/v2/pages/gallery",
+  "/admin/v2/pages/showreel",
+  "/admin/v2/pages/music",
+  "/admin/v2/pages/contact",
 ];
 
 const idValue = z
@@ -665,6 +672,29 @@ export async function finalizeMediaUpload(input: unknown) {
   });
 
   if (insertResult.error) {
+    if (insertResult.error.code === "23505") {
+      // A lost response can lead to retrying a successfully committed insert.
+      // A duplicate alone proves nothing: reconcile only the exact verified
+      // object, owned by this signed ticket, and never revive a trashed row or
+      // overwrite metadata that another admin may have edited since upload.
+      const existing = await supabase.from("media_assets")
+        .select("id,src,storage_bucket,storage_path,file_size,mime_type,media_type,deleted_at")
+        .eq("id", parsed.data.id)
+        .maybeSingle();
+      const asset = existing.data;
+      if (!existing.error && asset &&
+          asset.id === parsed.data.id &&
+          asset.src === publicUrl &&
+          asset.storage_bucket === MEDIA_BUCKET &&
+          asset.storage_path === parsed.data.storagePath &&
+          asset.file_size === actualSize &&
+          asset.mime_type === verifiedMimeType &&
+          asset.media_type === parsed.data.mediaType &&
+          asset.deleted_at === null) {
+        revalidateMediaSurfaces();
+        return { ok: true as const };
+      }
+    }
     // An insert can fail after another retry has already registered this file.
     // Retain the object; permanent cleanup must prove it is still unreferenced.
     console.error("Media asset insert failed after upload verification.", {
@@ -745,53 +775,11 @@ export async function updateMediaAsset(formData: FormData) {
 }
 
 export async function deleteMediaAsset(formData: FormData) {
-  const parsed = idValue.safeParse(formValue(formData, "id"));
-  if (!parsed.success) redirectToStatus("invalid-metadata", "library");
-
-  const { admin, supabase } = await getWriteContext();
-  const deleteResult = await supabase.rpc("trash_media_asset", {
-    p_asset_id: parsed.data,
-    p_actor_id: admin.id,
-  });
-
-  if (deleteResult.error) {
-    console.error(deleteResult.error);
-    if (deleteResult.error.message.includes("trash_media_asset")) {
-      redirectToStatus("trash-migration-required", "library");
-    }
-    redirectToStatus("delete-error", "library");
-  }
-
-  const outcome = (deleteResult.data as Array<{
-    outcome: "already_trashed" | "in_use" | "missing" | "trashed";
-    reference_total: number | string;
-    storage_bucket: string;
-    storage_path: string;
-  }> | null)?.[0];
-
-  if (!outcome || outcome.outcome === "missing") {
-    redirectToStatus("delete-error", "library");
-  }
-  if (outcome.outcome === "in_use") {
-    redirectToStatus("media-in-use", "library");
-  }
-  if (outcome.outcome === "already_trashed") {
-    redirectToStatus("deleted", "library");
-  }
-
-  await writeAuditLog({
-    actorId: admin.id,
-    action: "media_trash",
-    tableName: "media_assets",
-    recordId: parsed.data,
-    metadata: {
-      storageBucket: outcome.storage_bucket,
-      storagePath: outcome.storage_path,
-    },
-  });
-
-  revalidateMediaSurfaces();
-  redirectToStatus("deleted", "library");
+  // Older open Classic forms carry no media version. Never let them bypass the
+  // new usage review and explicit snapshot-based removal in V2.
+  await requireAdmin();
+  void formData;
+  redirect("/admin/v2/media");
 }
 
 export async function restoreMediaAsset(formData: FormData) {

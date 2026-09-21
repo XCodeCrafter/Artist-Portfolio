@@ -62,7 +62,7 @@ describe("unsaved-change history guard", () => {
 
   it("sequences confirmed links, forms, and reloads after compaction", () => {
     expect(guard).toContain(
-      "clearDirty(() => window.location.assign(destination.href))"
+      "confirmDiscard(() => window.location.assign(destination.href))"
     );
     expect(guard).toContain("submitter?.form === form ? submitter : undefined");
     expect(guard).toContain("isGuardedFormResubmission(form)");

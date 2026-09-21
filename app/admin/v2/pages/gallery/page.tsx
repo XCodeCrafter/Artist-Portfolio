@@ -2,15 +2,17 @@ import GalleryEditor from "@/components/admin/v2/GalleryEditor";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminGalleryEditorData } from "@/lib/admin/gallery";
 import { getMediaAssets } from "@/lib/admin/media";
+import { getVisualContentArchiveData } from "@/lib/admin/visual-content-archive";
 
 export const metadata = { title: "Gallery page · Admin V2" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminV2GalleryPage() {
   await requireAdmin();
-  const [gallery, media] = await Promise.all([
+  const [gallery, media, archive] = await Promise.all([
     getAdminGalleryEditorData(),
     getMediaAssets(),
+    getVisualContentArchiveData("gallery"),
   ]);
 
   return (
@@ -31,11 +33,12 @@ export default async function AdminV2GalleryPage() {
         <p className="mt-3 max-w-3xl text-sm leading-6 text-white/46">
           Edit the page in the same order visitors see it. Choose Hero,
           Introduction, or Frames in the real preview, then publish only that
-          section. Hidden frames remain ready to restore.
+          section. Hidden or archived frames remain recoverable; HOME Stories are separate.
         </p>
       </header>
 
       <GalleryEditor
+        archiveData={archive}
         assets={media.assets}
         disabled={
           !gallery.isConfigured ||

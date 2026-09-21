@@ -13,6 +13,7 @@ import {
 import {
   FaArrowDown,
   FaArrowUp,
+  FaArchive,
   FaCheck,
   FaChevronLeft,
   FaDesktop,
@@ -28,8 +29,13 @@ import {
   FaTimes,
 } from "react-icons/fa";
 import { saveMusicSectionV2 } from "@/app/admin/v2/pages/music/actions";
+import { loadMusicContentArchivePage, mutateMusicContentArchive } from "@/app/admin/v2/pages/music/archive-actions";
+import { ARCHIVE_PAGE_SIZE, parseArchivePage, type ArchiveData } from "@/lib/admin/content-archive-editor";
+import { parseMusicArchiveSnapshot } from "@/lib/admin/music-content-archive-editor";
+import MusicContentArchivePanel, { musicArchiveButtonClass } from "@/components/admin/v2/MusicContentArchivePanel";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
 import MusicPreviewFrame, {
   type MusicPreviewDevice,
 } from "@/components/admin/v2/MusicPreviewFrame";
@@ -37,6 +43,7 @@ import {
   INITIAL_MUSIC_SAVE_STATE,
   MUSIC_EDITOR_SECTIONS,
   getDirtyMusicSections,
+  getMusicFieldErrors,
   getMusicSectionPayload,
   getMusicSectionVersions,
   isMusicSectionDirty,
@@ -58,6 +65,7 @@ import {
 } from "@/lib/admin/music-editor";
 import type { MediaAsset } from "@/lib/admin/media";
 import { detectSocialPlatformFromUrl } from "@/lib/content/social-platforms";
+import { normalizeSpotifyArtistUrl } from "@/lib/spotify";
 
 type MusicEditorProps = {
   snapshot: MusicEditorSnapshot;
@@ -66,6 +74,13 @@ type MusicEditorProps = {
   migrationRequired: boolean;
   loadError?: string;
   mediaLoadError?: string;
+  archiveData?: Record<"platforms" | "soundcloud", ArchiveData>;
+};
+
+type ArchiveSection = "platforms" | "soundcloud";
+const EMPTY_ARCHIVE: ArchiveData = {
+  available: false, page: { items: [], total: 0, offset: 0 },
+  message: "Music archive is not available yet. Regular Music editing still works.",
 };
 
 type FieldErrors = Record<string, string[]>;
@@ -103,17 +118,6 @@ const SECTION_META: Record<
   },
 };
 
-function issueMap(error: {
-  issues: Array<{ path: PropertyKey[]; message: string }>;
-}): FieldErrors {
-  const errors: FieldErrors = {};
-  for (const issue of error.issues) {
-    const key = issue.path.map(String).join(".") || "form";
-    errors[key] = [...(errors[key] || []), issue.message];
-  }
-  return errors;
-}
-
 function validateSection(
   draft: MusicEditorDraft,
   section: MusicEditorSection
@@ -122,17 +126,14 @@ function validateSection(
     section === "hero"
       ? parseMusicHeroDraft(draft.hero)
       : section === "spotify"
-        ? parseMusicSpotifyDraft({
-            ...draft.spotify,
-            embedUrl: deriveSpotifyEmbedUrl(draft.spotify.artistUrl),
-          })
+        ? parseMusicSpotifyDraft(draft.spotify)
         : section === "platforms"
           ? parseMusicPlatformsDraft(getMusicSectionPayload(draft, section))
           : parseMusicSoundcloudDraft(draft.soundcloud);
 
   return result.success
     ? { ok: true, errors: {} }
-    : { ok: false, errors: issueMap(result.error) };
+    : { ok: false, errors: getMusicFieldErrors(result.error) };
 }
 
 function mergeErrors(...sources: FieldErrors[]) {
@@ -348,6 +349,8 @@ type InspectorFieldsProps = {
   onRemoveNewSoundcloud: (id: string) => void;
   onSpotifyChange: (patch: Partial<MusicEditorDraft["spotify"]>) => void;
   onSoundcloudHeadingChange: (value: string) => void;
+  archiveControl: (section: ArchiveSection, id: string, label: string) => ReactNode;
+  archivePanel: ReactNode;
 };
 
 function HeroInspector({
@@ -480,14 +483,13 @@ function HeroInspector({
   );
 }
 
-function SpotifyInspector({
+export function SpotifyInspector({
   draft,
   errors,
   onSpotifyChange,
 }: Pick<InspectorFieldsProps, "draft" | "errors" | "onSpotifyChange">) {
   const spotify = draft.spotify;
-  const spotifyUrlError =
-    fieldMessage(errors, "artistUrl") || fieldMessage(errors, "embedUrl");
+  const artistPlayerUrl = deriveSpotifyEmbedUrl(normalizeSpotifyArtistUrl(spotify.artistUrl));
   return (
     <div className="grid gap-5">
       <Field
@@ -503,26 +505,45 @@ function SpotifyInspector({
           value={spotify.releasesHeading}
         />
       </Field>
-      <Field error={spotifyUrlError} label="Spotify artist URL">
+      <Field error={fieldMessage(errors, "artistUrl")} label="Spotify artist URL">
         <input
           className={inputClass}
           inputMode="url"
           maxLength={2048}
-          onChange={(event) => {
-            const artistUrl = event.target.value;
-            onSpotifyChange({
-              artistUrl,
-              embedUrl: deriveSpotifyEmbedUrl(artistUrl),
-            });
-          }}
+          onChange={(event) => onSpotifyChange({ artistUrl: event.target.value })}
           placeholder="https://open.spotify.com/artist/..."
           value={spotify.artistUrl}
         />
       </Field>
-      <p className="rounded-2xl border border-white/8 bg-white/[0.025] px-4 py-3 text-xs leading-5 text-white/38">
-        Paste the normal Spotify artist link. The player link is created
-        automatically.
-      </p>
+      <div className="grid gap-3 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
+        <Field error={fieldMessage(errors, "embedUrl")} label="Spotify player link">
+          <input
+            className={inputClass}
+            inputMode="url"
+            maxLength={2048}
+            onChange={(event) => onSpotifyChange({ embedUrl: event.target.value })}
+            placeholder="https://open.spotify.com/playlist/..."
+            value={spotify.embedUrl}
+          />
+        </Field>
+        <p className="text-xs leading-5 text-white/50">
+          Paste the normal Spotify link to a playlist, album, track or artist.
+          We create the player automatically. Existing player links also work.
+        </p>
+        <button
+          className="min-h-11 rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/8 focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!artistPlayerUrl || artistPlayerUrl === spotify.embedUrl}
+          onClick={() => onSpotifyChange({ embedUrl: artistPlayerUrl })}
+          type="button"
+        >
+          Use artist releases
+        </button>
+        <p className="text-xs leading-5 text-white/45">
+          Changing the artist profile or heading will not replace your chosen
+          player. Leave the player link empty for a profile link only; clear both
+          links to hide this section from visitors.
+        </p>
+      </div>
     </div>
   );
 }
@@ -538,6 +559,8 @@ function PlatformsInspector({
   onPlatformChange,
   onRemoveNewPlatform,
   savedPlatformIds,
+  archiveControl,
+  archivePanel,
 }: Pick<
   InspectorFieldsProps,
   | "assets"
@@ -550,14 +573,16 @@ function PlatformsInspector({
   | "onPlatformChange"
   | "onRemoveNewPlatform"
   | "savedPlatformIds"
+  | "archiveControl"
+  | "archivePanel"
 >) {
   const items = draft.platforms.items;
   return (
     <div className="grid gap-4">
       <div className="flex items-start justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.025] p-3.5">
         <p className="max-w-[230px] text-xs leading-5 text-white/42">
-          Hide a saved card to remove it from the public page without deleting
-          it. New unsaved cards can be discarded.
+          Hide a saved card to keep it here, or archive it to free a slot.
+          New unsaved cards can be discarded.
         </p>
         <button
           className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
@@ -604,6 +629,8 @@ function PlatformsInspector({
               ) : null}
             </div>
           </div>
+
+          {savedPlatformIds.has(item.id) ? archiveControl("platforms", item.id, item.title || "Untitled platform") : null}
 
           <div className="mt-4 grid gap-4">
             <VisibilityToggle
@@ -685,6 +712,7 @@ function PlatformsInspector({
           No platform cards yet. Add the first destination when you are ready.
         </p>
       ) : null}
+      {archivePanel}
     </div>
   );
 }
@@ -698,6 +726,8 @@ function SoundcloudInspector({
   onSoundcloudChange,
   onSoundcloudHeadingChange,
   savedSoundcloudIds,
+  archiveControl,
+  archivePanel,
 }: Pick<
   InspectorFieldsProps,
   | "draft"
@@ -708,6 +738,8 @@ function SoundcloudInspector({
   | "onSoundcloudChange"
   | "onSoundcloudHeadingChange"
   | "savedSoundcloudIds"
+  | "archiveControl"
+  | "archivePanel"
 >) {
   const soundcloud = draft.soundcloud;
   return (
@@ -727,8 +759,8 @@ function SoundcloudInspector({
       <div className="grid gap-4 border-t border-white/8 pt-5">
         <div className="flex items-start justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.025] p-3.5">
           <p className="max-w-[230px] text-xs leading-5 text-white/42">
-            Hide a saved mix to take it off the public page and restore it
-            later. Only new unsaved mixes can be discarded.
+            Hide a saved mix to keep it here, or archive it to free a slot.
+            New unsaved mixes can be discarded.
           </p>
           <button
             className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
@@ -779,6 +811,7 @@ function SoundcloudInspector({
                 ) : null}
               </div>
             </div>
+            {savedSoundcloudIds.has(item.id) ? archiveControl("soundcloud", item.id, item.title || "Untitled mix") : null}
             <div className="mt-4 grid gap-4">
               <VisibilityToggle
                 checked={item.isPublished}
@@ -825,6 +858,7 @@ function SoundcloudInspector({
           </p>
         ) : null}
       </div>
+      {archivePanel}
     </div>
   );
 }
@@ -892,6 +926,7 @@ export default function MusicEditor({
   migrationRequired,
   loadError,
   mediaLoadError,
+  archiveData = { platforms: EMPTY_ARCHIVE, soundcloud: EMPTY_ARCHIVE },
 }: MusicEditorProps) {
   const [baseline, setBaseline] = useState(snapshot.draft);
   const [draft, setDraft] = useState(snapshot.draft);
@@ -916,6 +951,15 @@ export default function MusicEditor({
   const mobileDialogRef = useRef<HTMLDialogElement | null>(null);
   const handledEventIdsRef = useRef(new Set<string>());
   const latestSaveEventIdRef = useRef("");
+  const [archive, setArchive] = useState(archiveData);
+  const [archivePending, setArchivePending] = useState(false);
+  const [archivePagePending, setArchivePagePending] = useState(false);
+  const [archiveReloadRequired, setArchiveReloadRequired] = useState(false);
+  const archiveReloadRef = useRef(false);
+  const archiveInFlight = useRef<"mutation" | "page" | null>(null);
+  const saveInFlight = useRef(false);
+  const [archiveFeedback, setArchiveFeedback] = useState<{ message: string; error: boolean } | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState<{ section: ArchiveSection; id: string } | null>(null);
 
   const {
     clearDirty,
@@ -930,7 +974,7 @@ export default function MusicEditor({
   const applySaveResult = useCallback(
     (result: MusicSaveState) => {
       if (!result.eventId || handledEventIdsRef.current.has(result.eventId)) {
-        return;
+        return false;
       }
       handledEventIdsRef.current.add(result.eventId);
       if (handledEventIdsRef.current.size > 64) {
@@ -943,7 +987,7 @@ export default function MusicEditor({
         !result.canonicalSection ||
         !result.versions
       ) {
-        return;
+        return false;
       }
 
       const confirmed = parseMusicSectionSubmission(
@@ -952,14 +996,14 @@ export default function MusicEditor({
         result.versions,
         { requireExactCollectionVersions: true }
       );
-      if (!confirmed.success) return;
+      if (!confirmed.success) return false;
 
       const nextDraft = applyCanonicalSection(
         draftRef.current,
         result.section,
         confirmed.data.payload
       );
-      if (!nextDraft) return;
+      if (!nextDraft) return false;
       const nextBaseline = {
         ...baselineRef.current,
         [result.section]: nextDraft[result.section],
@@ -986,16 +1030,22 @@ export default function MusicEditor({
       if (!getDirtyMusicSections(nextBaseline, nextDraft).length) {
         clearDirty();
       }
+      return true;
     },
     [clearDirty]
   );
 
   const clientAction = useCallback(
     async (previousState: MusicSaveState, formData: FormData) => {
-      const result = await saveMusicSectionV2(previousState, formData);
-      latestSaveEventIdRef.current = result.eventId;
-      applySaveResult(result);
-      return result;
+      if (archiveInFlight.current === "mutation" || archiveReloadRef.current || saveInFlight.current) return previousState;
+      saveInFlight.current = true;
+      try {
+        const result = await runEditorSave(previousState, () => saveMusicSectionV2(previousState, formData), (response) => response.section === formData.get("section") && applySaveResult(response));
+        latestSaveEventIdRef.current = result.eventId;
+        return result;
+      } finally {
+        saveInFlight.current = false;
+      }
     },
     [applySaveResult]
   );
@@ -1048,16 +1098,132 @@ export default function MusicEditor({
     [activeSection, draft]
   );
   const responseVisible =
-    Boolean(saveState.eventId) && saveState.eventId !== dismissedEventId;
+    needsEditorReload(saveState) || (Boolean(saveState.eventId) && saveState.eventId !== dismissedEventId);
   const responseErrors =
     responseVisible && saveState.section === activeSection
       ? saveState.fieldErrors || {}
       : {};
   const errors = mergeErrors(validation.errors, responseErrors);
-  const editorDisabled = disabled || pending;
+  const editorDisabled = disabled || migrationRequired || Boolean(loadError) || pending || archivePending || archiveReloadRequired || needsEditorReload(saveState);
   const canSave = !editorDisabled && activeDirty && validation.ok;
   const statusIsError =
     responseVisible && !["idle", "saved"].includes(saveState.status);
+
+  function canMutateArchive(section: ArchiveSection) {
+    return archive[section].available && !editorDisabled && !archivePagePending &&
+      !archiveInFlight.current && !saveInFlight.current && !archiveReloadRef.current &&
+      !isMusicSectionDirty(baselineRef.current, draftRef.current, section);
+  }
+
+  async function mutateArchive(section: ArchiveSection, operation: "archive" | "restore", itemId: string) {
+    if (!canMutateArchive(section)) return;
+    const archivedItem = archive[section].page.items.find(item => item.id === itemId);
+    if (operation === "archive" && (!Object.hasOwn(versionsRef.current[section].items, itemId) ||
+      confirmArchive?.section !== section || confirmArchive.id !== itemId)) return;
+    if (operation === "restore" && (!archivedItem || draftRef.current[section].items.length >= (section === "platforms" ? 32 : 48))) return;
+    archiveInFlight.current = "mutation";
+    setArchivePending(true);
+    setArchiveFeedback(null);
+    try {
+      const result = await mutateMusicContentArchive({
+        section, operation, itemId,
+        expectedVersions: getMusicSectionVersions(versionsRef.current, section),
+        ...(operation === "restore" ? { expectedArchiveUpdatedAt: archivedItem!.updatedAt } : {}),
+      });
+      if (!result || typeof result.ok !== "boolean" || typeof result.message !== "string") throw new Error("Unverified archive response");
+      if (!result.ok) {
+        if (result.reloadRequired) {
+          archiveReloadRef.current = true;
+          setArchiveReloadRequired(true);
+        }
+        setArchiveFeedback({ message: result.message, error: true });
+        return;
+      }
+      const confirmed = result.section === section && parseMusicArchiveSnapshot(section, result.canonicalSection, result.versions);
+      const confirmedArchive = parseArchivePage(result.archive);
+      if (!confirmed || !confirmedArchive || confirmedArchive.offset !== 0) throw new Error("Unverified archive snapshot");
+      const restoredItem = confirmed.payload.items.find(item => item.id === itemId);
+      if ((operation === "archive" && restoredItem) || (operation === "restore" &&
+        (!restoredItem || restoredItem.isPublished || confirmedArchive.items.some(item => item.id === itemId)))) throw new Error("Unverified archive operation");
+      const nextDraft = { ...draftRef.current, [section]: confirmed.payload } as MusicEditorDraft;
+      const nextBaseline = { ...baselineRef.current, [section]: confirmed.payload } as MusicEditorDraft;
+      const nextVersions = applySavedVersions(versionsRef.current, section, confirmed.versions);
+      draftRef.current = nextDraft;
+      baselineRef.current = nextBaseline;
+      versionsRef.current = nextVersions;
+      setDraft(nextDraft);
+      setBaseline(nextBaseline);
+      setVersions(nextVersions);
+      setMediaRevision(revision => revision + 1);
+      setArchive(current => ({ ...current, [section]: { available: true, page: confirmedArchive } }));
+      setConfirmArchive(null);
+      setArchiveFeedback({ message: result.message, error: false });
+      setAnnouncement(result.message);
+      if (latestSaveEventIdRef.current) setDismissedEventId(latestSaveEventIdRef.current);
+      if (getDirtyMusicSections(nextBaseline, nextDraft).length) markDirty();
+      else clearDirty();
+    } catch {
+      archiveReloadRef.current = true;
+      setArchiveReloadRequired(true);
+      setArchiveFeedback({ error: true, message: "The archive outcome could not be confirmed. The server may have applied it. Reload the saved Music page before trying again." });
+    } finally {
+      archiveInFlight.current = null;
+      setArchivePending(false);
+    }
+  }
+
+  async function loadArchivePage(section: ArchiveSection, offset: number) {
+    if (!archive[section].available || editorDisabled || archiveInFlight.current || saveInFlight.current ||
+      !Number.isInteger(offset) || offset < 0 || offset > 1_000_000 || offset % ARCHIVE_PAGE_SIZE !== 0) return;
+    archiveInFlight.current = "page";
+    setArchivePagePending(true);
+    setArchiveFeedback(null);
+    try {
+      const result = await loadMusicContentArchivePage(section, offset);
+      const page = result && parseArchivePage(result.page);
+      if (!result?.available || !page || page.offset !== offset) {
+        setArchiveFeedback({ error: true, message: result?.message || "Archived items could not be loaded. Your current page has been kept." });
+        return;
+      }
+      setArchive(current => ({ ...current, [section]: { ...result, page } }));
+    } catch {
+      setArchiveFeedback({ error: true, message: "Archived items could not be loaded. Your current page has been kept." });
+    } finally {
+      archiveInFlight.current = null;
+      setArchivePagePending(false);
+    }
+  }
+
+  function archiveControl(section: ArchiveSection, id: string, label: string) {
+    const available = canMutateArchive(section);
+    const confirming = confirmArchive?.section === section && confirmArchive.id === id;
+    return <div className="mt-3">
+      <button aria-label={`Archive ${label}`} className={musicArchiveButtonClass} disabled={!available} onClick={() => {
+        if (canMutateArchive(section)) setConfirmArchive({ section, id });
+      }} type="button"><FaArchive /> Archive</button>
+      {confirming ? <div className="mt-3 rounded-xl border border-amber-200/15 bg-amber-200/[0.035] p-3">
+        <p className="text-xs font-semibold text-white/80">Archive {label}?</p>
+        <p className="mt-2 text-xs leading-5 text-white/50">This immediately removes the item from the public Music page. It stays recoverable in the archive. No Media files are deleted.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className={musicArchiveButtonClass} disabled={!available} onClick={() => mutateArchive(section, "archive", id)} type="button">Confirm archive</button>
+          <button className={musicArchiveButtonClass} disabled={archivePending} onClick={() => setConfirmArchive(null)} type="button">Cancel archive</button>
+        </div>
+      </div> : null}
+    </div>;
+  }
+
+  const archiveSection = activeSection === "platforms" || activeSection === "soundcloud" ? activeSection : null;
+  const archivePanel = archiveSection ? <MusicContentArchivePanel
+    activeCount={draft[archiveSection].items.length}
+    archive={archive[archiveSection]}
+    canBrowse={!editorDisabled && !archivePagePending}
+    canMutate={canMutateArchive(archiveSection)}
+    dirty={activeDirty}
+    loading={archivePagePending}
+    onPage={offset => loadArchivePage(archiveSection, offset)}
+    onRestore={id => mutateArchive(archiveSection, "restore", id)}
+    section={archiveSection}
+  /> : null;
 
   function commitDraft(next: MusicEditorDraft) {
     if (next === draftRef.current) return;
@@ -1187,7 +1353,7 @@ export default function MusicEditor({
 
   const selectSection = useCallback(
     (section: MusicEditorSection) => {
-      if (pending) return;
+      if (pending || archiveInFlight.current === "mutation") return;
       setActiveSection(section);
       setPreviewFocusRequestId((requestId) => requestId + 1);
       if (window.matchMedia("(min-width: 1280px)").matches) {
@@ -1223,6 +1389,8 @@ export default function MusicEditor({
     mediaRevision,
     savedPlatformIds,
     savedSoundcloudIds,
+    archiveControl,
+    archivePanel,
     onAddPlatform: addPlatform,
     onAddSoundcloud: addSoundcloud,
     onHeroChange: updateHero,
@@ -1240,7 +1408,11 @@ export default function MusicEditor({
       }),
   };
 
-  const statusLabel = pending
+  const statusLabel = archiveReloadRequired
+    ? "Reload required before editing"
+    : archivePending
+      ? "Updating Music archive..."
+      : pending
     ? `Saving ${SECTION_META[activeSection].label}...`
     : disabled
       ? "Saving paused"
@@ -1249,7 +1421,9 @@ export default function MusicEditor({
         : dirtySections.length
           ? `${dirtySections.length} other section${dirtySections.length === 1 ? "" : "s"} changed`
           : "Draft matches the last save";
-  const statusDetail = !validation.ok
+  const statusDetail = archiveReloadRequired
+    ? "The archive outcome needs verification. Your other drafts are kept until you choose to reload."
+    : !validation.ok
     ? "Fix the highlighted fields before saving this section."
     : responseVisible && statusIsError
       ? saveState.message
@@ -1257,9 +1431,17 @@ export default function MusicEditor({
         ? `${SECTION_META[lastSaved.section].label} last saved at ${formatSavedAt(lastSaved.savedAt)}.`
         : "Only the active section is written when you save.";
 
+  const archiveFeedbackPanel = archiveFeedback ? (
+    <section className={`mt-4 rounded-[18px] border px-4 py-3 text-sm leading-6 ${archiveFeedback.error ? "border-amber-300/16 bg-amber-400/[0.06] text-amber-50/76" : "border-emerald-300/16 bg-emerald-400/[0.06] text-emerald-50/76"}`} role={archiveFeedback.error ? "alert" : "status"}>
+      <p>{archiveFeedback.message}</p>
+      {archiveReloadRequired ? <button className={`${musicArchiveButtonClass} mt-3`} onClick={reloadAfterConflict} type="button">Reload saved Music page</button> : null}
+    </section>
+  ) : null;
+
   return (
     <form
       action={formAction}
+      id="music-content-archive"
       data-unsaved-guard-bypass="true"
       noValidate
       onSubmit={(event) => {
@@ -1402,7 +1584,7 @@ export default function MusicEditor({
                     ? "border-[#ff583f]/32 bg-[#ff3b1f] text-white"
                     : "border-white/9 bg-white/[0.035] text-white/48 hover:border-white/20 hover:text-white"
                 }`}
-                disabled={pending}
+                disabled={pending || archivePending}
                 key={section}
                 onClick={() => selectSection(section)}
                 role="tab"
@@ -1518,6 +1700,7 @@ export default function MusicEditor({
                 ) : null}
               </fieldset>
               <div className="shrink-0 border-t border-white/9 bg-[#111113] p-4 shadow-[0_-18px_50px_rgba(0,0,0,0.34)]">
+                {archiveFeedbackPanel}
                 <p className="text-xs font-semibold text-white/72">
                   {statusLabel}
                 </p>
@@ -1548,6 +1731,8 @@ export default function MusicEditor({
         </div>
       </dialog>
 
+      {archiveFeedbackPanel}
+
       {responseVisible && saveState.status !== "idle" ? (
         <section
           className={`mt-4 rounded-[18px] border px-4 py-3 text-sm leading-6 ${
@@ -1566,7 +1751,7 @@ export default function MusicEditor({
               )}
               {saveState.message}
             </span>
-            {saveState.status === "conflict" ? (
+            {needsEditorReload(saveState) ? (
               <button
                 className="min-h-10 rounded-xl border border-red-100/16 px-3 text-xs font-semibold transition hover:bg-white hover:text-black"
                 onClick={reloadAfterConflict}

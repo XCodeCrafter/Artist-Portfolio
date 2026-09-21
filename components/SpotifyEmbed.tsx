@@ -1,6 +1,8 @@
 "use client";
 
 import { useSyncExternalStore, type CSSProperties } from "react";
+import ExternalMediaGate from "@/components/privacy/ExternalMediaGate";
+import { deriveSpotifyEmbedUrl, getSpotifyOpenUrl } from "@/lib/spotify";
 
 type Props = {
   embedUrl: string;
@@ -43,8 +45,8 @@ export default function SpotifyEmbed({
   heightDesktop = 520,
   heightMobile = 352,
 }: Props) {
-  const normalizedEmbedUrl = embedUrl.trim();
-  const normalizedOpenUrl = openUrl.trim();
+  const normalizedEmbedUrl = deriveSpotifyEmbedUrl(embedUrl);
+  const normalizedOpenUrl = getSpotifyOpenUrl(embedUrl, openUrl);
   const isIOS = useSyncExternalStore(
     subscribeToDeviceState,
     detectIOS,
@@ -94,13 +96,13 @@ export default function SpotifyEmbed({
           className="relative h-[var(--spotify-mobile-height)] sm:h-[var(--spotify-desktop-height)]"
           style={frameStyle}
         >
-          <iframe
+          <ExternalMediaGate provider="Spotify"><iframe
             src={normalizedEmbedUrl}
             title={title}
             className="absolute inset-0 h-full w-full"
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
             loading="eager"
-          />
+          /></ExternalMediaGate>
         </div>
       )}
     </div>

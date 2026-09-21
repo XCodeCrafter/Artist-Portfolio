@@ -60,6 +60,7 @@ export type HeroContent = {
 };
 
 export type SiteSettings = {
+  footerContent?: import("./footer").FooterContent;
   portfolioType: PortfolioType;
   navigationConfigVersion: NavigationConfigVersion;
   hiddenNavPageSlugs: PageSlug[];

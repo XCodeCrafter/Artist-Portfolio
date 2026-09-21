@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   FaArrowRight,
   FaCheckCircle,
+  FaListUl,
   FaPalette,
   FaShieldAlt,
   FaTools,
@@ -32,7 +33,7 @@ export default function AdminV2SettingsPage() {
               Settings
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-white/46">
-              Brand, dashboard access, protection, audit history, and technical
+              Fonts, profile text, footer content, dashboard access, and technical
               checks now have one predictable home. Pick the subject; the
               implementation details can keep their dramatic monologues to
               themselves.
@@ -74,15 +75,25 @@ export default function AdminV2SettingsPage() {
               </span>
             </div>
             <h3 className="heading-ui mt-5 text-xl font-semibold text-white">
-              Fonts &amp; appearance
+              Appearance, profile &amp; footer
             </h3>
             <p className="mt-2 text-xs leading-5 text-white/38">
-              Choose headline, body, and UI fonts, then preview the white-soul
-              or red-light footer effect before publishing.
+              Choose fonts and the footer light. Edit your tagline, location,
+              introduction, site description, footer headings and buttons in the
+              same live preview, with a separate save for each section.
             </p>
             <span className="mt-5 inline-flex items-center gap-2 text-[11px] font-semibold text-white/48 transition group-hover:text-white">
-              Edit appearance <FaArrowRight className="text-[9px]" />
+              Edit fonts, profile or footer <FaArrowRight className="text-[9px]" />
             </span>
+          </Link>
+
+          <Link className={cardClass} href="/admin/v2/navigation">
+            <div className="flex items-start justify-between gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl border border-violet-200/14 bg-violet-400/8 text-violet-100/70"><FaListUl /></span>
+              <FaArrowRight className="mt-3 text-[10px] text-white/22 transition group-hover:translate-x-0.5 group-hover:text-white/64" />
+            </div>
+            <h3 className="heading-ui mt-5 text-xl font-semibold text-white">Owner name &amp; navigation</h3>
+            <p className="mt-2 text-xs leading-5 text-white/38">Change the owner’s name, choose navbar pages and their order, and add platform icons with your own links.</p>
           </Link>
 
           <Link className={cardClass} href="/admin/v2/security#access">

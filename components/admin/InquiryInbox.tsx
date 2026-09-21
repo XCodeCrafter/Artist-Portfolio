@@ -22,6 +22,7 @@ import {
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import VersionedDraftNotice from "@/components/admin/VersionedDraftNotice";
+import InboxWeeklySummary from "@/components/admin/InboxWeeklySummary";
 import useUnsavedChangesGuard, {
   getGuardedFormSubmitter,
   isGuardedFormResubmission,
@@ -807,6 +808,8 @@ export default function InquiryInbox({
           value={inquiriesAvailable ? inquirySummary.total : "—"}
         />
       </section>
+
+      <InboxWeeklySummary weekly={inquirySummary.weekly} />
 
       <section className="rounded-[22px] border border-white/9 bg-[#0f0f11]/92 p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

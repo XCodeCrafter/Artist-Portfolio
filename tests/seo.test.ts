@@ -40,7 +40,7 @@ describe("mixed public SEO", () => {
     }
   });
 
-  it("replaces old single-discipline defaults but keeps mixed custom copy", () => {
+  it("keeps saved single-discipline and mixed custom descriptions", () => {
     const legacy = contentFor(
       "musician",
       "Official music portfolio with releases and Spotify links."
@@ -50,9 +50,7 @@ describe("mixed public SEO", () => {
       "A personal archive of acting, music, and collaborative experiments."
     );
 
-    expect(getSeoIdentity(legacy).description).toContain(
-      "actor and musician portfolio"
-    );
+    expect(getSeoIdentity(legacy).description).toBe(legacy.settings.description);
     expect(getSeoIdentity(custom).description).toBe(
       custom.settings.description
     );
@@ -71,5 +69,11 @@ describe("mixed public SEO", () => {
         { "@type": "Occupation", name: "Musician" },
       ],
     });
+  });
+  it("does not reinterpret names mentioned in an owner-authored description", () => {
+    const content = contentFor("musician", "Music producer collaborating with Franky Fugazi.");
+    content.settings.artistName = "Another Artist";
+    content.heroes = { ...content.heroes, home: { ...content.heroes.home, title: "Another Artist" } };
+    expect(getSeoIdentity(content).description).toBe(content.settings.description);
   });
 });

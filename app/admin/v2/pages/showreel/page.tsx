@@ -2,15 +2,17 @@ import ShowreelEditor from "@/components/admin/v2/ShowreelEditor";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getMediaAssets } from "@/lib/admin/media";
 import { getAdminShowreelEditorData } from "@/lib/admin/showreel";
+import { getVisualContentArchiveData } from "@/lib/admin/visual-content-archive";
 
 export const metadata = { title: "Showreel page · Admin V2" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminV2ShowreelPage() {
   await requireAdmin();
-  const [showreel, media] = await Promise.all([
+  const [showreel, media, archive] = await Promise.all([
     getAdminShowreelEditorData(),
     getMediaAssets(),
+    getVisualContentArchiveData("showreel"),
   ]);
 
   return (
@@ -32,11 +34,12 @@ export default async function AdminV2ShowreelPage() {
           Edit the page in the same order visitors see it. Choose Hero,
           Introduction, or Videos in the real preview, then publish only that
           section. Music videos remain part of the same library and hidden
-          items stay ready to restore.
+          or archived items stay recoverable.
         </p>
       </header>
 
       <ShowreelEditor
+        archiveData={archive}
         assets={media.assets}
         disabled={
           !showreel.isConfigured ||

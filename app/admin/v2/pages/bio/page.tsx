@@ -2,6 +2,7 @@ import BioEditor from "@/components/admin/v2/BioEditor";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminBioEditorData } from "@/lib/admin/bio";
 import { getMediaAssets } from "@/lib/admin/media";
+import { getBioContentArchiveData } from "@/lib/admin/bio-content-archive";
 
 export const metadata = { title: "Bio page · Admin V2" };
 export const dynamic = "force-dynamic";
@@ -10,9 +11,12 @@ export default async function AdminV2BioPage() {
   // Keep authentication ahead of both service-role reads, even if this route
   // is accidentally rendered outside the protected V2 layout in the future.
   await requireAdmin();
-  const [bio, media] = await Promise.all([
+  const [bio, media, portraitsArchive, paragraphsArchive, creditsArchive] = await Promise.all([
     getAdminBioEditorData(),
     getMediaAssets(),
+    getBioContentArchiveData("portraits"),
+    getBioContentArchiveData("paragraphs"),
+    getBioContentArchiveData("credits"),
   ]);
 
   return (
@@ -34,12 +38,13 @@ export default async function AdminV2BioPage() {
           Edit the page in the same order visitors see it. Choose Hero,
           Biography, Resume, or Credits in the real preview, then publish only
           that section. Existing portraits, paragraphs, and credits stay
-          recoverable when hidden.
+          recoverable when hidden or archived.
         </p>
       </header>
 
       <BioEditor
         assets={media.assets}
+        archiveData={{ portraits: portraitsArchive, paragraphs: paragraphsArchive, credits: creditsArchive }}
         disabled={
           !bio.isConfigured ||
           bio.migrationRequired ||

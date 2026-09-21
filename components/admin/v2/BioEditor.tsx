@@ -11,9 +11,11 @@ import {
   useRef,
   useState,
   type ReactElement,
+  type ReactNode,
   type RefObject,
 } from "react";
 import {
+  FaArchive,
   FaArrowDown,
   FaArrowUp,
   FaCheck,
@@ -31,8 +33,13 @@ import {
   FaTimes,
 } from "react-icons/fa";
 import { saveBioSectionV2 } from "@/app/admin/v2/pages/bio/actions";
+import { loadBioContentArchivePage, mutateBioContentArchive } from "@/app/admin/v2/pages/bio/archive-actions";
+import { ARCHIVE_PAGE_SIZE, parseArchivePage, type ArchiveData } from "@/lib/admin/content-archive-editor";
+import { BIO_ARCHIVE_LIMITS, bioArchiveSection, parseBioArchiveSnapshot, type BioArchiveCollection, type BioArchiveData } from "@/lib/admin/bio-content-archive-editor";
+import BioContentArchivePanel, { bioArchiveButtonClass } from "@/components/admin/v2/BioContentArchivePanel";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
 import BioPreviewFrame, {
   type BioPreviewDevice,
 } from "@/components/admin/v2/BioPreviewFrame";
@@ -69,7 +76,18 @@ type BioEditorProps = {
   migrationRequired: boolean;
   loadError?: string;
   mediaLoadError?: string;
+  archiveData?: BioArchiveData;
 };
+
+const EMPTY_ARCHIVE: ArchiveData = {
+  available: false,
+  page: { items: [], total: 0, offset: 0 },
+  message: "Apply migration 0043 to enable this archive. Regular Bio editing still works.",
+};
+
+function archiveItems(draft: BioEditorDraft, collection: BioArchiveCollection) {
+  return collection === "credits" ? draft.credits.items : collection === "portraits" ? draft.biography.galleryImages : draft.biography.paragraphs;
+}
 
 type FieldErrors = Record<string, string[]>;
 
@@ -205,6 +223,10 @@ function createEmptyPortrait(): BioGalleryEditorItem {
     alt: "",
     isPublished: true,
   };
+}
+
+function isValidParagraphDelay(value: number) {
+  return Number.isInteger(value) && value >= 0 && value <= 5_000;
 }
 
 function createEmptyParagraph(index: number): BioParagraphEditorItem {
@@ -347,6 +369,8 @@ function VisibilityToggle({
 }
 
 type InspectorProps = {
+  archiveControl: (collection: BioArchiveCollection, id: string, label: string) => ReactNode;
+  archivePanel: (collection: BioArchiveCollection) => ReactNode;
   assets: MediaAsset[];
   draft: BioEditorDraft;
   errors: FieldErrors;
@@ -612,6 +636,7 @@ function BiographyInspector(props: InspectorProps) {
                   ) : null}
                 </div>
               </div>
+              {props.savedPortraitIds.has(item.id) ? props.archiveControl("portraits", item.id, item.alt || "Untitled portrait") : null}
               <div className="mt-4 grid gap-4">
                 <VisibilityToggle
                   checked={item.isPublished}
@@ -647,6 +672,7 @@ function BiographyInspector(props: InspectorProps) {
             </p>
           ) : null}
         </div>
+        {props.archivePanel("portraits")}
       </section>
 
       <section className="rounded-[20px] border border-white/9 bg-black/22 p-4">
@@ -683,6 +709,7 @@ function BiographyInspector(props: InspectorProps) {
                   ) : null}
                 </div>
               </div>
+              {props.savedParagraphIds.has(item.id) ? props.archiveControl("paragraphs", item.id, `Paragraph ${index + 1}`) : null}
               <div className="mt-4 grid gap-4">
                 <VisibilityToggle
                   checked={item.isPublished}
@@ -701,6 +728,32 @@ function BiographyInspector(props: InspectorProps) {
                     value={item.body}
                   />
                 </Field>
+                <details aria-label={`Paragraph ${index + 1} advanced settings`} className="rounded-xl border border-white/8 bg-black/15 p-3">
+                  <summary className="cursor-pointer text-xs font-semibold text-white/55">Advanced</summary>
+                  <div className="mt-4 grid gap-3">
+                    <Field
+                      error={!isValidParagraphDelay(item.revealDelay) ? "Enter a whole number from 0 to 5000 milliseconds." : fieldMessage(props.errors, `paragraphs.${index}.revealDelay`)}
+                      label="Animation delay (ms)"
+                      required
+                    >
+                      <input
+                        aria-label={`Paragraph ${index + 1} animation delay (ms)`}
+                        className={inputClass}
+                        max={5_000}
+                        min={0}
+                        onChange={(event) => props.onParagraphChange(index, {
+                          // An empty draft is invalid, not an instruction to publish 0.
+                          revealDelay: event.target.value.trim() === "" ? Number.NaN : Number(event.target.value),
+                        })}
+                        required
+                        step={1}
+                        type="number"
+                        value={Number.isFinite(item.revealDelay) ? item.revealDelay : ""}
+                      />
+                    </Field>
+                    <p className="text-xs leading-5 text-white/38">Delay before this paragraph appears. Use whole milliseconds from 0 to 5000; 0 starts immediately. An invalid draft keeps the saved timing in preview (or 0 for a new paragraph) until corrected.</p>
+                  </div>
+                </details>
               </div>
             </section>
           ))}
@@ -710,10 +763,11 @@ function BiographyInspector(props: InspectorProps) {
             </p>
           ) : null}
         </div>
+        {props.archivePanel("paragraphs")}
       </section>
 
       <p className="rounded-2xl border border-white/8 bg-white/[0.025] px-4 py-3 text-xs leading-5 text-white/38">
-        Saved items stay recoverable: switch them to hidden instead of deleting them.
+        Hide an item to keep it in the editor, or archive it to free an active slot. Both options keep it recoverable.
       </p>
     </div>
   );
@@ -796,7 +850,7 @@ function CreditsInspector(props: InspectorProps) {
       <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-3.5">
         <CollectionHeader count={items.length} label="Selected work" limit={100} onAdd={props.onAddCredit} />
         <p className="mt-3 text-xs leading-5 text-white/38">
-          Hide a saved credit to keep it recoverable. Only a new unsaved draft can be discarded.
+          Hide a saved credit to keep it here, or archive it to free an active slot. Only a new unsaved draft can be discarded.
         </p>
       </div>
       {items.map((item, index) => (
@@ -830,6 +884,7 @@ function CreditsInspector(props: InspectorProps) {
               ) : null}
             </div>
           </div>
+          {props.savedCreditIds.has(item.id) ? props.archiveControl("credits", item.id, item.title || "Untitled credit") : null}
           <div className="mt-4 grid gap-4">
             <VisibilityToggle
               checked={item.isPublished}
@@ -914,6 +969,7 @@ function CreditsInspector(props: InspectorProps) {
           No credits yet. Add the first project when it is ready.
         </p>
       ) : null}
+      {props.archivePanel("credits")}
     </div>
   );
 }
@@ -972,6 +1028,7 @@ export default function BioEditor({
   migrationRequired,
   loadError,
   mediaLoadError,
+  archiveData = { portraits: EMPTY_ARCHIVE, paragraphs: EMPTY_ARCHIVE, credits: EMPTY_ARCHIVE },
 }: BioEditorProps) {
   const [baseline, setBaseline] = useState(snapshot.draft);
   const [draft, setDraft] = useState(snapshot.draft);
@@ -995,24 +1052,33 @@ export default function BioEditor({
   const desktopFocusTargetRef = useRef<"open" | "close" | null>(null);
   const handledEventIdsRef = useRef(new Set<string>());
   const latestSaveEventIdRef = useRef("");
+  const [archive, setArchive] = useState(archiveData);
+  const [archivePending, setArchivePending] = useState(false);
+  const [archivePagePending, setArchivePagePending] = useState(false);
+  const [archiveReloadRequired, setArchiveReloadRequired] = useState(false);
+  const archiveReloadRef = useRef(false);
+  const archiveInFlight = useRef<"mutation" | "page" | null>(null);
+  const saveInFlight = useRef(false);
+  const [archiveFeedback, setArchiveFeedback] = useState<{ message: string; error: boolean } | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState<{ collection: BioArchiveCollection; id: string } | null>(null);
   const { clearDirty, confirmDiscard, hasUnsavedChanges, markDirty } =
     useUnsavedChangesGuard("You have unsaved Bio page changes. Leave and discard them?", true);
 
   const applySaveResult = useCallback(
     (result: BioSaveState) => {
-      if (!result.eventId || handledEventIdsRef.current.has(result.eventId)) return;
+      if (!result.eventId || handledEventIdsRef.current.has(result.eventId)) return false;
       handledEventIdsRef.current.add(result.eventId);
       if (handledEventIdsRef.current.size > 64) handledEventIdsRef.current = new Set([result.eventId]);
-      if (result.status !== "saved" || !result.section || !result.canonicalSection || !result.versions) return;
+      if (result.status !== "saved" || !result.section || !result.canonicalSection || !result.versions) return false;
       const confirmed = parseBioSectionSubmission(
         result.section,
         result.canonicalSection,
         result.versions,
         { requireExactCollectionVersions: true }
       );
-      if (!confirmed.success) return;
+      if (!confirmed.success) return false;
       const nextDraft = applyCanonicalSection(draftRef.current, result.section, confirmed.data.payload);
-      if (!nextDraft) return;
+      if (!nextDraft) return false;
       const nextBaseline = { ...baselineRef.current, [result.section]: nextDraft[result.section] } as BioEditorDraft;
       const nextVersions = applySavedVersions(versionsRef.current, result.section, confirmed.data.versions);
       draftRef.current = nextDraft;
@@ -1025,23 +1091,26 @@ export default function BioEditor({
       setLastSaved({ section: result.section, savedAt: result.savedAt || new Date().toISOString() });
       setAnnouncement(`${SECTION_META[result.section].label} saved.`);
       if (!getDirtyBioSections(nextBaseline, nextDraft).length) clearDirty();
+      return true;
     },
     [clearDirty]
   );
 
   const clientAction = useCallback(
     async (previousState: BioSaveState, formData: FormData) => {
+      if (archiveInFlight.current === "mutation" || archiveReloadRef.current || saveInFlight.current) return previousState;
+      saveInFlight.current = true;
       const submittedSection = formData.get("section");
       const section = BIO_EDITOR_SECTIONS.find(
         (candidate) => candidate === submittedSection
       );
       setSavingSection(section || null);
       try {
-        const result = await saveBioSectionV2(previousState, formData);
+        const result = await runEditorSave(previousState, () => saveBioSectionV2(previousState, formData), (response) => response.section === formData.get("section") && applySaveResult(response));
         latestSaveEventIdRef.current = result.eventId;
-        applySaveResult(result);
         return result;
       } finally {
+        saveInFlight.current = false;
         setSavingSection(null);
       }
     },
@@ -1097,13 +1166,157 @@ export default function BioEditor({
   );
   const activeDirty = isBioSectionDirty(baseline, draft, activeSection);
   const validation = useMemo(() => validateSection(draft, activeSection), [draft, activeSection]);
-  const responseVisible = Boolean(saveState.eventId) && saveState.eventId !== dismissedEventId;
+  const previewDraft = useMemo(() => {
+    if (draft.biography.paragraphs.every(item => isValidParagraphDelay(item.revealDelay))) return draft;
+    const savedDelays = new Map(baseline.biography.paragraphs.map(item => [item.id, item.revealDelay]));
+    return {
+      ...draft,
+      biography: {
+        ...draft.biography,
+        paragraphs: draft.biography.paragraphs.map(item => isValidParagraphDelay(item.revealDelay)
+          ? item
+          : { ...item, revealDelay: savedDelays.get(item.id) ?? 0 }),
+      },
+    };
+  }, [baseline.biography.paragraphs, draft]);
+  const responseVisible = needsEditorReload(saveState) || (Boolean(saveState.eventId) && saveState.eventId !== dismissedEventId);
   const responseErrors =
     responseVisible && saveState.section === activeSection ? saveState.fieldErrors || {} : {};
   const errors = mergeErrors(validation.errors, responseErrors);
-  const editorDisabled = disabled || pending;
+  const editorDisabled = disabled || migrationRequired || Boolean(loadError) || pending || archivePending || archiveReloadRequired || needsEditorReload(saveState);
   const canSave = !editorDisabled && activeDirty && validation.ok;
   const statusIsError = responseVisible && !["idle", "saved"].includes(saveState.status);
+
+  function canMutateArchive(collection: BioArchiveCollection) {
+    return archive[collection].available && !editorDisabled && !archivePagePending &&
+      !archiveInFlight.current && !saveInFlight.current && !archiveReloadRef.current &&
+      !isBioSectionDirty(baselineRef.current, draftRef.current, bioArchiveSection(collection));
+  }
+
+  async function mutateArchive(collection: BioArchiveCollection, operation: "archive" | "restore", itemId: string) {
+    if (!canMutateArchive(collection)) return;
+    const section = bioArchiveSection(collection);
+    const archivedItem = archive[collection].page.items.find(item => item.id === itemId);
+    const items = archiveItems(draftRef.current, collection);
+    if (operation === "archive" && (!items.some(item => item.id === itemId) ||
+      confirmArchive?.collection !== collection || confirmArchive.id !== itemId)) return;
+    if (operation === "restore" && (!archivedItem || items.length >= BIO_ARCHIVE_LIMITS[collection])) return;
+    archiveInFlight.current = "mutation";
+    setArchivePending(true);
+    setArchiveFeedback(null);
+    try {
+      const result = await mutateBioContentArchive({
+        collection, operation, itemId,
+        expectedVersions: getBioSectionVersions(versionsRef.current, section),
+        ...(operation === "restore" ? { expectedArchiveUpdatedAt: archivedItem!.updatedAt } : {}),
+      });
+      if (!result || typeof result.ok !== "boolean" || typeof result.message !== "string") throw new Error("Unverified archive response");
+      if (!result.ok) {
+        if (result.reloadRequired) {
+          archiveReloadRef.current = true;
+          setArchiveReloadRequired(true);
+        }
+        setArchiveFeedback({ message: result.message, error: true });
+        return;
+      }
+      const confirmed = result.collection === collection && result.section === section &&
+        parseBioArchiveSnapshot(collection, result.canonicalSection, result.versions);
+      const confirmedArchive = parseArchivePage(result.archive);
+      if (!confirmed || !confirmedArchive || confirmedArchive.offset !== 0) throw new Error("Unverified archive snapshot");
+      const nextDraft = { ...draftRef.current, [section]: confirmed.payload } as BioEditorDraft;
+      const confirmedItems = archiveItems(nextDraft, collection);
+      const expectedIds = new Set(items.map(item => item.id));
+      if (operation === "archive") expectedIds.delete(itemId);
+      else expectedIds.add(itemId);
+      if (confirmedItems.length !== expectedIds.size || confirmedItems.some(item => !expectedIds.has(item.id))) throw new Error("Unverified archive membership");
+      if (collection !== "credits") {
+        const siblingCollection = collection === "portraits" ? "paragraphs" : "portraits";
+        const siblingIds = new Set(archiveItems(draftRef.current, siblingCollection).map(item => item.id));
+        const confirmedSiblings = archiveItems(nextDraft, siblingCollection);
+        if (confirmedSiblings.length !== siblingIds.size || confirmedSiblings.some(item => !siblingIds.has(item.id))) throw new Error("Unverified Biography membership");
+      }
+      const restoredItem = confirmedItems.find(item => item.id === itemId);
+      if ((operation === "archive" && restoredItem) || (operation === "restore" &&
+        (!restoredItem || restoredItem.isPublished || confirmedArchive.items.some(item => item.id === itemId)))) throw new Error("Unverified archive operation");
+      const nextBaseline = { ...baselineRef.current, [section]: confirmed.payload } as BioEditorDraft;
+      const nextVersions = applySavedVersions(versionsRef.current, section, confirmed.versions);
+      draftRef.current = nextDraft;
+      baselineRef.current = nextBaseline;
+      versionsRef.current = nextVersions;
+      setDraft(nextDraft);
+      setBaseline(nextBaseline);
+      setVersions(nextVersions);
+      setMediaRevision(revision => revision + 1);
+      setArchive(current => ({ ...current, [collection]: { available: true, page: confirmedArchive } }));
+      setConfirmArchive(null);
+      setArchiveFeedback({ message: result.message, error: false });
+      setAnnouncement(result.message);
+      if (latestSaveEventIdRef.current) setDismissedEventId(latestSaveEventIdRef.current);
+      if (getDirtyBioSections(nextBaseline, nextDraft).length) markDirty();
+      else clearDirty();
+    } catch {
+      archiveReloadRef.current = true;
+      setArchiveReloadRequired(true);
+      setArchiveFeedback({ error: true, message: "The archive outcome could not be confirmed. The server may have applied it. Reload the saved Bio page before trying again." });
+    } finally {
+      archiveInFlight.current = null;
+      setArchivePending(false);
+    }
+  }
+
+  async function loadArchivePage(collection: BioArchiveCollection, offset: number) {
+    if (!archive[collection].available || editorDisabled || archiveInFlight.current || saveInFlight.current ||
+      !Number.isInteger(offset) || offset < 0 || offset > 1_000_000 || offset % ARCHIVE_PAGE_SIZE !== 0) return;
+    archiveInFlight.current = "page";
+    setArchivePagePending(true);
+    setArchiveFeedback(null);
+    try {
+      const result = await loadBioContentArchivePage(collection, offset);
+      const page = result && parseArchivePage(result.page);
+      if (!result?.available || !page || page.offset !== offset) {
+        setArchiveFeedback({ error: true, message: result?.message || "Archived items could not be loaded. Your current page has been kept." });
+        return;
+      }
+      setArchive(current => ({ ...current, [collection]: { ...result, page } }));
+    } catch {
+      setArchiveFeedback({ error: true, message: "Archived items could not be loaded. Your current page has been kept." });
+    } finally {
+      archiveInFlight.current = null;
+      setArchivePagePending(false);
+    }
+  }
+
+  function archiveControl(collection: BioArchiveCollection, id: string, label: string) {
+    const available = canMutateArchive(collection);
+    const confirming = confirmArchive?.collection === collection && confirmArchive.id === id;
+    return <div className="mt-3">
+      <button aria-label={`Archive ${label}`} className={bioArchiveButtonClass} disabled={!available} onClick={() => {
+        if (canMutateArchive(collection)) setConfirmArchive({ collection, id });
+      }} type="button"><FaArchive /> Archive</button>
+      {confirming ? <div className="mt-3 rounded-xl border border-amber-200/15 bg-amber-200/[0.035] p-3">
+        <p className="text-xs font-semibold text-white/80">Archive {label}?</p>
+        <p className="mt-2 text-xs leading-5 text-white/50">This immediately removes the item from the public Bio page. It stays recoverable in the archive. No Media files are deleted.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className={bioArchiveButtonClass} disabled={!available} onClick={() => mutateArchive(collection, "archive", id)} type="button">Confirm archive</button>
+          <button className={bioArchiveButtonClass} disabled={archivePending} onClick={() => setConfirmArchive(null)} type="button">Cancel archive</button>
+        </div>
+      </div> : null}
+    </div>;
+  }
+
+  function archivePanel(collection: BioArchiveCollection) {
+    return <BioContentArchivePanel
+      activeCount={archiveItems(draft, collection).length}
+      archive={archive[collection]}
+      canBrowse={!editorDisabled && !archivePagePending}
+      canMutate={canMutateArchive(collection)}
+      collection={collection}
+      dirty={isBioSectionDirty(baseline, draft, bioArchiveSection(collection))}
+      loading={archivePagePending}
+      onPage={offset => loadArchivePage(collection, offset)}
+      onRestore={id => mutateArchive(collection, "restore", id)}
+    />;
+  }
 
   function commitDraft(next: BioEditorDraft) {
     if (next === draftRef.current) return;
@@ -1255,7 +1468,7 @@ export default function BioEditor({
 
   const selectSection = useCallback(
     (section: BioEditorSection) => {
-      if (pending || savingSection) return;
+      if (pending || savingSection || archiveInFlight.current === "mutation") return;
       setActiveSection(section);
       setPreviewFocusRequestId((value) => value + 1);
       if (window.matchMedia("(min-width: 1280px)").matches) setInspectorOpen(true);
@@ -1289,6 +1502,8 @@ export default function BioEditor({
   }
 
   const inspectorProps: Omit<InspectorProps, "instance"> = {
+    archiveControl,
+    archivePanel,
     assets,
     draft,
     errors,
@@ -1313,7 +1528,11 @@ export default function BioEditor({
     onDiscardCredit: (id) => discardNew("credit", id),
   };
 
-  const statusLabel = pending
+  const statusLabel = archiveReloadRequired
+    ? "Reload saved Bio page to continue"
+    : archivePending
+      ? "Updating Bio archive..."
+      : pending
     ? `Saving ${SECTION_META[savingSection || activeSection].label}...`
     : disabled
       ? "Editor is read-only"
@@ -1324,7 +1543,9 @@ export default function BioEditor({
           : dirtySections.length
             ? `${dirtySections.length} other ${dirtySections.length === 1 ? "section has" : "sections have"} unsaved changes`
             : "All Bio changes are saved";
-  const statusDetail = migrationRequired
+  const statusDetail = archiveReloadRequired
+    ? "The archive outcome needs verification. Your other drafts are kept until you choose to reload."
+    : migrationRequired
     ? "Database migration 0030 is required before this editor can publish."
     : loadError
       ? loadError
@@ -1340,8 +1561,15 @@ export default function BioEditor({
             ? `${SECTION_META[lastSaved.section].label} last saved at ${formatSavedAt(lastSaved.savedAt)}.`
             : "Select a section in the preview or use the tabs above.";
 
+  const archiveFeedbackPanel = archiveFeedback ? (
+    <section className={`mt-4 rounded-[18px] border px-4 py-3 text-sm leading-6 ${archiveFeedback.error ? "border-amber-300/16 bg-amber-400/[0.06] text-amber-50/76" : "border-emerald-300/16 bg-emerald-400/[0.06] text-emerald-50/76"}`} role={archiveFeedback.error ? "alert" : "status"}>
+      <p>{archiveFeedback.message}</p>
+      {archiveReloadRequired ? <button className={`${bioArchiveButtonClass} mt-3`} onClick={reloadAfterConflict} type="button">Reload saved Bio page</button> : null}
+    </section>
+  ) : null;
+
   return (
-    <form action={formAction} data-unsaved-guard-bypass="true">
+    <form action={formAction} data-unsaved-guard-bypass="true" id="bio-content-archive">
       <input name="section" readOnly type="hidden" value={activeSection} />
       <input name="payload" readOnly type="hidden" value={JSON.stringify(getBioSectionPayload(draft, activeSection))} />
       <input name="versions" readOnly type="hidden" value={JSON.stringify(getBioSectionVersions(versions, activeSection))} />
@@ -1410,7 +1638,7 @@ export default function BioEditor({
               <button
                 aria-pressed={active}
                 className={`relative min-h-10 shrink-0 rounded-xl border px-3 text-xs font-semibold transition ${active ? "border-[#ff583f]/32 bg-[#ff3b1f] text-white" : "border-white/9 bg-white/[0.035] text-white/48 hover:border-white/20 hover:text-white"}`}
-                disabled={pending}
+                disabled={pending || archivePending}
                 key={section}
                 onClick={() => selectSection(section)}
                 type="button"
@@ -1426,7 +1654,7 @@ export default function BioEditor({
       <div className={`grid gap-4 xl:items-start ${inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_minmax(350px,440px)]" : "xl:grid-cols-[minmax(0,1fr)_64px]"}`}>
         <BioPreviewFrame
           device={device}
-          draft={draft}
+          draft={previewDraft}
           focusRequestId={previewFocusRequestId}
           footer={snapshot.footer}
           hasResumeDetails={snapshot.hasResumeDetails}
@@ -1481,6 +1709,7 @@ export default function BioEditor({
                 ) : null}
               </fieldset>
               <div className="shrink-0 border-t border-white/9 bg-[#111113] p-4 shadow-[0_-18px_50px_rgba(0,0,0,0.34)]">
+                {archiveFeedbackPanel}
                 <p className="text-xs font-semibold text-white/72">{statusLabel}</p>
                 <p aria-live={statusIsError ? "assertive" : "polite"} className={`mt-1 text-[11px] leading-5 ${statusIsError ? "text-red-100/72" : "text-white/38"}`}>
                   {responseVisible && saveState.status !== "idle" ? saveState.message : statusDetail}
@@ -1495,6 +1724,8 @@ export default function BioEditor({
         </div>
       </dialog>
 
+      {archiveFeedbackPanel}
+
       {responseVisible && saveState.status !== "idle" ? (
         <section className={`mt-4 rounded-[18px] border px-4 py-3 text-sm leading-6 ${saveState.status === "saved" ? "border-emerald-300/16 bg-emerald-400/[0.06] text-emerald-50/76" : "border-red-300/16 bg-red-400/[0.06] text-red-50/76"}`} role={statusIsError ? "alert" : "status"}>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1502,7 +1733,7 @@ export default function BioEditor({
               {saveState.status === "saved" ? <FaCheck /> : <FaExclamationTriangle />}
               {saveState.message}
             </span>
-            {saveState.status === "conflict" ? (
+            {needsEditorReload(saveState) ? (
               <button className="min-h-10 rounded-xl border border-red-100/16 px-3 text-xs font-semibold transition hover:bg-white hover:text-black" onClick={reloadAfterConflict} type="button">Reload saved Bio page</button>
             ) : null}
           </div>

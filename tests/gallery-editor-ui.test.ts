@@ -64,8 +64,8 @@ describe("Admin V2 Gallery editor UI contract", () => {
 
   it("hides saved frames and discards only unsaved frame drafts", () => {
     expect(editor).toContain('isMosaic: !visible');
-    expect(editor).toContain("if (id in versionsRef.current.frames.items) return;");
-    expect(editor).toContain("Hidden saved frames remain recoverable");
+    expect(editor).toContain("if (Object.hasOwn(versionsRef.current.frames.items, id)) return;");
+    expect(editor).toContain("Hide saved frames to keep them here, or archive");
     expect(editor).toContain("moveGalleryEditorItem");
     expect(editor).not.toContain("deleteGallery");
   });

@@ -189,7 +189,7 @@ export default async function AdminV2OverviewPage() {
               className="heading-ui mt-2 text-xl font-semibold text-white"
               id="dashboard-next-actions"
             >
-              {hasNextActions ? "Your next actions" : "Everything is ready"}
+              {hasNextActions ? "Your next actions" : "No setup issues found"}
             </h2>
           </div>
           {hasNextActions ? (
@@ -228,8 +228,9 @@ export default async function AdminV2OverviewPage() {
           <div className="mt-4 flex items-start gap-3 rounded-2xl border border-emerald-300/13 bg-emerald-400/[0.045] px-4 py-3 text-emerald-100/62">
             <FaCheckCircle className="mt-0.5 shrink-0" />
             <p className="text-xs leading-5">
-              No editor setup or new Inbox message needs your attention. Pick
-              a page below whenever you want to make a change.
+              Editor and deployment checks found no setup issue or new message.
+              This is not a full production test. Security → Advanced explains
+              exactly what was checked; delivery and publishing still need testing.
             </p>
           </div>
         )}
@@ -362,8 +363,8 @@ export default async function AdminV2OverviewPage() {
             Insights
           </h2>
           <p className="mt-2 text-xs leading-5 text-white/36">
-            Popular pages, visitors, interactions, recent activity, and data
-            health—kept separate from everyday editing.
+            Reported visits, popular pages, interactions, recent activity, and
+            reporting coverage—kept separate from everyday editing.
           </p>
         </Link>
 

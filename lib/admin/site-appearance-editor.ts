@@ -2,8 +2,9 @@ import { z } from "zod";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import { BODY_FONT_KEYS, DISPLAY_FONT_KEYS, UI_FONT_KEYS } from "@/lib/content/fonts";
 import { FOOTER_EFFECTS } from "@/lib/content/types";
+import { DEFAULT_FOOTER_CONTENT, footerContentSchema } from "@/lib/content/footer";
 
-export const APPEARANCE_EDITOR_SECTIONS = ["name", "appearance"] as const;
+export const APPEARANCE_EDITOR_SECTIONS = ["name", "appearance", "identity", "footer"] as const;
 export type AppearanceEditorSection = (typeof APPEARANCE_EDITOR_SECTIONS)[number];
 
 const nameSchema = z.object({
@@ -16,13 +17,20 @@ const appearanceSchema = z.object({
   uiFont: z.enum(UI_FONT_KEYS),
   footerEffect: z.enum(FOOTER_EFFECTS),
 }).strict();
+const identitySchema = z.object({
+  tagline: z.string().trim().max(220),
+  description: z.string().trim().max(1000),
+  location: z.string().trim().max(220),
+  contactBlurb: z.string().trim().max(1000),
+}).strict();
 const versionsSchema = z.object({
   updatedAt: z.string().max(64).refine(
     (value) => /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value)),
     "The saved version is invalid. Reload this editor."
   ),
 }).strict();
-const draftSchema = z.object({ name: nameSchema, appearance: appearanceSchema }).strict();
+const schemas = { name: nameSchema, appearance: appearanceSchema, identity: identitySchema, footer: footerContentSchema };
+const draftSchema = z.object(schemas).strict();
 
 export type AppearanceEditorDraft = z.infer<typeof draftSchema>;
 export type AppearanceEditorVersions = z.infer<typeof versionsSchema>;
@@ -62,7 +70,7 @@ export function parseAppearanceSubmission(section: unknown, payload: unknown, ve
   const selected = z.enum(APPEARANCE_EDITOR_SECTIONS).safeParse(section);
   if (!selected.success) return { success: false, fieldErrors: { section: ["Choose a valid settings section."] } };
   const version = versionsSchema.safeParse(versions);
-  const parsed = (selected.data === "name" ? nameSchema : appearanceSchema).safeParse(payload);
+  const parsed = schemas[selected.data].safeParse(payload);
   if (!version.success || !parsed.success) return {
     success: false,
     fieldErrors: {
@@ -92,6 +100,8 @@ export function createFallbackAppearanceEditorSnapshot(): AppearanceEditorSnapsh
         uiFont: settings.uiFont,
         footerEffect: settings.footerEffect,
       },
+      identity: { tagline: settings.tagline, description: settings.description, location: settings.location, contactBlurb: settings.contactBlurb },
+      footer: { ...DEFAULT_FOOTER_CONTENT },
     },
     versions: { updatedAt: new Date(0).toISOString() },
   };

@@ -68,6 +68,32 @@ describe("Site appearance V2 server action", () => {
     expect(query.eq.mock.calls).toEqual([["id", "main"], ["updated_at", versions.updatedAt]]);
     expect(mocks.revalidate).toHaveBeenCalledWith("/admin/v2/settings/appearance");
   });
+  it("saves identity only using CAS, without changing name, fonts or footer content", async () => {
+    const payload = { tagline: "Music producer", description: "Music-only description", location: "Prague", contactBlurb: "Music bookings" };
+    const values = { tagline: payload.tagline, description: payload.description, location: payload.location, contact_blurb: payload.contactBlurb };
+    const { query } = database({ data: { ...values, updated_at: updatedAt }, error: null });
+    expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("identity", payload))).toMatchObject({ status: "saved", canonicalSection: payload });
+    expect(query.update).toHaveBeenCalledExactlyOnceWith(values);
+    expect(query.eq.mock.calls).toEqual([["id", "main"], ["updated_at", versions.updatedAt]]);
+  });
+  it("saves only the validated footer JSON with its version predicate", async () => {
+    const payload = { ...draft.footer, primaryLabel: "Listen", primaryHref: "/music" };
+    const { query } = database({ data: { footer_content: payload, updated_at: updatedAt }, error: null });
+    expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("footer", payload))).toMatchObject({ status: "saved", section: "footer", canonicalSection: payload });
+    expect(query.update).toHaveBeenCalledExactlyOnceWith({ footer_content: payload });
+    expect(query.eq.mock.calls).toEqual([["id", "main"], ["updated_at", versions.updatedAt]]);
+  });
+  it("rejects unsafe footer links and unexpected fields before privileged access", async () => {
+    for (const primaryHref of ["javascript:alert(1)", "//evil.example", "http://evil.example", "https://user:password@example.com", "/\\evil.example"]) {
+      expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("footer", { ...draft.footer, primaryHref }))).toMatchObject({ status: "invalid" });
+    }
+    expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("footer", { ...draft.footer, html: "<script>" }))).toMatchObject({ status: "invalid" });
+    expect(mocks.service).not.toHaveBeenCalled();
+  });
+  it("reports exactly which migration is needed for footer publishing", async () => {
+    database({ data: null, error: { code: "42703", message: "site_settings.footer_content is missing" } });
+    expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("footer", draft.footer))).toMatchObject({ status: "migration-required", message: expect.stringContaining("0039_footer_content_editor.sql") });
+  });
   it("treats zero affected rows as conflict rather than reporting false success", async () => {
     database({ data: null, error: null });
     expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("name", draft.name))).toMatchObject({ status: "conflict" });

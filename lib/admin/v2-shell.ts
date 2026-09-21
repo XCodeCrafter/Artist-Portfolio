@@ -59,6 +59,13 @@ export const ADMIN_V2_NAVIGATION = [
     group: "Portfolio",
   },
   {
+    key: "media",
+    href: "/admin/v2/media",
+    label: "Media library",
+    description: "Upload, usage and safe removal",
+    group: "Work",
+  },
+  {
     key: "inbox",
     href: "/admin/v2/inbox",
     label: "Inbox",
@@ -76,7 +83,7 @@ export const ADMIN_V2_NAVIGATION = [
     key: "appearance",
     href: "/admin/v2/settings/appearance",
     label: "Appearance",
-    description: "Fonts and footer light",
+    description: "Fonts, identity and footer",
     group: "Settings",
   },
   {

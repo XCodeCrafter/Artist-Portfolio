@@ -12,11 +12,13 @@ import {
 } from "@/lib/admin/contact";
 import {
   parseContactSectionSubmission,
+  type ContactDetailsDraft,
   type ContactEditorSection,
   type ContactEditorVersions,
   type ContactSaveState,
 } from "@/lib/admin/contact-editor";
 import { createAdminServiceClient } from "@/lib/admin/service";
+import { readContactCopyCapability } from "@/lib/admin/contact-copy";
 
 const formSchema = z
   .object({
@@ -116,6 +118,20 @@ export async function saveContactSectionV2(
     );
   }
 
+  if (section === "details") {
+    const details = payload as ContactDetailsDraft;
+    if (!details.location || !details.contactBlurb) {
+      const optionalCopy = await readContactCopyCapability(supabase);
+      if (!optionalCopy.available) {
+        return result(
+          optionalCopy.migrationRequired ? "migration-required" : "invalid",
+          optionalCopy.message || "Optional Contact fields could not be verified. Nothing was sent.",
+          { section }
+        );
+      }
+    }
+  }
+
   const { data, error } = await supabase.rpc(
     rpcName(section),
     rpcArguments(section, payload, versions)
@@ -188,6 +204,10 @@ export async function saveContactSectionV2(
   revalidatePath("/booking");
   revalidatePath("/admin/v2/pages/contact");
   revalidatePath("/admin/v2-preview/contact");
+  if (section === "details") {
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/v2/settings/appearance");
+  }
 
   return result("saved", "Section saved and published.", {
     section,

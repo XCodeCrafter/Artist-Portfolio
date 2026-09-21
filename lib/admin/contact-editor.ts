@@ -136,8 +136,8 @@ const contactHeroDraftSchema = z
 
 const contactDetailsDraftSchema = z
   .object({
-    location: requiredText(220),
-    contactBlurb: requiredText(1_000),
+    location: text(220),
+    contactBlurb: text(1_000),
   })
   .strict();
 

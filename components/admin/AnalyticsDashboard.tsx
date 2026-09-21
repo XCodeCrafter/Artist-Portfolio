@@ -292,13 +292,16 @@ function ChartBars({ daily }: { daily: AnalyticsSummary["daily"] }) {
       className="grid h-56 min-w-[720px] items-end gap-1 border-b border-white/8"
       style={{ gridTemplateColumns: `repeat(${daily.length}, minmax(6px, 1fr))` }}
     >
-      {daily.map((day) => (
+      {daily.map((day, index) => (
         <div
           aria-label={`${formatShortDay(day.label)}: ${day.pageViews} views, ${day.outboundClicks} outbound clicks, ${day.bookingSubmits} accepted inquiries`}
           className="group relative flex h-full items-end justify-center gap-px pt-5"
           key={day.label}
           tabIndex={0}
         >
+          <span className={`pointer-events-none absolute top-0 z-10 hidden w-40 rounded-lg border border-white/15 bg-[#161619] p-2 text-xs text-white shadow-xl group-hover:block group-focus:block ${index < daily.length / 2 ? "left-0" : "right-0"}`}>
+            {formatShortDay(day.label)} · {day.pageViews} views · {day.outboundClicks} clicks · {day.bookingSubmits} consented inquiries
+          </span>
           <span
             className="w-[44%] rounded-t-sm bg-white/72 transition group-hover:bg-white group-focus:bg-white"
             style={{ height: `${(day.pageViews / max) * 100}%` }}
@@ -330,7 +333,8 @@ function TrafficChart({ analytics }: { analytics: AnalyticsSummary }) {
             Last {analytics.rangeDays} calendar days
           </h2>
           <p className="mt-2 text-sm text-white/42">
-            Scroll the complete range horizontally on smaller screens.
+            Recorded, consented production activity only. UTC days; today is partial.
+            Missing history is not proof of zero visits. Scroll on smaller screens.
           </p>
         </div>
         <div className="flex flex-wrap gap-3 text-[11px] text-white/46">
@@ -439,7 +443,7 @@ function ContactActivity({ analytics }: { analytics: AnalyticsSummary }) {
     <section className={sectionClass}>
       <p className={labelClass}>Contact activity</p>
       <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">Independent activity counts</h2>
-      <p className="mt-2 text-sm leading-6 text-white/42">These totals share a reporting window, but are not a session-linked conversion funnel. An inquiry is accepted when at least the inbox or e-mail delivery channel succeeds.</p>
+      <p className="mt-2 text-sm leading-6 text-white/42">Only visitors who allowed analytics appear here. These are independent counts, not a session-linked conversion funnel. An inquiry is accepted when the inbox or e-mail channel succeeds; the Inbox contains all accepted messages regardless of analytics permission.</p>
       <div className="mt-6 grid gap-4">
         {steps.map((step, index) => (
           <div key={step.label}>
@@ -553,7 +557,7 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
       id: "acquisition",
       label: "Acquisition",
       badge: "Top 6",
-      node: analyticsAvailable ? <div className="grid gap-4"><div className="rounded-[18px] border border-white/9 bg-[#101012]/90 p-4"><p className={labelClass}>Privacy-safe sessions</p><p className="mt-2 text-3xl font-semibold text-white">{formatNumber(analytics.uniqueSessions)}</p><p className="mt-1 text-xs text-white/36">Anonymous 30-minute browser sessions in this range; no raw IP or fingerprint.</p></div><div className="grid gap-4 xl:grid-cols-3"><RankingPanel description="Coarse referrer domains only; queries and full URLs are discarded." empty="No source data yet." eyebrow="Traffic sources" items={analytics.topSources} title="Where visits start" total={analytics.pageViews} /><RankingPanel description="Broad device category, derived without fingerprinting." empty="No device data yet." eyebrow="Devices" items={analytics.devices} title="Screen context" total={analytics.pageViews} /><RankingPanel description="Broad browser family only." empty="No browser data yet." eyebrow="Browsers" items={analytics.browsers} title="Browser mix" total={analytics.pageViews} /></div></div> : unavailableAnalytics,
+      node: analyticsAvailable ? <div className="grid gap-4"><div className="rounded-[18px] border border-white/9 bg-[#101012]/90 p-4"><p className={labelClass}>Consented visits</p><p className="mt-2 text-3xl font-semibold text-white">{analytics.isCapped ? "≥ " : ""}{formatNumber(analytics.uniqueSessions)}</p><p className="mt-1 text-xs text-white/36">Tab-scoped 30-minute sessions with a recorded page view, not unique people. No fingerprint or raw IP is stored in analytics.</p></div><div className="grid gap-4 xl:grid-cols-3"><RankingPanel description="One landing source per recorded session; known utm_source labels take priority. Referrer suppression appears as Direct / unknown." empty="No corrected source data yet." eyebrow="Traffic sources" items={analytics.topSources} title="Where visits start" total={analytics.uniqueSessions} /><RankingPanel description="Broad device category per page view, derived without fingerprinting." empty="No device data yet." eyebrow="Devices" items={analytics.devices} title="Screen context" total={analytics.pageViews} /><RankingPanel description="Broad browser family per page view." empty="No browser data yet." eyebrow="Browsers" items={analytics.browsers} title="Browser mix" total={analytics.pageViews} /></div></div> : unavailableAnalytics,
     },
     {
       id: "content",
@@ -565,7 +569,7 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
       id: "engagement",
       label: "Engagement",
       badge: "Top 6",
-      node: analyticsAvailable ? <div className="grid gap-4 xl:grid-cols-3"><RankingPanel description="CTA, gallery, video, and contact interactions captured by a strict allowlist." empty="No engagement events yet." eyebrow="On-site engagement" items={analytics.engagements} title="Interaction signals" total={analytics.engagements.reduce((total, item) => total + item.value, 0)} /><RankingPanel description="External destinations grouped by the visitor-visible link label." empty="No outbound clicks yet." eyebrow="Outbound intent" items={analytics.topTargets} title="Chosen destinations" total={analytics.outboundClicks} /><ContactActivity analytics={analytics} /></div> : unavailableAnalytics,
+      node: analyticsAvailable ? <div className="grid gap-4 xl:grid-cols-3"><RankingPanel description="Explicit gallery/video opens, marked full-player playback, CTA clicks and contact starts. Hover previews are excluded; cross-origin embedded playback is not measured." empty="No engagement events yet." eyebrow="On-site engagement" items={analytics.engagements} title="Interaction signals" total={analytics.engagements.reduce((total, item) => total + item.value, 0)} /><RankingPanel description="External clicks grouped by stable platform/domain, not editable link text. A platform click is not a song play." empty="No outbound clicks yet." eyebrow="Outbound intent" items={analytics.topTargets} title="Chosen destinations" total={analytics.outboundClicks} /><ContactActivity analytics={analytics} /></div> : unavailableAnalytics,
     },
     {
       id: "events",
@@ -584,13 +588,14 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
       label: "System health",
       node: (
         <section className={sectionClass}>
-          <p className={labelClass}>Data confidence</p><h2 className="heading-ui mt-2 text-2xl font-semibold text-white">Monitoring sources</h2><p className="mt-2 text-sm text-white/42">A zero is shown only when its source loaded successfully. Revolutionary technology, apparently.</p>
+          <p className={labelClass}>Data confidence</p><h2 className="heading-ui mt-2 text-2xl font-semibold text-white">Monitoring sources</h2><p className="mt-2 text-sm text-white/42">Readable historical rows do not verify that collection is currently working. Zero means no recorded events, not no visitors.</p>
           <div className={`mt-6 grid gap-3 ${isV2 ? "" : "sm:grid-cols-2"}`}>
             <div className="rounded-[18px] border border-white/9 bg-black/22 p-4"><div className="flex items-center justify-between"><span className="font-semibold text-white">Analytics events</span><span className={analyticsAvailable ? "text-emerald-200" : "text-amber-200"}>{analyticsAvailable ? "Available" : "Unavailable"}</span></div><p className="mt-2 text-xs leading-5 text-white/38">{analyticsAvailable ? `${analytics.totalEvents} events in range · latest ${formatDate(analytics.lastEventAt)}` : analyticsError || "Configuration is incomplete."}</p></div>
             {!isV2 ? <div className="rounded-[18px] border border-white/9 bg-black/22 p-4"><div className="flex items-center justify-between"><span className="font-semibold text-white">Inquiry database</span><span className={inquiriesAvailable ? "text-emerald-200" : "text-amber-200"}>{inquiriesAvailable ? "Available" : "Unavailable"}</span></div><p className="mt-2 text-xs leading-5 text-white/38">{inquiriesAvailable ? `${inquirySummary.total} exact records · ${inquiryPagination.from}–${inquiryPagination.to} loaded · ${deliveryKnown} delivery states known${deliveryIssues ? ` · ${deliveryIssues} need attention` : ""}` : inquiriesError || "Configuration is incomplete."}</p></div> : null}
           </div>
           {analyticsAvailable ? <div className="mt-4 grid gap-3 sm:grid-cols-3">{(["LCP", "INP", "CLS"] as const).map((name) => { const vital = analytics.webVitals.find((item) => item.name === name); return <div className="rounded-[16px] border border-white/8 bg-black/20 p-3" key={name}><div className="flex items-center justify-between"><span className="font-mono text-[10px] text-white/42">{name}</span><span className={vital?.rating === "good" ? "text-[10px] text-emerald-200" : vital ? "text-[10px] text-amber-200" : "text-[10px] text-white/30"}>{vital?.rating || "Waiting"}</span></div><p className="mt-2 text-lg font-semibold text-white">{vital ? `${name === "CLS" ? vital.value.toFixed(3) : Math.round(vital.value)}${name === "CLS" ? "" : " ms"}` : "—"}</p><p className="mt-1 text-[9px] text-white/28">{vital ? `p75 · ${vital.samples} samples` : "No samples in range"}</p></div>; })}</div> : null}
-          {analytics.isCapped ? <div className="mt-4 rounded-xl border border-amber-300/16 bg-amber-400/[0.06] p-3 text-xs leading-5 text-amber-100/62">The raw event query reached 5,000 rows. Totals and comparisons are partial until server-side aggregation is added.</div> : null}
+          <p className="mt-4 text-xs leading-5 text-white/45">Custom Web Vitals collection is paused: its previous measurements did not follow the standard definitions. Historical values are excluded. A standards-based collector and verified long-term database aggregation are still required.</p>
+          {analytics.isCapped ? <div className="mt-4 rounded-xl border border-amber-300/16 bg-amber-400/[0.06] p-3 text-xs leading-5 text-amber-100/62">The database returned only part of the requested event range. Counts and rankings are a lower-bound sample; comparisons are hidden until verified server-side aggregation is added.</div> : null}
         </section>
       ),
     },
@@ -658,15 +663,17 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
     <div className="grid min-w-0 gap-4">
       <StatusNotice analyticsConfigured={analyticsConfigured} analyticsError={analyticsError} inquiriesConfigured={inquiriesConfigured} inquiriesError={inquiriesError} status={status} />
 
-      {isV2 && analyticsAvailable && analytics.isCapped ? (
+      {analyticsAvailable && analytics.isCapped ? (
         <div className="rounded-xl border border-amber-300/20 bg-amber-400/[0.08] px-4 py-3 text-sm leading-6 text-amber-100">
-          This report reached the 5,000-event read limit. Totals and comparisons
-          are partial; rankings still describe only the loaded sample.
+          This report is a partial sample (the 5,000-event read limit or a lower
+          database limit was reached). Counts are lower bounds, rankings describe
+          only loaded events, and comparison percentages are hidden.
         </div>
       ) : null}
+      {analyticsAvailable ? <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs leading-5 text-white/55">Only the corrected, consent-based production collector is included. Earlier measurements are excluded{analytics.legacyEvents ? ` (${analytics.legacyEvents} legacy events in the loaded sample)` : ""}. Historical coverage is not verified; comparisons remain unavailable until coverage and aggregation are reliable.</div> : null}
 
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-[18px] border border-white/9 bg-[#0f0f11]/90 p-3">
-        <div className="min-w-0"><p className={labelClass}>Reporting window</p><p className="mt-1 text-xs text-white/38">Every comparison uses the immediately preceding equal period.</p></div>
+        <div className="min-w-0"><p className={labelClass}>Reporting window</p><p className="mt-1 text-xs text-white/38">UTC calendar days. The preceding equal period is loaded, but trends are hidden while history coverage is unverified.</p></div>
         <div className="admin-scrollbar-none flex max-w-full overflow-x-auto rounded-xl border border-white/9 bg-black/24 p-1">
           {ANALYTICS_RANGE_DAYS.map((days) => <Link aria-current={analytics.rangeDays === days ? "page" : undefined} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${analytics.rangeDays === days ? "bg-white text-black" : "text-white/44 hover:text-white"}`} href={`${getAdminAnalyticsPath(surface)}?range=${days}#${activeSectionId}`} key={days}>{days}d</Link>)}
         </div>
@@ -680,11 +687,11 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
       </div>
 
       <section className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard available={analyticsAvailable} current={analytics.currentPeriod.pageViews} description={`Page views · ${analytics.rangeDays} days`} icon={<FaChartLine />} label="Page views" previous={analytics.previousPeriod.pageViews} rangeDays={analytics.rangeDays} value={formatNumber(analytics.pageViews)} />
-        {isV2 ? <MetricCard available={analyticsAvailable} description={`Anonymous 30-minute sessions · ${analytics.rangeDays} days`} icon={<FaUsers />} label="Anonymous visits" rangeDays={analytics.rangeDays} value={formatNumber(analytics.uniqueSessions)} /> : null}
-        <MetricCard available={analyticsAvailable} current={analytics.currentPeriod.outboundClicks} description={`External clicks · ${analytics.rangeDays} days`} icon={<FaMousePointer />} label={isV2 ? "External clicks" : "Outbound"} previous={analytics.previousPeriod.outboundClicks} rangeDays={analytics.rangeDays} value={formatNumber(analytics.outboundClicks)} />
-        {!isV2 ? <MetricCard available={inquiriesAvailable} current={inquirySummary.current7Days} description="New messages · last 7 days" icon={<FaEnvelope />} label="Inquiries" previous={inquirySummary.previous7Days} rangeDays={7} value={formatNumber(inquirySummary.current7Days)} /> : null}
-        <MetricCard available={analyticsAvailable} current={isV2 ? analytics.currentPeriod.bookingSubmits : undefined} description={`Inbox or e-mail accepted · ${analytics.rangeDays} days`} icon={<FaArrowUp />} label={isV2 ? "Accepted contact forms" : "Accepted inquiries"} previous={isV2 ? analytics.previousPeriod.bookingSubmits : undefined} rangeDays={analytics.rangeDays} value={formatNumber(analytics.bookingSubmits)} />
+        <MetricCard available={analyticsAvailable} description={`Recorded views · ${analytics.rangeDays} days`} icon={<FaChartLine />} label="Page views" rangeDays={analytics.rangeDays} value={`${analytics.isCapped ? "≥ " : ""}${formatNumber(analytics.pageViews)}`} />
+        {isV2 ? <MetricCard available={analyticsAvailable} description={`30-minute tab sessions · not people`} icon={<FaUsers />} label="Consented visits" rangeDays={analytics.rangeDays} value={`${analytics.isCapped ? "≥ " : ""}${formatNumber(analytics.uniqueSessions)}`} /> : null}
+        <MetricCard available={analyticsAvailable} description={`Recorded clicks · ${analytics.rangeDays} days`} icon={<FaMousePointer />} label={isV2 ? "External clicks" : "Outbound"} rangeDays={analytics.rangeDays} value={`${analytics.isCapped ? "≥ " : ""}${formatNumber(analytics.outboundClicks)}`} />
+        {!isV2 ? <MetricCard available={inquiriesAvailable && inquirySummary.weekly?.available === true} current={inquirySummary.current7Days} description="Received messages · last 7 days" icon={<FaEnvelope />} label="Inquiries" previous={inquirySummary.previous7Days} rangeDays={7} value={formatNumber(inquirySummary.current7Days)} /> : null}
+        <MetricCard available={analyticsAvailable} description={`Analytics opt-in only · all messages in Inbox`} icon={<FaArrowUp />} label="Consented inquiries" rangeDays={analytics.rangeDays} value={`${analytics.isCapped ? "≥ " : ""}${formatNumber(analytics.bookingSubmits)}`} />
       </section>
 
       <div className={`sticky min-w-0 z-20 rounded-[20px] border border-white/9 bg-[#0f0f11]/95 p-2 shadow-2xl backdrop-blur-xl ${isV2 ? "top-[76px] lg:top-3" : "top-2"}`}>
@@ -706,7 +713,7 @@ function AnalyticsWorkspace(props: AnalyticsWorkspaceProps) {
         <div className="mt-2 flex flex-wrap items-center justify-end gap-2 px-2 text-[10px] text-white/30">
           {!isV2 && hasUnsavedChanges ? <span className="rounded-full border border-amber-300/18 bg-amber-400/[0.07] px-2 py-1 font-semibold text-amber-100/72">Unsaved inquiry</span> : null}
           <span className={`h-1.5 w-1.5 rounded-full ${analyticsAvailable ? "bg-emerald-300" : "bg-amber-300"}`} />
-          {analyticsAvailable ? (analytics.lastEventAt ? `Updated ${formatDate(analytics.lastEventAt)}` : "Connected · waiting for first event") : "Analytics unavailable"}
+          {analyticsAvailable ? (analytics.lastEventAt ? `Last recorded event ${formatDate(analytics.lastEventAt)}` : "Readable · no corrected events in this range") : "Analytics unavailable"}
         </div>
       </div>
 

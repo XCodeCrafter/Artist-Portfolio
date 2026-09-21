@@ -398,6 +398,7 @@ describe("Admin V2 shell helpers", () => {
       "showreel",
       "music",
       "contact",
+      "media",
       "inbox",
       "insights",
       "appearance",
@@ -439,6 +440,8 @@ describe("Admin V2 shell helpers", () => {
       "contact"
     );
     expect(getAdminV2ActiveItem("/admin/v2/inbox").key).toBe("inbox");
+    expect(getAdminV2ActiveItem("/admin/v2/media").key).toBe("media");
+    expect(getAdminV2ActiveItem("/admin/v2/pages/home/programs").key).toBe("home");
     expect(getAdminV2ActiveItem("/admin/v2/inbox/message").key).toBe("inbox");
     expect(getAdminV2ActiveItem("/admin/v2/insights").key).toBe("insights");
     expect(getAdminV2ActiveItem("/admin/v2/insights/detail").key).toBe(
@@ -612,7 +615,7 @@ describe("Admin V2 navigation migration contract", () => {
       "utf8"
     );
     expect(readiness).toContain(
-      'supabase.rpc("get_site_navigation_v2_snapshot"'
+      'client.rpc("get_site_navigation_v2_snapshot"'
     );
     expect(readiness).not.toContain('.from("site_navigation_items")');
     expect(readiness).toContain("getNavigationSnapshotRows");

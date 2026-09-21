@@ -8,6 +8,8 @@ import type {
 } from "@/lib/content/types";
 import { detectSocialPlatform } from "@/lib/content/social-platforms";
 import { isSafeManagedMediaSource } from "@/lib/media-source";
+import { deriveSpotifyEmbedUrl, normalizeSpotifyArtistUrl } from "@/lib/spotify";
+export { deriveSpotifyEmbedUrl } from "@/lib/spotify";
 
 export const MUSIC_EDITOR_SECTIONS = [
   "hero",
@@ -122,7 +124,7 @@ export const INITIAL_MUSIC_SAVE_STATE: MusicSaveState = {
 };
 
 const text = (max: number) => z.string().trim().max(max);
-const requiredText = (max: number) => z.string().trim().min(1).max(max);
+const requiredText = (max: number) => z.string().trim().min(1, "Please fill in this field.").max(max, `Keep this field to ${max} characters or fewer.`);
 const recordId = z
   .string()
   .min(1)
@@ -164,34 +166,6 @@ function isSafeOptionalHref(value: string) {
     return true;
   }
   return isHttpsUrl(value);
-}
-
-function isSpotifyArtistUrl(value: string) {
-  if (!value) return true;
-  try {
-    const url = new URL(value);
-    return (
-      !hasUnsafeUrlParts(url) &&
-      url.hostname.toLowerCase() === "open.spotify.com" &&
-      /^\/artist\/[A-Za-z0-9]+\/?$/.test(url.pathname)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isSpotifyEmbedUrl(value: string) {
-  if (!value) return true;
-  try {
-    const url = new URL(value);
-    return (
-      !hasUnsafeUrlParts(url) &&
-      url.hostname.toLowerCase() === "open.spotify.com" &&
-      url.pathname.startsWith("/embed/")
-    );
-  } catch {
-    return false;
-  }
 }
 
 function isSoundcloudTrackUrl(value: string) {
@@ -245,13 +219,13 @@ const musicSpotifyDraftSchema = z
   .object({
     releasesHeading: heading,
     artistUrl: text(2_048).refine(
-      isSpotifyArtistUrl,
+      (value) => !value || Boolean(normalizeSpotifyArtistUrl(value)),
       "Use an open.spotify.com artist link or leave it empty."
-    ),
+    ).transform(normalizeSpotifyArtistUrl).pipe(text(2_048)),
     embedUrl: text(2_048).refine(
-      isSpotifyEmbedUrl,
-      "Use an open.spotify.com/embed link or leave it empty."
-    ),
+      (value) => !value || Boolean(deriveSpotifyEmbedUrl(value)),
+      "Paste a Spotify artist, playlist, album, track, show or episode link, or leave it empty."
+    ).transform(deriveSpotifyEmbedUrl).pipe(text(2_048)),
   })
   .strict();
 
@@ -424,8 +398,8 @@ const previewDraftSchema = z
     spotify: z
       .object({
         releasesHeading: text(220),
-        artistUrl: previewHref,
-        embedUrl: previewHref,
+        artistUrl: text(2_048).transform(normalizeSpotifyArtistUrl),
+        embedUrl: text(2_048).transform(deriveSpotifyEmbedUrl),
       })
       .strict(),
     platforms: z
@@ -499,11 +473,32 @@ export function parseMusicSoundcloudDraft(value: unknown) {
   return musicSoundcloudDraftSchema.safeParse(value);
 }
 
-function issueMap(error: z.ZodError) {
+// Lifecycle operations must preserve readable legacy rows (for example a card
+// with no image yet). This does not weaken the stricter ordinary save schemas.
+export function parseMusicCollectionSnapshotPayload(section: "platforms" | "soundcloud", value: unknown) {
+  const schema = section === "platforms"
+    ? z.object({ items: z.array(snapshotPlatformEditorItemSchema).max(32) }).strict()
+    : z.object({ mixesHeading: heading, items: z.array(snapshotSoundcloudEditorItemSchema).max(48) }).strict();
+  const parsed = schema.safeParse(value);
+  if (!parsed.success || new Set(parsed.data.items.map((item) => item.id)).size !== parsed.data.items.length) return null;
+  return parsed.data;
+}
+
+export function getMusicFieldErrors(error: z.ZodError) {
   const errors: Record<string, string[]> = {};
   for (const issue of error.issues) {
     const key = issue.path.join(".") || "form";
-    errors[key] = [...(errors[key] || []), issue.message];
+    const field = String(issue.path.at(-1));
+    const requiredLabels: Record<string, string> = {
+      title: "Add a title.", href: "Paste the destination URL.",
+      embedUrl: "Paste a SoundCloud track URL.", imageSrc: "Choose a platform image from the Media Library.",
+      backgroundSrc: "Choose a background image or video.",
+      releasesHeading: "Add a heading for releases.", mixesHeading: "Add a heading for mixes.",
+      iconKey: "Choose a platform icon.",
+    };
+    const message = issue.code === "too_small" && issue.origin === "string"
+      ? requiredLabels[field] || "Please fill in this field." : issue.message;
+    errors[key] = [...(errors[key] || []), message];
   }
   return errors;
 }
@@ -545,10 +540,10 @@ export function parseMusicSectionSubmission(
     return {
       success: false,
       fieldErrors: {
-        ...(!parsedPayload.success ? issueMap(parsedPayload.error) : {}),
+        ...(!parsedPayload.success ? getMusicFieldErrors(parsedPayload.error) : {}),
         ...(!parsedVersions.success
           ? Object.fromEntries(
-              Object.entries(issueMap(parsedVersions.error)).map(
+              Object.entries(getMusicFieldErrors(parsedVersions.error)).map(
                 ([key, messages]) => [`versions.${key}`, messages]
               )
             )
@@ -734,12 +729,6 @@ export function getMusicSectionPayload(
       })),
     };
   }
-  if (section === "spotify") {
-    return {
-      ...draft.spotify,
-      embedUrl: deriveSpotifyEmbedUrl(draft.spotify.artistUrl),
-    };
-  }
   return draft[section];
 }
 
@@ -806,20 +795,6 @@ export function parseMusicPreviewUpdateMessage(
   return parsed.success ? parsed.data : null;
 }
 
-export function deriveSpotifyEmbedUrl(value: string) {
-  try {
-    const url = new URL(value.trim());
-    if (hasUnsafeUrlParts(url) || url.hostname.toLowerCase() !== "open.spotify.com") {
-      return "";
-    }
-
-    const match = url.pathname.match(/^\/artist\/([A-Za-z0-9]+)\/?$/);
-    return match ? `https://open.spotify.com/embed/artist/${match[1]}` : "";
-  } catch {
-    return "";
-  }
-}
-
 export function createMusicPageViewDataFromEditor(
   draft: MusicEditorDraft,
   footer: MusicEditorFooter
@@ -850,8 +825,8 @@ export function createMusicPageViewDataFromEditor(
       })),
     spotify: {
       heading: draft.spotify.releasesHeading,
-      artistUrl: draft.spotify.artistUrl,
-      embedUrl: deriveSpotifyEmbedUrl(draft.spotify.artistUrl),
+      artistUrl: normalizeSpotifyArtistUrl(draft.spotify.artistUrl),
+      embedUrl: deriveSpotifyEmbedUrl(draft.spotify.embedUrl),
     },
     soundcloud: {
       heading: draft.soundcloud.mixesHeading,

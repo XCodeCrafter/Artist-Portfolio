@@ -2,6 +2,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import ExternalMediaGate from "@/components/privacy/ExternalMediaGate";
+import { usePrivacyConsent } from "@/components/privacy/PrivacyProvider";
 
 type Mix = {
   title?: string;
@@ -55,6 +57,7 @@ function SoundcloudCard({
   interactionMode: "public" | "preview";
 }) {
   const [interactive, setInteractive] = useState<boolean>(false);
+  const { externalMedia } = usePrivacyConsent();
 
   // Auto-lock back after a while (prevents “iframe eats scroll forever”)
   useEffect(() => {
@@ -76,7 +79,7 @@ function SoundcloudCard({
           className="relative h-[240px] w-full overflow-hidden rounded-xl"
         >
           {/* Shield */}
-          {interactionMode === "public" && !interactive ? (
+          {interactionMode === "public" && externalMedia && !interactive ? (
             <button
               type="button"
               className={[
@@ -95,7 +98,7 @@ function SoundcloudCard({
             </button>
           ) : null}
 
-          <iframe
+          <ExternalMediaGate provider="SoundCloud"><iframe
             src={src}
             title={mix.title ? `SoundCloud: ${mix.title}` : "SoundCloud track"}
             className="absolute inset-0 h-full w-full"
@@ -107,7 +110,7 @@ function SoundcloudCard({
                 interactionMode === "public" && interactive ? "auto" : "none",
             }}
             tabIndex={interactionMode === "preview" ? -1 : undefined}
-          />
+          /></ExternalMediaGate>
         </div>
       </div>
     </div>

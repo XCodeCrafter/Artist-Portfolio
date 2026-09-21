@@ -11,6 +11,8 @@ import {
   getReferrerWithoutQuery,
 } from "@/lib/security/request";
 import { consumeDatabaseRateLimit } from "@/lib/security/rate-limit";
+import { readConsentCookie } from "@/lib/privacy/consent";
+import { ANALYTICS_COLLECTION_VERSION, CAMPAIGN_SOURCES, getAcquisitionLabel } from "@/lib/analytics-session";
 
 export const runtime = "nodejs";
 
@@ -30,14 +32,16 @@ const PUBLIC_PAGE_PATHS = [
 ] as const;
 
 const PublicPagePathSchema = z.enum(PUBLIC_PAGE_PATHS);
-const SessionIdSchema = z.string().uuid().optional().default("");
+const SessionIdSchema = z.string().uuid();
 const PageViewMetadataSchema = z
   .object({
     title: z.string().trim().max(300).optional(),
+    landingReferrer: z.string().max(1200).optional().default(""),
+    campaignSource: z.enum(CAMPAIGN_SOURCES).optional(),
   })
   .strict()
   .optional()
-  .default({});
+  .default({ landingReferrer: "" });
 const EmptyMetadataSchema = z.object({}).strict().optional().default({});
 const EngagementMetadataSchema = z
   .object({
@@ -46,15 +50,9 @@ const EngagementMetadataSchema = z
       "gallery_open",
       "video_open",
       "video_play",
+      "contact_open",
       "contact_start",
     ]),
-  })
-  .strict();
-const WebVitalMetadataSchema = z
-  .object({
-    name: z.enum(["LCP", "INP", "CLS"]),
-    value: z.number().finite().min(0).max(120_000),
-    rating: z.enum(["good", "needs-improvement", "poor"]),
   })
   .strict();
 
@@ -107,14 +105,6 @@ const AnalyticsEventSchema = z.discriminatedUnion("eventName", [
     targetUrl: z.literal("").optional().default(""),
     metadata: EngagementMetadataSchema,
   }),
-  z.object({
-    eventName: z.literal("web_vital"),
-    pagePath: PublicPagePathSchema,
-    sessionId: SessionIdSchema,
-    targetLabel: z.literal("").optional().default(""),
-    targetUrl: z.literal("").optional().default(""),
-    metadata: WebVitalMetadataSchema,
-  }),
 ]);
 
 function sanitizeHeaderValue(value?: string | null) {
@@ -127,22 +117,6 @@ function sanitizeHeaderValue(value?: string | null) {
 
 function getRequestMeta(req: Request) {
   const userAgent = req.headers.get("user-agent") || "";
-
-  let referrerDomain = "";
-  const referrer = getReferrerWithoutQuery(req.headers);
-  if (referrer) {
-    try {
-      referrerDomain = new URL(referrer).hostname.replace(/^www\./, "").slice(0, 120);
-      const requestHost = (req.headers.get("host") || "")
-        .split(":")[0]
-        .replace(/^www\./, "");
-      if (referrerDomain && referrerDomain === requestHost) {
-        referrerDomain = "Internal navigation";
-      }
-    } catch {
-      referrerDomain = "";
-    }
-  }
 
   const deviceCategory = /tablet|ipad/i.test(userAgent)
     ? "Tablet"
@@ -160,7 +134,6 @@ function getRequestMeta(req: Request) {
           : "Other / unknown";
 
   return {
-    referrerDomain: referrerDomain || "Direct / unknown",
     deviceCategory,
     browserCategory,
   };
@@ -192,6 +165,14 @@ async function writeSecurityEvent(
 }
 
 export async function POST(req: Request) {
+  // A refusal is not a security event. Do not derive identifiers, consume a
+  // database rate-limit slot, or read the body without current permission.
+  if (!readConsentCookie(req.headers.get("cookie") || "")?.analytics) {
+    return NextResponse.json({ ok: true });
+  }
+  if (process.env.NODE_ENV !== "production" || (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production")) {
+    return NextResponse.json({ ok: true });
+  }
   const ipKey = keyedDigest("public-rate-ip", getClientIp(req.headers));
   const admissionLimit = await consumeDatabaseRateLimit({
     bucket: "public:analytics:ip",
@@ -251,18 +232,25 @@ export async function POST(req: Request) {
 
   const supabase = createAdminServiceClient();
   if (!supabase) {
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: false }, { status: 503 });
   }
 
-  const clientMetadata =
-    parsed.data.eventName === "page_view"
-      ? parsed.data.metadata.title
-        ? { title: parsed.data.metadata.title }
-        : {}
-      : parsed.data.eventName === "engagement" ||
-          parsed.data.eventName === "web_vital"
-        ? parsed.data.metadata
-        : {};
+  let clientMetadata: Record<string, unknown> = {};
+  if (parsed.data.eventName === "page_view") {
+    let referrerDomain = "";
+    try {
+      const landing = new URL(parsed.data.metadata.landingReferrer || "");
+      if (["https:", "http:"].includes(landing.protocol) && landing.origin !== new URL(req.url).origin && !landing.username && !landing.password) referrerDomain = landing.hostname.replace(/^www\./, "").slice(0, 120);
+    } catch { /* Direct / unknown. */ }
+    clientMetadata = {
+      ...(parsed.data.metadata.title ? { title: parsed.data.metadata.title } : {}),
+      acquisitionSource: getAcquisitionLabel(parsed.data.metadata.campaignSource || referrerDomain),
+    };
+  } else if (parsed.data.eventName === "engagement") {
+    clientMetadata = parsed.data.metadata;
+  } else if (parsed.data.eventName === "outbound_click") {
+    clientMetadata = { destination: getAcquisitionLabel(new URL(parsed.data.targetUrl).hostname) };
+  }
 
   const { error } = await supabase.from("analytics_events").insert({
     event_name: parsed.data.eventName,
@@ -271,13 +259,16 @@ export async function POST(req: Request) {
     target_url: parsed.data.targetUrl,
     metadata: {
       ...clientMetadata,
+      collectionVersion: ANALYTICS_COLLECTION_VERSION,
+      consentVersion: 1,
       ...(parsed.data.sessionId ? { sessionId: parsed.data.sessionId } : {}),
       ...getRequestMeta(req),
     },
   });
 
   if (error) {
-    return NextResponse.json({ ok: true });
+    console.error("Analytics event persistence failed", { code: error.code });
+    return NextResponse.json({ ok: false }, { status: 503 });
   }
 
   return NextResponse.json({ ok: true });

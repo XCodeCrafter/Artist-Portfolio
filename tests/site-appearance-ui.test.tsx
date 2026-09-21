@@ -90,12 +90,43 @@ describe("Appearance and navbar name V2 controls", () => {
     for (const source of [appearanceSource, nameSource]) {
       expect(source).toContain('data-unsaved-guard-bypass="true"');
       expect(source).not.toContain("data-unsaved-guard-ignore");
-      expect(source).toContain('result.status === "saved"');
-      expect(source).toContain("setSaved(result.canonicalSection)");
-      expect(source).toContain("setVersions(result.versions)");
-      expect(source).toContain("clearDirty(() => router.refresh())");
+      expect(source).toContain("parseAppearanceSubmission(");
     }
+    expect(nameSource).toContain("runEditorSave(previous");
+    expect(nameSource).toContain("setSaved(confirmed.data.payload)");
+    expect(nameSource).toContain("setVersions(confirmed.data.versions)");
+    expect(nameSource).toContain("clearDirty(() => router.refresh())");
+    expect(appearanceSource).toContain("[result.section]: confirmed.data.payload");
+    expect(appearanceSource).toContain("setSaved(nextSaved)");
+    expect(appearanceSource).toContain('result.status === "saved"');
+    expect(appearanceSource).toContain("setVersions(result.versions)");
+    expect(appearanceSource).toContain("JSON.stringify(nextSaved) === JSON.stringify(nextDraft)");
     appearance(); expect(mocks.guard).toHaveBeenCalledWith(undefined, true);
+  });
+  it("offers live footer regions and no longer sends profile copy to Classic", () => {
+    const html = appearance();
+    expect(html).toContain('aria-label="Edit Profile &amp; introduction"');
+    expect(html).toContain('aria-label="Edit Footer invitation &amp; buttons"');
+    expect(html).toContain('aria-label="Edit Footer social headings"');
+    expect(html).toContain("Profile &amp; introduction");
+    expect(html).toContain("Footer content");
+    expect(read("app/admin/v2/settings/appearance/page.tsx")).not.toContain("/admin/content");
+  });
+  it("scopes a missing 0039 warning to the new footer section", () => {
+    const html = appearance({ footerMigrationRequired: true });
+    expect(html).toContain("Footer content requires migration 0039");
+    expect(html).not.toMatch(/<fieldset disabled=""/);
+  });
+  it("keeps draft state and blocks blind retry after an uncertain save response", () => {
+    expect(appearanceSource).toContain("setSaveUncertain(true)");
+    expect(appearanceSource).toContain("The save response was lost. Your draft was kept.");
+    expect(appearanceSource).toContain('state.status === "conflict" || saveUncertain');
+    expect(appearanceSource).toContain('!sectionDirty || saveUncertain || state.status === "conflict"');
+  });
+  it("confirms a section discard through the shared guard while preserving other section drafts", () => {
+    expect(appearanceSource).toContain("confirmDiscard(() => change(section, saved[section]))");
+    expect(appearanceSource).toContain("JSON.stringify(nextDraft) === JSON.stringify(saved)");
+    expect(appearanceSource).not.toContain("window.confirm(");
   });
   it("uses the public footer renderer for both effects while making preview links inert", () => {
     for (const footerEffect of ["soul", "red-light"] as const) {

@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { requestDiscardConfirmation } from "./discardConfirmation";
 
 const DEFAULT_MESSAGE =
-  "You have unsaved changes. Leave this editor and discard them?";
+  "You have unsaved changes. Discard them and continue?";
 const HISTORY_GUARD_KEY = "__portfolioEditorGuard";
 const HISTORY_GUARD_BASE_KEY = "__portfolioEditorGuardBase";
 const FORM_RESUBMITTING_KEY = "unsavedGuardResubmitting";
@@ -56,6 +57,8 @@ export default function useUnsavedChangesGuard(
   const historyGuardIdRef = useRef<string | null>(null);
   const historyCompactionRef = useRef<HistoryCompaction | null>(null);
   const restoringHistoryGuardIdRef = useRef<string | null>(null);
+  const backDiscardPendingRef = useRef(false);
+  const confirmationRef = useRef<AbortController | null>(null);
 
   const removeCurrentHistoryMarker = useCallback(() => {
     const guardId = historyGuardIdRef.current;
@@ -151,9 +154,15 @@ export default function useUnsavedChangesGuard(
       afterDiscard?.();
       return true;
     }
-    if (!window.confirm(message)) return false;
-    clearDirty(afterDiscard);
-    return true;
+    if (confirmationRef.current) return false;
+    const controller = new AbortController();
+    confirmationRef.current = controller;
+    void requestDiscardConfirmation(message, controller.signal).then((accepted) => {
+      if (confirmationRef.current !== controller) return;
+      confirmationRef.current = null;
+      if (accepted) clearDirty(afterDiscard);
+    });
+    return false;
   }, [clearDirty, message]);
 
   const prepareFormSubmission = useCallback(
@@ -234,6 +243,10 @@ export default function useUnsavedChangesGuard(
         ) {
           restoringHistoryGuardIdRef.current = null;
           event.stopImmediatePropagation();
+          if (backDiscardPendingRef.current) {
+            backDiscardPendingRef.current = false;
+            confirmDiscard(() => window.history.back());
+          }
           return;
         }
         restoringHistoryGuardIdRef.current = null;
@@ -261,19 +274,11 @@ export default function useUnsavedChangesGuard(
         return;
       }
 
-      if (!window.confirm(message)) {
-        restoringHistoryGuardIdRef.current = guardId;
-        window.history.forward();
-        return;
-      }
-
-      window.history.replaceState(
-        withoutHistoryGuardKeys(currentState),
-        "",
-        window.location.href
-      );
-      resetDirtyState();
-      window.history.back();
+      // Restore the guarded entry before opening the non-blocking dialog.
+      // Confirming then compacts it and performs the originally requested Back.
+      backDiscardPendingRef.current = true;
+      restoringHistoryGuardIdRef.current = guardId;
+      window.history.forward();
     }
 
     function onDocumentClick(event: MouseEvent) {
@@ -308,15 +313,9 @@ export default function useUnsavedChangesGuard(
         destination.hash === window.location.hash;
       if (sameDestination) return;
 
-      if (dirtyRef.current && !window.confirm(message)) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        return;
-      }
-
       event.preventDefault();
       event.stopImmediatePropagation();
-      clearDirty(() => window.location.assign(destination.href));
+      confirmDiscard(() => window.location.assign(destination.href));
     }
 
     function onDocumentSubmit(event: SubmitEvent) {
@@ -332,15 +331,18 @@ export default function useUnsavedChangesGuard(
       }
       if (form.dataset.unsavedGuardBypass === "true") return;
 
-      if (dirtyRef.current && !window.confirm(message)) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        return;
-      }
-
       event.preventDefault();
       event.stopImmediatePropagation();
-      prepareFormSubmission(form, getGuardedFormSubmitter(event));
+      const submitter = getGuardedFormSubmitter(event);
+      confirmDiscard(() => {
+        if (!form.isConnected) return;
+        form.dataset[FORM_RESUBMITTING_KEY] = "true";
+        try {
+          form.requestSubmit(submitter?.form === form ? submitter : undefined);
+        } finally {
+          delete form.dataset[FORM_RESUBMITTING_KEY];
+        }
+      });
     }
 
     window.addEventListener("beforeunload", onBeforeUnload);
@@ -356,11 +358,17 @@ export default function useUnsavedChangesGuard(
   }, [
     armHistoryGuard,
     clearDirty,
+    confirmDiscard,
     guardOtherFormSubmissions,
     message,
     prepareFormSubmission,
     resetDirtyState,
   ]);
+
+  useEffect(() => () => {
+    confirmationRef.current?.abort();
+    confirmationRef.current = null;
+  }, []);
 
   return {
     clearDirty,

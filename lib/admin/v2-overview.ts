@@ -7,13 +7,16 @@ import { getAdminGalleryEditorData } from "@/lib/admin/gallery";
 import { getAdminHomeEditorData } from "@/lib/admin/home";
 import { getAdminNewInquiryCount } from "@/lib/admin/inquiries";
 import { getAdminMusicEditorData } from "@/lib/admin/music";
+import { getMediaLibraryV2Data } from "@/lib/admin/media-library";
 import { getAdminNavigationData } from "@/lib/admin/navigation";
 import {
   createNavigationEditorModel,
   toPreviewNavigationItems,
 } from "@/lib/admin/navigation-editor";
 import { getAdminShowreelEditorData } from "@/lib/admin/showreel";
+import { getAdminAppearanceData } from "@/lib/admin/site-appearance";
 import { getVisiblePublicPageNavigationItems } from "@/lib/content/navigation";
+import { getProductionReadiness } from "@/lib/admin/readiness";
 
 export type AdminV2PageEditorState =
   | "ready"
@@ -117,7 +120,7 @@ function sortIssues(issues: AdminV2OverviewIssue[]) {
 export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
   await requireAdmin();
 
-  const [navigation, home, bio, gallery, showreel, music, contact, inbox] =
+  const [navigation, home, bio, gallery, showreel, music, contact, inbox, appearance, media, readiness] =
     await Promise.all([
       getAdminNavigationData(),
       getAdminHomeEditorData(),
@@ -127,6 +130,11 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
       getAdminMusicEditorData(),
       getAdminContactEditorData(),
       getAdminNewInquiryCount(),
+      getAdminAppearanceData(),
+      getMediaLibraryV2Data(),
+      // Page/workspace loaders above already verify their snapshots. Do not
+      // repeat that full fan-out just to show deployment warnings on Overview.
+      getProductionReadiness({ includeSchema: false }).catch(() => null),
     ]);
 
   const navigationModel = createNavigationEditorModel(navigation.navigation);
@@ -218,7 +226,7 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
     },
   ];
 
-  const serviceUnavailable = [navigation, ...editors.map((item) => item.readiness)]
+  const serviceUnavailable = [navigation, appearance, media, ...editors.map((item) => item.readiness)]
     .some((item) => !item.isConfigured);
   const issues: AdminV2OverviewIssue[] = [];
 
@@ -282,6 +290,38 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
     }
   }
 
+  // These are separate workspaces, not public pages. Their migration health
+  // still belongs in the setup queue; a ready Bio editor says nothing about
+  // whether the new footer or safe Media removal can be saved.
+  if (appearance.isConfigured) {
+    if (appearance.loadError || appearance.migrationRequired) {
+      issues.push({
+        id: "appearance-unavailable", title: "Appearance settings need attention",
+        detail: appearance.loadError || "The saved typography and profile settings need their database setup checked.",
+        href: "/admin/v2/settings/appearance", tone: "error",
+      });
+    } else if (appearance.footerMigrationRequired) {
+      issues.push({
+        id: "footer-migration", title: "Footer content needs setup",
+        detail: "Apply and verify migration 0039 before editing footer content. Fonts and profile text remain available.",
+        href: "/admin/v2/settings/appearance", tone: "warning",
+      });
+    }
+  }
+  if (media.isConfigured) {
+    if (media.loadError) {
+      issues.push({
+        id: "media-unavailable", title: "Media library is unavailable", detail: media.loadError,
+        href: "/admin/v2/media", tone: "error",
+      });
+    } else if (media.usageError) {
+      issues.push({
+        id: "media-usage-unavailable", title: "Media usage and removal need attention", detail: media.usageError,
+        href: "/admin/v2/media", tone: "warning",
+      });
+    }
+  }
+
   if (
     contact.isConfigured &&
     !contact.loadError &&
@@ -300,6 +340,31 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
       href: "/admin/v2/pages/contact",
       tone: "setup",
     });
+  }
+
+  if (!readiness) {
+    issues.push({
+      id: "readiness-unavailable",
+      title: "Production checks could not be verified",
+      detail: "Editing may still work. Open Security → Advanced and retry the read-only checks before launch.",
+      href: "/admin/v2/security#configuration",
+      tone: "warning",
+    });
+  } else {
+    for (const check of readiness.checks) {
+      if (!check.critical || check.status === "pass") continue;
+      // Keep one actionable card for the same problem instead of duplicating
+      // Contact setup and the server-connection warning already shown above.
+      if (check.id === "email" && issues.some((issue) => issue.id === "contact-delivery-setup")) continue;
+      if (serviceUnavailable && (check.id === "service-key" || check.status === "unknown")) continue;
+      issues.push({
+        id: `production-${check.id}`,
+        title: `${check.label}: ${check.status === "unknown" ? "not verified" : "needs attention"}`,
+        detail: check.detail,
+        href: "/admin/v2/security#configuration",
+        tone: check.status === "unknown" ? "warning" : "error",
+      });
+    }
   }
 
   const pages: AdminV2PageSummary[] = editors.map(

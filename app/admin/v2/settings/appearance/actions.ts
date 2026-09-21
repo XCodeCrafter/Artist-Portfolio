@@ -8,9 +8,9 @@ import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { createAdminServiceClient } from "@/lib/admin/service";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { isMissingSiteAppearanceSchemaError } from "@/lib/admin/site-appearance";
-import { parseAppearanceSubmission, type AppearanceEditorSection, type AppearanceSaveState } from "@/lib/admin/site-appearance-editor";
+import { APPEARANCE_EDITOR_SECTIONS, parseAppearanceSubmission, type AppearanceEditorSection, type AppearanceSaveState } from "@/lib/admin/site-appearance-editor";
 
-const formSchema = z.object({ section: z.string().max(32), payload: z.string().max(4_000), versions: z.string().max(1_000) }).strict();
+const formSchema = z.object({ section: z.string().max(32), payload: z.string().max(12_000), versions: z.string().max(1_000) }).strict();
 function result(status: AppearanceSaveState["status"], message: string, extra: Partial<AppearanceSaveState> = {}): AppearanceSaveState {
   return { status, message, eventId: randomUUID(), ...extra };
 }
@@ -30,7 +30,7 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
   catch { return result("invalid", "The settings draft could not be read."); }
   const parsed = parseAppearanceSubmission(form.data.section, payload, versions);
   if (!parsed.success) return result("invalid", "Fix the highlighted fields before saving.", {
-    ...(form.data.section === "name" || form.data.section === "appearance" ? { section: form.data.section as AppearanceEditorSection } : {}),
+    ...(APPEARANCE_EDITOR_SECTIONS.includes(form.data.section as AppearanceEditorSection) ? { section: form.data.section as AppearanceEditorSection } : {}),
     fieldErrors: parsed.fieldErrors,
   });
   const section = parsed.data.section;
@@ -41,7 +41,10 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
   // part of this single UPDATE; concurrent changes never become blind writes.
   const values = parsed.data.section === "name"
     ? { artist_name: parsed.data.payload.artistName }
-    : {
+    : parsed.data.section === "identity" ? {
+      tagline: parsed.data.payload.tagline, description: parsed.data.payload.description,
+      location: parsed.data.payload.location, contact_blurb: parsed.data.payload.contactBlurb,
+    } : parsed.data.section === "footer" ? { footer_content: parsed.data.payload } : {
       display_font: parsed.data.payload.displayFont,
       body_font: parsed.data.payload.bodyFont,
       ui_font: parsed.data.payload.uiFont,
@@ -49,7 +52,8 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
     };
   const columns = section === "name"
     ? "artist_name,updated_at"
-    : "display_font,body_font,ui_font,footer_effect,updated_at";
+    : section === "identity" ? "tagline,description,location,contact_blurb,updated_at"
+    : section === "footer" ? "footer_content,updated_at" : "display_font,body_font,ui_font,footer_effect,updated_at";
   const { data, error } = await supabase.from("site_settings")
     .update(values)
     .eq("id", "main")
@@ -58,7 +62,7 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
     .maybeSingle<Record<string, unknown>>();
   if (error) {
     if (error.code === "40001") return result("conflict", "Site settings changed in another admin session. Your draft was kept. Reload before saving again.", { section });
-    if (isMissingSiteAppearanceSchemaError(error)) return result("migration-required", "The database is missing existing site settings fields. Check the settings migrations before saving.", { section });
+    if (isMissingSiteAppearanceSchemaError(error)) return result("migration-required", section === "footer" ? "Apply migration 0039_footer_content_editor.sql and its check before publishing footer content." : "The database is missing existing site settings fields. Check the settings migrations before saving.", { section });
     if (error.code === "22023" || error.code === "23514") return result("invalid", "The database rejected these settings. Review your selections and try again.", { section });
     console.error("Admin V2 appearance save failed.", { section, code: error.code });
     return result("error", "Settings could not be saved. Your local changes are still here.", { section });
@@ -67,6 +71,8 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
 
   const canonicalSection = section === "name"
     ? { artistName: data.artist_name }
+    : section === "identity" ? { tagline: data.tagline, description: data.description, location: data.location, contactBlurb: data.contact_blurb }
+    : section === "footer" ? data.footer_content
     : { displayFont: data.display_font, bodyFont: data.body_font, uiFont: data.ui_font, footerEffect: data.footer_effect };
   const confirmed = parseAppearanceSubmission(section, canonicalSection, { updatedAt: data.updated_at });
   if (!confirmed.success) return result("error", "The save response could not be confirmed. Reload to verify your saved settings.", { section });
@@ -76,8 +82,9 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
     metadata: { section, fields: Object.keys(values) },
   });
   revalidatePath("/", "layout");
-  for (const path of ["/admin/v2", "/admin/v2/navigation", "/admin/v2/settings/appearance", "/admin/content", "/admin/settings"]) revalidatePath(path);
-  return result("saved", section === "name" ? "Owner name saved and published." : "Appearance saved and published.", {
+  for (const path of ["/admin/v2", "/admin/v2/navigation", "/admin/v2/settings/appearance", "/admin/v2/pages/contact", "/admin/content", "/admin/settings"]) revalidatePath(path);
+  const labels = { name: "Owner name", appearance: "Appearance", identity: "Profile & introduction", footer: "Footer content" };
+  return result("saved", `${labels[section]} saved and published.`, {
     section, canonicalSection: confirmed.data.payload, versions: confirmed.data.versions, savedAt: new Date().toISOString(),
   });
 }

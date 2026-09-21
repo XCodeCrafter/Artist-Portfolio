@@ -4,12 +4,14 @@ import { getBookingInquiries } from "@/lib/admin/inquiries";
 const serviceMocks = vi.hoisted(() => ({
   hasAdminServiceEnv: vi.fn(() => true),
   createAdminServiceClient: vi.fn<() => unknown>(),
+  requireAdmin: vi.fn(async () => ({ id: "admin", role: "owner" })),
 }));
 
 vi.mock("@/lib/admin/service", () => ({
   hasAdminServiceEnv: serviceMocks.hasAdminServiceEnv,
   createAdminServiceClient: serviceMocks.createAdminServiceClient,
 }));
+vi.mock("@/lib/admin/auth", () => ({ requireAdmin: serviceMocks.requireAdmin }));
 
 const row = {
   id: "22222222-2222-4222-8222-222222222222",
@@ -90,13 +92,19 @@ function createReadClient(
     })),
     {
       select: vi.fn(() => ({
-        gte: vi.fn(async () => ({ count: counts[5], error: null })),
+        gte: vi.fn(() => ({
+          lt: vi.fn(() => ({
+            abortSignal: vi.fn(async () => ({ count: counts[5], error: null })),
+          })),
+        })),
       })),
     },
     {
       select: vi.fn(() => ({
         gte: vi.fn(() => ({
-          lt: vi.fn(async () => ({ count: counts[6], error: null })),
+          lt: vi.fn(() => ({
+            abortSignal: vi.fn(async () => ({ count: counts[6], error: null })),
+          })),
         })),
       })),
     },
@@ -151,7 +159,7 @@ describe("admin inquiry data", () => {
     );
     expect(result.isConfigured).toBe(true);
     expect(result.loadError).toBeUndefined();
-    expect(result.summary).toEqual({
+    expect(result.summary).toMatchObject({
       total: 41,
       new: 7,
       read: 8,
@@ -159,6 +167,7 @@ describe("admin inquiry data", () => {
       archived: 17,
       current7Days: 4,
       previous7Days: 3,
+      weekly: { available: true, current7Days: 4, previous7Days: 3 },
     });
     expect(result.pagination).toEqual({
       page: 2,

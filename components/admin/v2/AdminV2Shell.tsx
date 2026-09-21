@@ -80,6 +80,7 @@ function iconFor(key: AdminV2NavigationKey) {
     music: <FaMusic />,
     contact: <FaEnvelope />,
     inbox: <FaInbox />,
+    media: <FaImages />,
     insights: <FaChartLine />,
     appearance: <FaPalette />,
     settings: <FaShieldAlt />,

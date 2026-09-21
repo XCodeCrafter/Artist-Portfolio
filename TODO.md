@@ -1,6 +1,6 @@
 # Artist Portfolio V2 Roadmap
 
-Updated: 2026-09-04
+Updated: 2026-09-21
 
 ## Product direction
 
@@ -1115,3 +1115,492 @@ Acceptance:
 
 - V2 becomes default only after all critical checks and owner review pass.
 - Rollback does not require restoring deleted content or database records.
+
+## Batch 11 — Public editability audit & Classic → V2 completion (2026-09-20)
+
+Audit: `docs/public-editability-audit-2026-09-20.md`. This batch does not replace
+the pending ImageKit Batch 7A.2f, Gmail notifications Batch 7B, or production
+acceptance / migration-history reconciliation.
+
+### 11A — Audit and missing workflows
+
+- [x] Audit all public routes and active Classic workflows before implementation.
+- [x] Identify Media library, CNC program management, and tagline/site description
+      as actual Classic-only gaps; distinguish new product scope from parity.
+- [x] Record fixed legal copy, page SEO, system labels, and layout limitations.
+
+### 11B — Media library V2
+
+- [x] Native library route, sidebar/finder entry, file selection and contextual
+      inspector; upload, search, type/Trash filters, descriptions and usage.
+- [x] Connect page media pickers and Showreel upload to V2 Media.
+- [x] Versioned metadata writes; atomic replace-used-file-and-trash; restore.
+- [x] Add service-only migration 0040 usage registry, reference replacement and
+      stale-writer guards (including hidden/Classic references).
+- [x] Verify migrations 0039–0040 in isolated PostgreSQL and test lifecycle errors,
+      stale references, both CAS checks, rollback and provider-variant protection.
+- [x] Owner reports applying 0039 and 0040 in Supabase (2026-09-20).
+      Appearance and Media usage load successfully in authenticated V2.
+- [ ] Confirm all rows in the matching 0039 and 0040 read-only check scripts
+      have `passed = true`; successful UI reads do not verify every grant,
+      constraint, or trigger. Never blind `supabase db push`.
+- [ ] Owner acceptance: upload disposable fixture, replace a used fixture,
+      verify public result, move to Trash and restore. No live files used as tests.
+- [ ] Separate follow-up: provider-aware permanent cleanup / freed storage bytes.
+      Recoverable Trash intentionally retains original objects and billed size.
+
+### 11C — HOME code programs and shared identity/footer
+
+- [x] Bring CNC source CRUD, order, visibility and public code preview into V2
+      HOME with contextual inspector, draft guard and existing versioned RPC.
+- [x] Move brand tagline/site description into Appearance; preserve user-written
+      music-only or acting-only copy without heuristic replacement.
+- [x] Add editable footer content with the actual shared footer preview; prepare
+      migration 0039 without changing current default design.
+- [x] Final full regression: **882 tests / 86 files**, TypeScript, ESLint and
+      production build passed after all review fixes. Both isolated PostgreSQL
+      migration scripts passed; only the pre-existing Edge Runtime deprecation
+      warning remains in the build output.
+- [x] Public browser smoke on all eight routes; mobile HOME/Gallery/Contact and
+      Showreel. Repair the discovered Showreel min-content overflow without
+      changing video behavior. Authenticated V2 remains gated by owner login.
+- [ ] Authenticated owner acceptance after migrations: Media, CNC and Appearance
+      drafts/inspector/save/conflict/Trash workflows with disposable fixtures.
+
+Classic remains available during the rollback window. No production content,
+storage object, provider setting, account, or migration is changed by this batch.
+
+## Batch 12 — Audit repairs & visitor privacy (2026-09-21)
+
+Implementation notes: `docs/privacy-and-audit-repairs-2026-09-21.md` and
+`docs/analytics-consent-hardening-2026-09-20.md`. No new migration in this batch.
+
+### 12A — Confirmed audit defects
+
+- [x] Preserve V2 drafts/CAS on rejected or malformed saves; ambiguous results
+      and conflicts require explicit saved-version reload before retry.
+- [x] Replace application-owned native confirm prompts with an accessible
+      in-app discard dialog; retain the browser's real beforeunload protection.
+- [x] Fix Media inspector reachability and dirty state after restoring values.
+- [x] Include Appearance/footer + Media readiness on Overview, and expose
+      owner identity/footer destinations clearly in Settings.
+- [x] Correct HOME enabled/visible language, Gallery help and Music validation.
+- [x] Correct analytics attribution, tab visits, explicit interactions and
+      partial-report warnings. Exclude legacy measurements without deleting them.
+- [x] Stop presenting bespoke Web Vitals and unverified comparison percentages
+      as reliable measurements. Exclude development / Vercel preview ingestion.
+
+### 12B — Functional consent, not a decorative banner
+
+- [x] Default-denied analytics and external-player categories; equal accept/reject,
+      granular choices, 180-day preference cookie and withdrawal/reopen controls.
+- [x] Music-themed Read more dialog, keyboard controls, mobile layout and a
+      factual privacy notice including providers, storage and contact handling.
+- [x] Block Spotify/SoundCloud/YouTube/Vimeo iframe requests before consent;
+      unmount after withdrawal. Preserve hosted Showreel preview/playback behavior.
+- [x] Gate analytics in both client and API before identifiers/database processing;
+      keep essential Contact/Inbox delivery independent from analytics consent.
+- [x] Test cookie failures/expiry, per-purpose choices, cross-tab synchronization,
+      withdrawal, actual collector callbacks and server no-consent behavior.
+- [x] Browser QA: default no iframes, reject + reload, external-only permission,
+      withdrawal, desktop/mobile Read more and Escape/focus restoration.
+- [x] Non-publishing V2 browser QA: Media dirty reversal, reachable lower controls,
+      Keep editing / Discard navigation, Settings and honest Insights states.
+- [x] Final `npm run check`: 997 tests / 97 files, TypeScript, ESLint and production
+      build passed; `git diff --check` passed.
+
+### 12C — Production completion / owner follow-up (not claimed complete)
+
+- [ ] Implement DB-side analytics aggregates, verified coverage/cutover, long-term
+      retention and the proposed main visits/views graph before promising 1Y
+      reporting or accurate comparisons. No invented unique-person/time metrics.
+- [ ] Add internal-traffic controls, monitored ingestion health and a
+      standards-based performance collector in a separate analytics batch.
+- [ ] Owner/legal review before launch: real controller contact/identity,
+      actual provider contracts/regions/transfers, rights and retention schedule;
+      verify scheduled cleanup and procedures for deletion requests.
+- [ ] Production acceptance on disposable fixtures: saves/conflicts/uploads/
+      replace/Trash/restore, consented event ingestion and Contact delivery.
+- [ ] Still return to ImageKit **7A.2f**, Gmail/Resend **7B**, migration verification
+      checks **0039/0040**, and safe CLI migration-history reconciliation.
+
+## Batch 13 — Classic parity and safe retirement (2026-09-21)
+
+Owner approved sequential implementation after the read-only Classic/V2 audit.
+Work on one sub-batch per turn; retain Classic and all existing content until the
+final audit and explicit retirement approval. Do not replay migrations or publish
+test content. Existing ImageKit, email, analytics and production follow-ups above
+remain open; they were not completed Classic features lost during migration.
+
+### 13A — Spotify player parity
+
+Status: complete. No database migration required.
+
+- [x] Preserve the selected player on heading-only saves, profile edits and in
+      the 1:1 preview; never silently replace a saved playlist with artist releases.
+- [x] Keep the artist profile separate; accept ordinary playlist, album, track
+      or artist links for the player with clear errors and an explicit reset to
+      artist releases. Preserve intentional empty players and valid embed options.
+- [x] Validate and normalize trusted Spotify URLs on server and preview boundaries;
+      preserve consent gating and link the iOS fallback to the chosen content.
+- [x] Add save, preview, URL-safety and editor regressions; run automated checks
+      and non-publishing browser QA if the authenticated local session is available.
+
+Verification: full automated suite, TypeScript, ESLint and production build pass;
+only the existing Edge Runtime deprecation warning remains. Regression tests
+cover independent fields, normal/embedded URLs, query preservation, blank
+players, unsafe hosts, preview sanitation, RPC/CAS and the actual iOS fallback.
+Authenticated browser QA on port 3001 confirms field independence, validation,
+the explicit artist shortcut and valid blank players; draft values were restored
+without saving or changing production content. External player consent stays
+unchanged. A provider playback/live database write is not claimed by this QA.
+
+### 13B — Unified production readiness
+
+Status: complete. No database migration required.
+
+- [x] Bring useful Classic checks into V2 Security: production HTTPS URL, schema,
+      storage availability, auth secret and public signup status.
+- [x] Show actionable critical warnings on Overview; distinguish an unavailable
+      check from a verified failure. Update outdated migration wording/checks.
+- [x] Keep advanced diagnostics out of the everyday editing path; test parity.
+
+Implementation: shared pass/fail/unknown checks now feed Security and Overview.
+Required editor interfaces include footer content (0039) and Media usage (0040).
+Diagnostics use bounded read-only requests; removed the old Contact write probes
+and rate-limit consumption. Overview skips duplicate editor snapshot reads,
+shows only critical deployment issues and avoids duplicate Contact warnings.
+Advanced keeps optional setup separate and explains each check's limited scope;
+configured credentials never imply tested writes, delivery or scheduled jobs.
+
+Verification: 1,072 tests, TypeScript, ESLint and production build passed. The
+existing Edge Runtime deprecation warning remains. Authenticated browser QA on
+localhost:3001 verified Overview warnings, the direct Advanced link and expanded
+passing checks, including database interfaces and Media storage; no browser
+warnings/errors were observed. Regression tests cover unavailable dependencies,
+malformed responses, missing schema, safe error messages and unknown-state UI.
+No content, access settings, migrations or external configuration were changed.
+
+Owner follow-up before production: connected Supabase Auth reports public signup
+enabled. Disable public registration after confirming the intended admin-invite
+flow. This local environment also lacks the production HTTPS URL and Contact
+email setup; the checks do not establish the separate Vercel deployment's state.
+
+### 13C — Media organization and recognition
+
+Status: complete. No database migration required.
+
+- [x] Add compact filters for missing alt, oversized, recent and availability;
+      sorting by newest, largest and name without misleading publication wording.
+- [x] Add recognizable video poster thumbnails without preloading every video.
+- [x] Add copy-URL convenience and richer placement labels/editor links.
+- [x] Assess a safe "Use on page" shortcut that opens a draft, never auto-publishes.
+- [x] Test selection, filters, dirty-state protection and mobile ergonomics.
+
+Implementation: composable type/search/condition/availability filters with newest,
+largest and natural-name sorting. Size hints use recorded sizes above 2 MB for
+photos and 20 MB for videos, not upload limits or automatic optimization. Recent
+uses the refreshed server snapshot time. Filtering keeps the selected draft and
+its original CAS version, including when its card disappears from the results.
+Unknown usage never becomes a claim that a file is unused.
+
+Video grid tiles use only safe, already-saved poster images from HOME, page heroes,
+Showreel and Gallery, read with bounded optional queries. Missing/unusable posters
+show a labelled fallback; generation and background video downloads are not added.
+Only the selected inspector mounts a player, with preload="none". Copy URL reports
+clipboard failure honestly. Placement descriptions distinguish hidden/Classic
+references and link only to known V2 editors without claiming precise locations
+when the usage registry cannot provide them.
+
+Shortcut assessment: automatic draft injection is deferred, not silently wired
+to an ineffective query parameter. It needs a compatible destination field and
+per-editor draft/CAS integration across six editors. The safe guided alternative
+opens an editor in a new tab, preserving the Media draft; the owner chooses the
+section and file, then explicitly saves there. No automatic placement/publication.
+
+Verification: 1,183 tests, TypeScript, ESLint and production build passed; only
+the existing Edge Runtime warning remains. Authenticated browser QA on port 3001
+verified sorting, combined filters, draft preservation/restoration without saving,
+and no video elements in the grid. Desktop (1440 px) and mobile (390 px) layouts
+were checked; mobile selection focuses the inspector with no horizontal overflow.
+No browser warnings/errors were observed. Current live-library videos have no
+usable saved posters; populated-poster and unsafe/error paths are covered by
+regression fixtures. No media, portfolio content, permissions or provider settings
+were changed. No migration or upload/removal operation was run during browser QA.
+
+### 13D — Retiring old content safely
+
+Status: owner confirmed 0041 through 0044 rollout with all checks true. All
+archive collections are implemented and locally verified. Authenticated browser
+QA for Gallery/Showreel and disposable-fixture lifecycle verification remain
+pending; the archive audit gate is not complete until those checks pass.
+
+- [x] Design recoverable archive/removal for saved BIO items, credits, platforms,
+      SoundCloud, navbar shortcuts, Gallery and Showreel content cards.
+- [x] Separate content-card removal from file Trash; hidden/archived rows must not
+      permanently consume active collection capacity. Preserve references/CAS.
+- [x] Prepare any forward-only migration and tests; wait for owner rollout where
+      required. No deletion of existing public content as a test.
+
+#### 13D.1 — Shared private archive foundation + Navbar pilot
+
+- [x] Prepare migration 0041 with a private archive, exact active-collection CAS,
+      archive-row CAS, hidden restore, capacity enforcement and Media references.
+- [x] Add explicit archive confirmation and paginated restore to Navbar shortcuts;
+      missing migration blocks only archive, not the existing shortcut editor.
+- [x] Verify isolated SQL, application boundaries, draft protection and build.
+- [x] Owner applies `supabase/migrations/0041_content_archive_navbar.sql`, then
+      runs `supabase/checks/0041_content_archive_navbar.sql` (all seven checks
+      returned true, confirmed by owner screenshot). Reload Navbar V2 before use.
+
+Implementation: saved shortcut cards now have explicit Archive confirmation;
+this immediately removes the icon from navbar/footer and frees its active slot.
+Restoration preserves its original data/order but always returns it hidden.
+The archive is private, paginated by 20, and never deletes a storage file.
+Archived file references remain visible in Media usage and participate in exact
+replacement, which also invalidates the archived row's restore version. Stale
+clients cannot recreate archived IDs. Unconfirmed outcomes keep the draft and
+require a guarded reload, without silently discarding another Navbar editor's
+unsaved work. Normal saving remains independent of read-only archive paging.
+
+Verification: isolated PostgreSQL/PGlite exercises forward deployment/rerun,
+whole-collection CAS, hidden restore/ABA, stale Classic upserts, last-item empty
+state, the 16-slot limit, permissions, paging, media replacement and rollback in
+both directions. Application and UI regression tests cover origin/auth gates,
+malformed snapshots, unknown outcomes, sibling drafts and pagination races.
+Full verification passed: 1,298 tests, TypeScript, ESLint and production build;
+only the existing Edge Runtime deprecation/static-generation warnings remain.
+Authenticated browser QA on port 3001 verified the pre-migration warning,
+disabled Archive, ordinary draft editing and discard, with no save or content
+mutation; no browser warnings/errors were observed. Follow-up after owner rollout
+confirmed the archive loads and Archive becomes enabled. Actual archive/restore
+was not exercised against the owner's live content. No remote SQL or media
+operation was executed by the agent.
+
+Resume: owner confirmed 0041 through 0045 + checks. 13E is implemented below;
+deferred browser QA remains pending. Keep 13G as the final
+audit gate. Apply only
+the new forward migration; do not rerun older migrations over the newer registry.
+
+#### 13D.2 — Music collections
+
+- [x] Extend the private archive through forward migration 0042 for platforms
+      and SoundCloud; release active capacity (32/48), restore hidden, retain
+      original data/order and protect archived media references.
+- [x] Integrate with the 1:1 Music inspector and preserve sibling drafts plus
+      Spotify/SoundCloud's shared presentation version. Keep incomplete legacy
+      records archivable without weakening ordinary save validation.
+- [x] Verify isolated SQL, server/parser/UI boundaries and production build.
+- [x] Owner applies `supabase/migrations/0042_content_archive_music.sql`, then
+      `supabase/checks/0042_content_archive_music.sql` (all nine checks true,
+      confirmed by screenshot). Reload Music V2; do not rerun older migrations.
+
+Implementation: Archive is part of each saved Platform / SoundCloud card in the
+existing inspector. Explicit confirmation immediately removes that item from
+public Music; restoration returns the original data/order as hidden. Unsaved
+cards still use local Discard. Archives page by 20 and show active capacity.
+Missing 0042 disables only lifecycle controls, not existing Music editing.
+
+Whole-collection and archive-row CAS, source-ID recreation guards and monotonic
+restore versions follow the Navbar pilot. SoundCloud also locks and checks its
+shared Music presentation version without changing its heading or timestamp.
+Canonical results update only the affected section, keeping other drafts. Legacy
+readable cards without images/icons remain recoverable; normal saving remains
+strict. Unconfirmed outcomes block writes and expose guarded reload on desktop
+and inside the mobile modal. Normal saving still works during read-only paging.
+Media usage retains archived file references and now offers both Navbar and
+Music destinations without falsely guessing which collection owns a reference.
+Server success confirmation was strengthened in both Music and Navbar to reject
+results that silently lose or inject unrelated active IDs.
+
+Verification: isolated PostgreSQL/PGlite covers deploy/rerun preservation,
+both capacity limits, CAS/ABA, hidden restore, intentionally empty collections,
+shared presentation conflicts, stale Classic upserts, archived media replacement,
+permission boundaries, paging and atomic rollback in both directions. Navbar
+0041 operations and all seven earlier checks still pass; 0042 has nine passing
+checks. Full regression: 1,455 tests, TypeScript, ESLint and production build.
+Only existing Edge Runtime warnings remain. Browser QA verified both pre-rollout
+archive states, ordinary edits and independent Hero/SoundCloud draft discard;
+the 390px mobile inspector and scrollable archive fit correctly. No browser
+warnings/errors observed. No public content was changed, no storage object was
+deleted and no remote migration was run. Live archive/restore after owner rollout
+remains a later fixture-based check, not an unreported production experiment.
+
+Next: 13D.3 is implemented below; owner confirmed 0043 rollout and checks.
+
+#### 13D.3 — Bio collections
+
+- [x] Add recoverable portraits, paragraphs and credit cards with their existing
+      coupled biography/CAS boundaries intact.
+- [x] Preserve legacy readable portraits, all sibling drafts, media references,
+      collection capacity (32/50/100), original order and hidden restoration.
+- [x] Verify 0043 isolated SQL, boundary/UI tests, build and pre-rollout browser
+      state without changing the owner's content.
+- [x] Owner applies `supabase/migrations/0043_content_archive_bio.sql`, then
+      `supabase/checks/0043_content_archive_bio.sql` (all nine results true,
+      confirmed by screenshot). Reload Bio V2; do not rerun older migrations.
+
+Implementation: saved portraits, paragraphs and credits now have explicit
+Archive confirmation directly in the 1:1 inspector and their own paginated
+archives. Archive removes the public item and frees its active slot; restore
+preserves the original row/order but always returns it hidden. No media file is
+deleted. New unsaved cards still use local Discard. Missing 0043 disables only
+archive controls; existing Bio editing remains available.
+
+Biography always checks its complete save boundary: profile version, portrait
+versions and paragraph versions. A lifecycle action never edits profile copy or
+its timestamp. Canonical results update the whole confirmed Biography while
+preserving Hero/Resume/Credits drafts; Credits remains independent. Legacy safe
+HTTPS portraits remain recoverable without weakening normal managed-media save
+validation. Unknown outcomes lock further writes and expose guarded reload,
+including inside the mobile inspector. Read-only archive paging does not block
+ordinary saving. Media's archived-reference destinations now include Bio.
+
+Verification: isolated PostgreSQL/PGlite passed deployment/rerun preservation,
+all three capacity limits, original-row hidden restore/order, CAS/ABA, coupled
+profile/sibling conflicts, ID-recreation guards, same-ID cross-collection safety,
+private paging/roles, archived portrait/credit media replacement, stale ordinary
+saves and atomic rollback. All nine 0043 checks and previous 0041/0042 checks
+pass in the isolated database. Full regression: 1,675 tests, TypeScript, ESLint
+and production build; only the existing Edge Runtime warnings remain. New
+regressions also prevent malformed version-map validation from throwing in the
+Navbar and Music archive parsers.
+
+Authenticated browser QA on port 3001 verified migration-gated portrait,
+paragraph and credit controls; independent Biography/Hero draft preservation
+and discard; and the 390px mobile Credits inspector/archive. No browser
+warnings/errors were observed. Test drafts were discarded; no content was saved
+or archived, no storage file was deleted and no remote SQL was executed. Live
+archive/restore on disposable fixtures remains part of the final 13G audit.
+
+Next: 13D.4 is implemented below and owner confirmed 0044. Classic stays in
+place until the final parity/production audit gate is complete.
+
+#### 13D.4 — Gallery and Showreel
+
+- [x] Preserve Gallery HOME-story exclusions and Showreel historical capacity.
+- [x] Fix intentional-empty Showreel fallback before removing its last saved row;
+      no demo content should reappear merely because a collection is archived.
+- [x] Recheck archive/media replacement, restore and all collection limits in
+      isolated SQL and regression tests. File Trash and provider optimization
+      stay separate; live fixture verification remains a 13G gate.
+- [x] Owner applies `supabase/migrations/0044_content_archive_gallery_showreel.sql`,
+      then `supabase/checks/0044_content_archive_gallery_showreel.sql` (all ten
+      results true, confirmed by two owner screenshots). Reload Gallery/Showreel
+      V2 before live use.
+- [ ] Authenticated desktop/mobile browser QA: retry when the in-app browser
+      attaches again; this turn's two background-tab attempts timed out before
+      any page UI could be inspected. Include disposable-fixture lifecycle
+      writes at the final 13G gate, not experiments on the owner's real content.
+
+Implementation: both 1:1 inspectors now provide explicit Archive confirmation,
+20-item archive pages and hidden restore with original row data/order. Gallery
+only handles non-HOME-story rows and cannot steal or recreate an archived ID.
+Showreel keeps all video types and historical identifiers. A private persisted
+high-water mark retains restoration capacity for catalogs already above 120;
+normal new-card limits are unchanged. An existing competing featured marker
+refuses restoration without modifying the archive, rather than silently losing
+historical data. Archived files remain protected in Media usage/replacement;
+the placement helper links to Gallery and Showreel as additional destinations.
+
+Canonical responses must exactly match the affected collection membership and
+versions. Sibling Hero/Introduction drafts survive; dirty Frames/Videos must be
+saved/discarded first. Synchronous save/archive locks cover same-frame races,
+unknown outcomes require guarded reload (also inside the mobile modal), and
+read-only paging does not consume ordinary Save. Legacy readable records use
+read-snapshot validation without weakening normal media validation. The normal
+Showreel version parser also preserves own historical `__proto__` IDs safely,
+so recovered items remain editable; unversioned new IDs stay strict.
+
+The successful-empty public video mapper no longer revives fallback reels after
+the last saved item is hidden/archived. Visitor playback/scroll interactions
+were not modified. No real content, files or remote migrations were changed.
+
+Verification: all 1,949 tests across 123 files pass, including 72 archive UI
+cases, 153 server/parser cases, 14 SQL contracts and 32 normal-save legacy-ID
+regressions. TypeScript, ESLint and production build pass; only the existing
+Edge Runtime deprecation/static-generation warnings remain. Isolated
+PostgreSQL/PGlite verifies deploy/rerun preservation, all six predecessor
+lifecycles/checks, exact full-row hidden restore/order/ABA, 123-item historical
+catalog recovery and later growth, HOME exclusion/ownership rollback, featured
+conflicts, safe legacy IDs, all capacity/CAS/private-role boundaries, archived
+Media replacement and atomic rollback. All ten 0044 checks pass locally.
+Browser layout/real interaction verification is explicitly deferred above.
+
+Next: 0044 rollout/checks confirmed; 13E small useful Classic controls below. Keep the
+deferred browser verification visible, then complete 13F and the final 13G audit
+before removing Classic.
+
+### 13E — Small useful Classic controls
+
+- [x] Restore BIO paragraph animation delay under Advanced, preserving defaults.
+- [x] Add the real received-inquiries weekly count/trend to Inbox, independently
+      of visitor analytics consent; show honest missing-data states.
+- [x] Resolve Appearance/Contact validation disagreement for shared optional copy.
+- [x] Owner applies only `supabase/migrations/0045_contact_optional_copy.sql`,
+      then `supabase/checks/0045_contact_optional_copy.sql` (all six results true,
+      confirmed by owner screenshot).
+      Reload Contact V2. No earlier migration needs to be reapplied.
+- [ ] Authenticated desktop/mobile browser verification. The in-app browser
+      again failed to attach before any UI could be inspected this turn; do not
+      treat automated component tests as completed live browser QA.
+
+Implementation: each BIO paragraph has a collapsed Advanced animation delay
+control (whole milliseconds, 0–5000). Existing defaults and saved values remain
+unchanged. Valid edits update the 1:1 preview; invalid/empty drafts block Biography
+saving and coupled archive actions without coercing the value to zero. The
+preview temporarily retains saved timing while the actual draft remains invalid.
+
+Inbox now shows received messages over the last seven 24-hour periods compared
+with the preceding seven. Both head-only exact counts use one fixed UTC snapshot
+and half-open intervals; include every retained status, exclude deleted records,
+and are independent of the page filter and analytics consent. Null, malformed,
+failed or timed-out counts are unavailable, not zero. A weekly-statistics failure
+does not disable message triage; the Classic metric also honors this availability.
+
+Contact and Appearance now agree that location and introduction are optional.
+Explicitly cleared values hide their rows in public Contact/footer and previews;
+the actual contact form and footer buttons remain available. Forward-only 0045
+relaxes just the two minimum lengths while preserving strict payloads, maxima,
+private service-role access and shared site-settings CAS. It never rewrites
+existing content. A private, read-only capability gates empty saves, freshly
+checked server-side; missing/unverified 0045 does not block filled details or Hero.
+Contact saves invalidate shared footer/Appearance views as well.
+
+Verification: targeted BIO/Contact/Inbox regressions and isolated PostgreSQL
+tests pass. The isolated database verifies all six 0045 checks, content-preserving
+deploy/rerun, strict empty/max-length inputs, shared Appearance CAS in both
+directions, unchanged Hero and permission boundaries. Full regression passed:
+2,068 tests across 129 files, TypeScript, ESLint and production build. Only the
+existing Edge Runtime deprecation/static-generation warnings remain. Read-only
+peer review found no actionable regressions. Live browser QA remains deferred.
+No remote SQL, owner-content writes, media changes or commit/push were performed.
+
+0045 rollout/checks confirmed. Next: 13F cutover preparation, followed by the explicitly
+announced final 13G parity/production audit. Classic remains until owner approval.
+
+### 13F — Prepare the Classic cutover (retain rollback)
+
+- [ ] Extract retained upload, security and Inbox actions from Classic route
+      modules; inventory all V2 imports before removing any old route files.
+- [ ] Prepare V2 login/MFA destinations and legacy route/hash redirects, including
+      the old Insights inquiries anchor; remove Classic fallback links.
+- [ ] Preserve auth/recovery/callback routes, authorization, shared layouts,
+      noindex protections and shared tables. Do not delete data with screens.
+- [ ] Do not restore obsolete actor/musician, raw IDs, unused featured/story
+      controls or unrestricted iframe/media sources merely to match Classic.
+
+### 13G — Final audit gate (announce to owner when 13A–13F are ready)
+
+- [ ] Repeat Classic/V2 feature parity and public editability audit.
+- [ ] Run full regression/build and authenticated desktop/mobile browser QA;
+      verify saves/conflicts/uploads/replace/Trash/restore on disposable fixtures.
+- [ ] Verify migrations/check scripts and list remaining production blockers;
+      distinguish cutover readiness from ImageKit/email/analytics completion.
+- [ ] Report findings to owner and fix blockers before proposing removal.
+
+### 13H — Retire Classic only after audit and owner approval
+
+- [ ] Make V2 the sole admin interface with working legacy redirects.
+- [ ] Remove obsolete Classic UI without deleting shared services or content.
+- [ ] Run post-cutover smoke/security checks and document the rollback path.

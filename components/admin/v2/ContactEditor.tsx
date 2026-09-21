@@ -27,6 +27,7 @@ import {
 import { saveContactSectionV2 } from "@/app/admin/v2/pages/contact/actions";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
 import ContactPreviewFrame, {
   type ContactPreviewDevice,
 } from "@/components/admin/v2/ContactPreviewFrame";
@@ -49,10 +50,12 @@ import {
   type ContactSaveState,
 } from "@/lib/admin/contact-editor";
 import type { MediaAsset } from "@/lib/admin/media";
+import type { ContactCopyCapability } from "@/lib/admin/contact-copy";
 
 type FieldErrors = Record<string, string[]>;
 
 type ContactEditorProps = {
+  optionalCopy?: ContactCopyCapability;
   assets: MediaAsset[];
   delivery: {
     emailConfigured: boolean;
@@ -297,11 +300,13 @@ function DetailsInspector({
   errors,
   instance,
   onChange,
+  optionalCopy,
 }: {
   draft: ContactDetailsDraft;
   errors: FieldErrors;
   instance: "desktop" | "mobile";
   onChange: (patch: Partial<ContactDetailsDraft>) => void;
+  optionalCopy: ContactCopyCapability;
 }) {
   const blurbId = `${instance}-contact-details-blurb`;
   const locationId = `${instance}-contact-details-location`;
@@ -314,12 +319,13 @@ function DetailsInspector({
         in portfolio footers. Form security and delivery messages remain
         system-owned so an innocent copy edit cannot accidentally lie about
         where a message went.
+        {" "}Both fields are optional. Leave a field blank to hide that detail.
       </p>
+      {!optionalCopy.available ? <p className="rounded-2xl border border-amber-200/15 bg-amber-200/[0.035] px-4 py-3 text-xs leading-5 text-amber-100/75" role="status">{optionalCopy.message || "Apply migration 0045 to save empty Contact details. Filled details and Hero editing still work."}</p> : null}
       <Field
         controlId={blurbId}
         error={blurbError}
         label="Collaboration introduction"
-        required
       >
         <textarea
           aria-describedby={blurbError ? `${blurbId}-error` : undefined}
@@ -329,7 +335,6 @@ function DetailsInspector({
           maxLength={1000}
           onChange={(event) => onChange({ contactBlurb: event.target.value })}
           placeholder="For acting, music, productions, bookings, and creative collaborations."
-          required
           value={draft.contactBlurb}
         />
       </Field>
@@ -337,7 +342,6 @@ function DetailsInspector({
         controlId={locationId}
         error={locationError}
         label="Based in"
-        required
       >
         <input
           aria-describedby={locationError ? `${locationId}-error` : undefined}
@@ -347,7 +351,6 @@ function DetailsInspector({
           maxLength={220}
           onChange={(event) => onChange({ location: event.target.value })}
           placeholder="Amsterdam, The Netherlands"
-          required
           value={draft.location}
         />
       </Field>
@@ -429,6 +432,7 @@ function formatSavedAt(value: string) {
 }
 
 export default function ContactEditor({
+  optionalCopy = { available: false, migrationRequired: true },
   assets,
   delivery,
   disabled,
@@ -469,7 +473,7 @@ export default function ContactEditor({
 
   const applySaveResult = useCallback(
     (result: ContactSaveState) => {
-      if (!result.eventId || handledEventIdsRef.current.has(result.eventId)) return;
+      if (!result.eventId || handledEventIdsRef.current.has(result.eventId)) return false;
       handledEventIdsRef.current.add(result.eventId);
       if (
         result.status !== "saved" ||
@@ -477,20 +481,20 @@ export default function ContactEditor({
         !result.canonicalSection ||
         !result.versions
       ) {
-        return;
+        return false;
       }
       const confirmed = parseContactSectionSubmission(
         result.section,
         result.canonicalSection,
         result.versions
       );
-      if (!confirmed.success) return;
+      if (!confirmed.success) return false;
       const nextDraft = applyCanonicalSection(
         draftRef.current,
         result.section,
         confirmed.data.payload
       );
-      if (!nextDraft) return;
+      if (!nextDraft) return false;
       const nextBaseline = {
         ...baselineRef.current,
         [result.section]: nextDraft[result.section],
@@ -512,6 +516,7 @@ export default function ContactEditor({
       });
       setAnnouncement(`${SECTION_META[result.section].label} saved.`);
       if (!getDirtyContactSections(nextBaseline, nextDraft).length) clearDirty();
+      return true;
     },
     [clearDirty]
   );
@@ -523,9 +528,8 @@ export default function ContactEditor({
       );
       setSavingSection(section || null);
       try {
-        const result = await saveContactSectionV2(previousState, formData);
+        const result = await runEditorSave(previousState, () => saveContactSectionV2(previousState, formData), (response) => response.section === formData.get("section") && applySaveResult(response));
         latestSaveEventIdRef.current = result.eventId;
-        applySaveResult(result);
         return result;
       } finally {
         setSavingSection(null);
@@ -579,14 +583,16 @@ export default function ContactEditor({
     [activeSection, draft]
   );
   const responseVisible =
-    Boolean(saveState.eventId) && saveState.eventId !== dismissedEventId;
+    needsEditorReload(saveState) || (Boolean(saveState.eventId) && saveState.eventId !== dismissedEventId);
   const responseErrors =
     responseVisible && saveState.section === activeSection
       ? saveState.fieldErrors || {}
       : {};
   const errors = mergeErrors(validation.errors, responseErrors);
-  const editorDisabled = disabled || pending;
-  const canSave = !editorDisabled && activeDirty && validation.ok;
+  const editorDisabled = disabled || pending || needsEditorReload(saveState);
+  const optionalCopyBlocked = activeSection === "details" && !optionalCopy.available &&
+    (!draft.details.location.trim() || !draft.details.contactBlurb.trim());
+  const canSave = !editorDisabled && activeDirty && validation.ok && !optionalCopyBlocked;
   const statusIsError =
     responseVisible && !["idle", "saved"].includes(saveState.status);
 
@@ -677,6 +683,7 @@ export default function ContactEditor({
       />
     ) : (
       <DetailsInspector
+        optionalCopy={optionalCopy}
         draft={draft.details}
         errors={errors}
         instance={instance}
@@ -690,6 +697,8 @@ export default function ContactEditor({
       ? "Editor is read-only"
       : !validation.ok
         ? `${SECTION_META[activeSection].label} needs attention`
+        : optionalCopyBlocked
+          ? "Empty Contact details are not ready to save"
         : activeDirty
           ? `${SECTION_META[activeSection].label} has unsaved changes`
           : dirtySections.length
@@ -703,6 +712,8 @@ export default function ContactEditor({
         ? mediaLoadError
         : !validation.ok
           ? `${Object.values(validation.errors).flat().length} highlighted ${Object.values(validation.errors).flat().length === 1 ? "field needs" : "fields need"} attention before saving.`
+          : optionalCopyBlocked
+            ? optionalCopy.message || "Apply migration 0045, then reload to enable empty Contact fields."
           : activeDirty
             ? "Only the active section will be published."
             : dirtySections.length
@@ -994,7 +1005,7 @@ export default function ContactEditor({
               )}
               {saveState.message}
             </span>
-            {saveState.status === "conflict" ? (
+            {needsEditorReload(saveState) ? (
               <button
                 className="min-h-10 rounded-xl border border-red-100/16 px-3 text-xs font-semibold transition hover:bg-white hover:text-black"
                 onClick={reloadAfterConflict}

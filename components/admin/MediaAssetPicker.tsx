@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { MediaAsset } from "@/lib/admin/media";
 
@@ -205,6 +206,10 @@ export default function MediaAssetPicker({
           ) : null}
         </label>
       </details>
+      <p className="mt-2 text-xs leading-5 text-white/45">
+        Need another file? <Link href="/admin/v2/media#upload" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">Open Media Library in a new tab</Link>.
+        {" "}After uploading, save or discard this draft before refreshing the editor.
+      </p>
 
       {kind === "media" && mediaTypeName ? (
         <label className="mt-3 block">

@@ -23,6 +23,8 @@ import {
 } from "@/lib/security/request";
 import { consumeDatabaseRateLimit } from "@/lib/security/rate-limit";
 import type { PortfolioType } from "@/lib/content";
+import { readConsentCookie } from "@/lib/privacy/consent";
+import { ANALYTICS_COLLECTION_VERSION } from "@/lib/analytics-session";
 
 export const runtime = "nodejs";
 
@@ -290,11 +292,13 @@ async function updateInquiryEmailTracking(input: {
 }
 
 async function writeBookingAnalytics(input: {
+  analyticsConsent: boolean;
   userAgent: string;
   portfolioType: PortfolioType;
   inquiryType: LegacyInquiryType;
   inquiryIntent: InquiryIntent;
 }) {
+  if (!input.analyticsConsent || process.env.NODE_ENV !== "production" || (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production")) return;
   const supabase = createAdminServiceClient();
   if (!supabase) return;
 
@@ -311,6 +315,8 @@ async function writeBookingAnalytics(input: {
       target_label: `${getInquiryIntentLabel(input.inquiryIntent)} inquiry form`,
       target_url: "",
       metadata: {
+        collectionVersion: ANALYTICS_COLLECTION_VERSION,
+        consentVersion: 1,
         portfolioType: input.portfolioType,
         inquiryType: input.inquiryType,
         inquiryIntent: input.inquiryIntent,
@@ -327,6 +333,7 @@ async function writeBookingAnalytics(input: {
 
 async function respondToEmailFailure(input: {
   inquirySaved: boolean;
+  analyticsConsent: boolean;
   userAgent: string;
   portfolioType: PortfolioType;
   inquiryType: LegacyInquiryType;
@@ -340,6 +347,7 @@ async function respondToEmailFailure(input: {
   }
 
   await writeBookingAnalytics({
+    analyticsConsent: input.analyticsConsent,
     userAgent: input.userAgent,
     portfolioType: input.portfolioType,
     inquiryType: input.inquiryType,
@@ -464,6 +472,7 @@ export async function POST(req: Request) {
     }
 
     const userAgent = getUserAgent(req);
+    const analyticsConsent = readConsentCookie(req.headers.get("cookie") || "")?.analytics === true;
     if (shouldBlockUserAgent(userAgent)) {
       await writeSecurityEvent(req, "security_contact_suspicious_user_agent", {
         portfolioType,
@@ -559,6 +568,7 @@ export async function POST(req: Request) {
       }
 
       await writeBookingAnalytics({
+        analyticsConsent,
         userAgent,
         portfolioType,
         inquiryType,
@@ -629,6 +639,7 @@ export async function POST(req: Request) {
       });
       return respondToEmailFailure({
         inquirySaved: inquiry.ok,
+        analyticsConsent,
         userAgent,
         portfolioType,
         inquiryType,
@@ -661,6 +672,7 @@ export async function POST(req: Request) {
       });
       return respondToEmailFailure({
         inquirySaved: inquiry.ok,
+        analyticsConsent,
         userAgent,
         portfolioType,
         inquiryType,
@@ -679,6 +691,7 @@ export async function POST(req: Request) {
     });
 
     await writeBookingAnalytics({
+      analyticsConsent,
       userAgent,
       portfolioType,
       inquiryType,

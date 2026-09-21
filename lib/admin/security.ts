@@ -7,9 +7,10 @@ import {
   createAdminServiceClient,
   hasAdminServiceEnv,
 } from "@/lib/admin/service";
-import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
-import { probeDatabaseRateLimit } from "@/lib/security/rate-limit";
-import { probeAdminSessionBoundary } from "@/lib/admin/session-security";
+import {
+  getProductionReadiness,
+  type ReadinessCheck,
+} from "@/lib/admin/readiness";
 
 export type AdminProfile = {
   userId: string;
@@ -35,8 +36,12 @@ export type AuditLogEntry = {
 };
 
 export type SecurityCheck = {
+  id?: string;
   label: string;
   ok: boolean;
+  status?: "pass" | "fail" | "unknown";
+  critical?: boolean;
+  href?: string;
   detail: string;
   verification?: "runtime" | "implemented";
 };
@@ -121,6 +126,35 @@ type AuditLogRow = {
   metadata: Record<string, unknown>;
   created_at: string;
 };
+
+function isAdminProfileRow(value: unknown): value is AdminProfileRow {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.user_id === "string" && typeof row.email === "string" &&
+    (row.role === "owner" || row.role === "admin") &&
+    typeof row.is_active === "boolean" && typeof row.created_at === "string" &&
+    typeof row.updated_at === "string";
+}
+
+function isAuditLogRow(value: unknown): value is AuditLogRow {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.id === "string" &&
+    (row.actor_id === null || typeof row.actor_id === "string") &&
+    typeof row.action === "string" && typeof row.table_name === "string" &&
+    typeof row.record_id === "string" && typeof row.created_at === "string" &&
+    Boolean(row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata));
+}
+
+function isReadableAuthUser(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const user = value as Record<string, unknown>;
+  return typeof user.id === "string" &&
+    typeof user.created_at === "string" &&
+    (user.last_sign_in_at === undefined || typeof user.last_sign_in_at === "string") &&
+    (user.factors === undefined || (Array.isArray(user.factors) && user.factors.every(factor =>
+      factor && typeof factor === "object" && typeof factor.status === "string")));
+}
 
 const SECURITY_EVENT_SET = new Set<string>(SECURITY_EVENT_ACTIONS);
 const ADMIN_AUTH_RATE_LIMIT_EVENT_SET = new Set<SecurityEventAction>([
@@ -303,126 +337,70 @@ function mapAuditLog(row: AuditLogRow): AuditLogEntry {
 }
 
 function getSecurityChecks(
+  readinessChecks: ReadinessCheck[],
   profiles: AdminProfile[],
-  databaseRateLimitReady: boolean,
+  profilesReadReady = false,
   auditReadReady = false,
   latestAuditAt = "",
-  authDirectoryReady = false,
-  sessionBoundaryReady = false
+  authDirectoryReady = false
 ): SecurityCheck[] {
   const allowedEmails = getAllowedAdminEmails();
   const hasServiceKey = hasAdminServiceEnv();
   const isProduction = process.env.NODE_ENV === "production";
-  const activeOwners = profiles.filter(
-    (profile) => profile.isActive && profile.role === "owner"
-  ).length;
+  const authorizationReady = hasServiceKey
+    ? profilesReadReady && profiles.some((profile) => profile.isActive)
+    : !isProduction && allowedEmails.length > 0;
 
   return [
-    {
-      label: "Supabase Auth",
-      ok: hasSupabaseBrowserEnv(),
+    // Production checks have one source for Classic, V2 Overview and Security.
+    // Only presentation-safe statuses cross this boundary, never provider errors
+    // or environment values. The shared loader performs no write probes.
+    ...readinessChecks.map((check): SecurityCheck => ({
+      id: check.id,
+      label: check.label,
+      ok: check.ok,
+      status: check.status,
+      critical: check.critical,
+      href: check.href,
+      detail: check.detail,
       verification: "runtime",
-      detail: hasSupabaseBrowserEnv()
-        ? "Public Supabase auth variables are configured."
-        : "Set NEXT_PUBLIC_SUPABASE_URL and a publishable/anon key.",
-    },
+    })),
     {
-      label: "Server Admin Key",
-      ok: hasAdminServiceEnv(),
-      verification: "runtime",
-      detail: hasAdminServiceEnv()
-        ? "Server-side Supabase service key is configured."
-        : "Set SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY.",
-    },
-    {
+      id: "admin-authorization-source",
       label: "Admin Authorization Source",
-      ok: hasServiceKey
-        ? profiles.some((profile) => profile.isActive)
-        : !isProduction && allowedEmails.length > 0,
+      ok: authorizationReady,
+      status: hasServiceKey && !profilesReadReady
+        ? "unknown"
+        : authorizationReady ? "pass" : "fail",
+      critical: true,
       detail: hasServiceKey
-        ? "Active admin_profiles rows are authoritative."
+        ? !profilesReadReady
+          ? "Admin profiles could not be read. Their current authorization state is unknown; retry or inspect Supabase access."
+          : authorizationReady
+            ? "Active admin_profiles rows are authoritative."
+            : "No active admin profiles were found. Configure admin access before production use."
         : isProduction
           ? "Production requires the server key and active admin profiles."
           : `${allowedEmails.length} local fallback email(s) in ADMIN_EMAILS.`,
       verification: "runtime",
     },
     {
-      label: "Owner Profile",
-      ok: (!hasServiceKey && !isProduction) || activeOwners > 0,
-      verification: "runtime",
-      detail:
-        activeOwners > 0
-          ? `${activeOwners} active owner profile(s).`
-          : hasServiceKey
-            ? "Create at least one active owner in admin_profiles."
-            : "Production admin access requires a service key and an active owner profile.",
-    },
-    {
-      label: "Immediate Session Revocation",
-      ok: sessionBoundaryReady,
-      verification: "runtime",
-      detail: sessionBoundaryReady
-        ? "Admin requests check live sessions in the database. Revoked sessions are denied on subsequent requests; recovery challenges are issued atomically."
-        : "Apply and verify migration 0038. Until then, session revocation can take until the existing access token expires, and recovery uses the previous issuance flow.",
-    },
-    {
-      label: "Database Rate Limit",
-      ok: databaseRateLimitReady,
-      verification: "runtime",
-      detail: databaseRateLimitReady
-        ? "Admin auth, contact, and analytics throttling can reach the atomic database function."
-        : "The atomic database rate-limit function could not be verified. Apply the current migrations and inspect Supabase access.",
-    },
-    {
-      label: "Email Delivery",
-      ok: Boolean(
-        process.env.RESEND_API_KEY &&
-          process.env.BOOKING_TO_EMAIL &&
-          process.env.BOOKING_FROM_EMAIL
-      ),
-      verification: "runtime",
-      detail:
-        process.env.RESEND_API_KEY &&
-        process.env.BOOKING_TO_EMAIL &&
-        process.env.BOOKING_FROM_EMAIL
-          ? "Resend and the booking sender/recipient settings are configured. Delivery webhooks are a separate signal."
-          : "Configure RESEND_API_KEY, BOOKING_TO_EMAIL, and BOOKING_FROM_EMAIL.",
-    },
-    {
-      label: "Delivery Webhook",
-      ok: Boolean(process.env.RESEND_WEBHOOK_SECRET),
-      verification: "runtime",
-      detail: process.env.RESEND_WEBHOOK_SECRET
-        ? "Signed Resend delivery events can update inquiry delivery health."
-        : "Create the /api/resend/webhook endpoint in Resend and set RESEND_WEBHOOK_SECRET.",
-    },
-    {
-      label: "Retention Scheduler",
-      ok: Boolean(process.env.CRON_SECRET),
-      verification: "runtime",
-      detail: process.env.CRON_SECRET
-        ? "The authenticated daily maintenance endpoint is configured."
-        : "Set CRON_SECRET in Vercel so the scheduled retention endpoint can run.",
-    },
-    {
-      label: "Deep Health Monitor",
-      ok: Boolean(process.env.HEALTHCHECK_SECRET),
-      verification: "runtime",
-      detail: process.env.HEALTHCHECK_SECRET
-        ? "Authenticated database and storage health checks are available."
-        : "Set HEALTHCHECK_SECRET for dependency monitoring; public health remains liveness-only.",
-    },
-    {
+      id: "admin-auth-directory",
       label: "Admin Auth Directory",
       ok: authDirectoryReady,
+      status: authDirectoryReady ? "pass" : "unknown",
+      critical: false,
       verification: "runtime",
       detail: authDirectoryReady
         ? "Supabase Auth users, MFA enrollment, and sign-in metadata are readable."
         : "Admin Auth metadata could not be verified with the server key.",
     },
     {
+      id: "audit-read-path",
       label: "Audit Read Path",
       ok: auditReadReady,
+      status: auditReadReady ? "pass" : "unknown",
+      critical: true,
       verification: "runtime",
       detail: auditReadReady
         ? latestAuditAt
@@ -431,6 +409,7 @@ function getSecurityChecks(
         : "The audit log table could not be read. Audit writes also report explicit server errors.",
     },
     {
+      id: "public-api-guards",
       label: "Public API Guards",
       ok: true,
       verification: "implemented",
@@ -438,6 +417,7 @@ function getSecurityChecks(
         "Contact and analytics APIs use payload limits, origin checks, bot filters, and audit logging.",
     },
     {
+      id: "admin-action-guard",
       label: "Admin Action Guard",
       ok: true,
       verification: "implemented",
@@ -468,10 +448,11 @@ async function getSecurityEventLogs(): Promise<{
     .limit(1000)
     .returns<AuditLogRow[]>();
 
+  const readable = !error && Array.isArray(data) && data.every(isAuditLogRow);
   return {
-    logs: (data || []).map(mapAuditLog),
-    isCapped: (data?.length || 0) >= 1000,
-    error,
+    logs: readable ? data.map(mapAuditLog) : [],
+    isCapped: readable && data.length >= 1000,
+    error: error || (readable ? undefined : true),
   };
 }
 
@@ -510,13 +491,25 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
 }> {
   const allowedEmails =
     process.env.NODE_ENV === "production" ? [] : getAllowedAdminEmails();
+  const readinessPromise = getProductionReadiness().catch(() => ({
+    checks: [{
+      id: "production-readiness",
+      label: "Production checks",
+      ok: false,
+      status: "unknown" as const,
+      critical: true,
+      detail: "Production configuration could not be checked. Retry or inspect the server configuration; no failed setting has been confirmed.",
+      href: "/admin/v2/security#configuration",
+    }],
+  }));
 
   if (!hasAdminServiceEnv()) {
+    const readiness = await readinessPromise;
     return {
       profiles: [],
       auditLogs: [],
       securitySummary: emptySecurityEventSummary(),
-      checks: getSecurityChecks([], false),
+      checks: getSecurityChecks(readiness.checks, []),
       allowedEmails,
       isConfigured: false,
       canManageAdmins: false,
@@ -525,11 +518,12 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
 
   const supabase = createAdminServiceClient();
   if (!supabase) {
+    const readiness = await readinessPromise;
     return {
       profiles: [],
       auditLogs: [],
       securitySummary: emptySecurityEventSummary(),
-      checks: getSecurityChecks([], false),
+      checks: getSecurityChecks(readiness.checks, []),
       allowedEmails,
       isConfigured: false,
       canManageAdmins: false,
@@ -540,32 +534,41 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
     profilesResult,
     logsResult,
     securityLogsResult,
-    rateLimitResult,
     authDirectoryResult,
-    sessionBoundaryReady,
+    readiness,
   ] = await Promise.all([
-    supabase
+    Promise.resolve(supabase
       .from("admin_profiles")
       .select("*")
       .order("created_at", { ascending: false })
-      .returns<AdminProfileRow[]>(),
-    supabase
+      .returns<AdminProfileRow[]>())
+      .catch(() => ({ data: null, error: true })),
+    Promise.resolve(supabase
       .from("audit_logs")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(100)
-      .returns<AuditLogRow[]>(),
-    getSecurityEventLogs(),
-    probeDatabaseRateLimit(supabase),
-    supabase.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-    probeAdminSessionBoundary(supabase),
+      .returns<AuditLogRow[]>())
+      .catch(() => ({ data: null, error: true })),
+    getSecurityEventLogs()
+      .catch(() => ({ logs: [], isCapped: false, error: true })),
+    supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+      .catch(() => ({ data: null, error: true })),
+    readinessPromise,
   ]);
 
-  const authDirectoryReady = !authDirectoryResult.error;
+  const profilesReadReady = !profilesResult.error &&
+    Array.isArray(profilesResult.data) && profilesResult.data.every(isAdminProfileRow);
+  const auditReadReady = !logsResult.error &&
+    Array.isArray(logsResult.data) && logsResult.data.every(isAuditLogRow);
+  const authDirectoryReady = !authDirectoryResult.error &&
+    Array.isArray(authDirectoryResult.data?.users) &&
+    authDirectoryResult.data.users.every(isReadableAuthUser);
   const authUsersById = new Map(
-    (authDirectoryResult.data?.users || []).map((user) => [user.id, user])
+    (authDirectoryReady ? authDirectoryResult.data?.users || [] : [])
+      .map((user) => [user.id, user])
   );
-  const profiles = (profilesResult.data || []).map((row) => {
+  const profiles = (profilesReadReady ? profilesResult.data || [] : []).map((row) => {
     const profile = mapAdminProfile(row);
     const authUser = authUsersById.get(profile.userId);
 
@@ -581,7 +584,7 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
         : null,
     };
   });
-  const auditLogs = (logsResult.data || []).map(mapAuditLog);
+  const auditLogs = (auditReadReady ? logsResult.data || [] : []).map(mapAuditLog);
 
   return {
     profiles,
@@ -591,19 +594,20 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
       securityLogsResult.isCapped
     ),
     checks: getSecurityChecks(
+      readiness.checks,
       profiles,
-      rateLimitResult,
-      !logsResult.error,
+      profilesReadReady,
+      auditReadReady,
       auditLogs[0]?.createdAt || "",
-      authDirectoryReady,
-      sessionBoundaryReady
+      authDirectoryReady
     ),
     allowedEmails,
     isConfigured: true,
     canManageAdmins: currentAdmin.role === "owner",
     loadError:
-      profilesResult.error ||
-      logsResult.error ||
+      !profilesReadReady ||
+      !auditReadReady ||
+      !authDirectoryReady ||
       securityLogsResult.error
         ? "Unable to load security data from Supabase."
         : undefined,

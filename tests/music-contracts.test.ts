@@ -126,10 +126,10 @@ describe("Music visual editor presentation contract", () => {
 
   it("includes the Music V2 snapshot in production readiness", () => {
     expect(readiness).toContain(
-      'supabase.rpc("get_music_page_v2_snapshot", { p_site_id: "main" })'
+      'client.rpc("get_music_page_v2_snapshot", { p_site_id: "main" })'
     );
     expect(readiness).toContain(
-      '"Apply all current Supabase migrations through 0038, including Home V2 and admin session hardening."'
+      'footer content (0039) and Media usage (0040)'
     );
   });
 

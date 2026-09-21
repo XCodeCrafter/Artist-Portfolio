@@ -26,6 +26,7 @@ import {
   FaUndo,
 } from "react-icons/fa";
 import { saveNavigationV2 } from "@/app/admin/v2/navigation/actions";
+import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
 import { useNavbarUnsavedChanges } from "@/components/admin/v2/NavbarUnsavedChangesProvider";
 import {
   INITIAL_NAVIGATION_SAVE_STATE,
@@ -34,6 +35,7 @@ import {
   getNavigationPosition,
   moveNavigationItem,
   moveNavigationItemBefore,
+  parseNavigationExpectedVersions,
   restoreRecommendedNavigation,
   serializeNavigationDraft,
   setNavigationItemVisibility,
@@ -302,25 +304,30 @@ export default function NavigationManager({
     useNavbarUnsavedChanges("navigation");
   const clientAction = useCallback(
     async (previousState: NavigationSaveState, formData: FormData) => {
-      const result = await saveNavigationV2(previousState, formData);
-      if (
-        result.status === "saved" &&
-        result.expectedVersions &&
-        result.configVersion !== undefined
-      ) {
-        if (expectedVersionsInputRef.current) {
-          expectedVersionsInputRef.current.value = JSON.stringify(
-            result.expectedVersions
-          );
+      return runEditorSave(previousState, () => saveNavigationV2(previousState, formData), (result) => {
+        const confirmedVersions = parseNavigationExpectedVersions(result.expectedVersions);
+        if (
+          result.status === "saved" &&
+          confirmedVersions &&
+          Object.keys(confirmedVersions).length === draftRef.current.length &&
+          draftRef.current.every((item) => Object.hasOwn(confirmedVersions, item.key)) &&
+          result.configVersion === 1
+        ) {
+          if (expectedVersionsInputRef.current) {
+            expectedVersionsInputRef.current.value = JSON.stringify(
+              confirmedVersions
+            );
+          }
+          if (configVersionInputRef.current) {
+            configVersionInputRef.current.value = String(result.configVersion);
+          }
+          savedDraftRef.current = draftRef.current;
+          setHasUnsavedChanges(false);
+          clearDirty(() => router.refresh());
+          return true;
         }
-        if (configVersionInputRef.current) {
-          configVersionInputRef.current.value = String(result.configVersion);
-        }
-        savedDraftRef.current = draftRef.current;
-        setHasUnsavedChanges(false);
-        clearDirty(() => router.refresh());
-      }
-      return result;
+        return false;
+      });
     },
     [clearDirty, router]
   );
@@ -345,6 +352,7 @@ export default function NavigationManager({
   const editorDisabled =
     disabled ||
     pending ||
+    needsEditorReload(saveState) ||
     migrationRequired ||
     unsupportedVersion ||
     blockingIssues.length > 0 ||
@@ -537,7 +545,7 @@ export default function NavigationManager({
                   )}
                   {saveState.message}
                 </span>
-                {saveState.status === "conflict" ? (
+                {needsEditorReload(saveState) ? (
                   <button
                     className="min-h-10 rounded-xl border border-red-100/16 px-3 text-xs font-semibold transition hover:bg-white hover:text-black"
                     onClick={reloadSavedNavbar}
@@ -821,7 +829,7 @@ export default function NavigationManager({
           >
             {stickyFeedback}
           </p>
-          {saveState.status === "conflict" ? (
+          {needsEditorReload(saveState) ? (
             <button
               className="mt-2 min-h-9 rounded-xl border border-red-100/16 px-3 text-[10px] font-semibold text-red-50/76 transition hover:bg-white hover:text-black"
               onClick={reloadSavedNavbar}
@@ -831,6 +839,17 @@ export default function NavigationManager({
             </button>
           ) : null}
         </div>
+        <button
+          className="mt-3 min-h-11 rounded-xl border border-white/15 px-4 text-xs text-white/70 disabled:opacity-35 sm:mt-0"
+          disabled={pending || !hasUnsavedChanges}
+          type="button"
+          onClick={() => {
+            updateDraft(savedDraftRef.current, "Page selection and order restored to the last save.");
+            setPresetUndo(null);
+          }}
+        >
+          Discard page changes
+        </button>
         <button
           aria-busy={pending}
           className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 sm:mt-0 sm:w-auto sm:min-w-[170px]"

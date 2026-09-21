@@ -328,7 +328,22 @@ const showreelWorksDraftSchema = z
     }
   });
 
-const versionMap = z.record(legacyVideoId, timestamp);
+// Saved legacy IDs must survive normal saves as well as archive restoration.
+// z.record silently omits __proto__; rebuilding validated own entries keeps
+// that historical key as data without invoking a prototype setter.
+const versionMap = z.unknown().transform((value, context): Record<string, string> => {
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+    context.addIssue({ code: "custom", message: "Invalid saved versions. Reload this editor." });
+    return z.NEVER;
+  }
+  const entries = Object.entries(value);
+  if (entries.some(([id, version]) => !legacyVideoId.safeParse(id).success || !timestamp.safeParse(version).success)) {
+    context.addIssue({ code: "custom", message: "Invalid saved versions. Reload this editor." });
+    return z.NEVER;
+  }
+  return Object.fromEntries(entries) as Record<string, string>;
+});
 const singletonVersionsSchema = z.object({ updatedAt: timestamp }).strict();
 const worksVersionsSchema = z.object({ items: versionMap }).strict();
 
@@ -525,6 +540,14 @@ export function parseShowreelSectionSubmission(
       versions: parsedVersions.data,
     },
   };
+}
+
+// Historical IDs and readable legacy fields stay intact during archive/restore.
+// Preview rendering still sanitizes sources; normal saves keep their own rules.
+export function parseShowreelArchivePayload(value: unknown): ShowreelWorksDraft | null {
+  const parsed = z.object({ items: z.array(snapshotWorkSchema.omit({ updatedAt: true })).max(10_000) }).strict().safeParse(value);
+  if (!parsed.success || new Set(parsed.data.items.map(item => item.id)).size !== parsed.data.items.length) return null;
+  return parsed.data;
 }
 
 export function parseShowreelEditorSnapshot(

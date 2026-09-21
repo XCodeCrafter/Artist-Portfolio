@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveSiteAppearanceV2 } from "@/app/admin/v2/settings/appearance/actions";
 import { useNavbarUnsavedChanges } from "./NavbarUnsavedChangesProvider";
-import { INITIAL_APPEARANCE_SAVE_STATE, type AppearanceSaveState } from "@/lib/admin/site-appearance-editor";
+import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
+import { INITIAL_APPEARANCE_SAVE_STATE, parseAppearanceSubmission, type AppearanceSaveState } from "@/lib/admin/site-appearance-editor";
 import type { AdminAppearanceData } from "@/lib/admin/site-appearance";
 
 export default function NavbarNameEditor({ snapshot, isConfigured, migrationRequired, loadError }: AdminAppearanceData) {
@@ -15,14 +16,17 @@ export default function NavbarNameEditor({ snapshot, isConfigured, migrationRequ
   const { markDirty, clearDirty, confirmDiscard } = useNavbarUnsavedChanges("name");
   const dirty = draft.artistName !== saved.artistName;
   const [state, action, pending] = useActionState(async (previous: AppearanceSaveState, form: FormData) => {
-    const result = await saveSiteAppearanceV2(previous, form);
-    if (result.status === "saved" && result.versions && result.canonicalSection && "artistName" in result.canonicalSection) {
-      setSaved(result.canonicalSection);
-      setDraft(result.canonicalSection);
-      setVersions(result.versions);
-      clearDirty(() => router.refresh());
-    }
-    return result;
+    return runEditorSave(previous, () => saveSiteAppearanceV2(previous, form), (result) => {
+      const confirmed = parseAppearanceSubmission(result.section, result.canonicalSection, result.versions);
+      if (confirmed.success && confirmed.data.section === "name") {
+        setSaved(confirmed.data.payload);
+        setDraft(confirmed.data.payload);
+        setVersions(confirmed.data.versions);
+        clearDirty(() => router.refresh());
+        return true;
+      }
+      return false;
+    });
   }, INITIAL_APPEARANCE_SAVE_STATE);
   const blocked = !isConfigured || migrationRequired || Boolean(loadError);
 
@@ -43,7 +47,7 @@ export default function NavbarNameEditor({ snapshot, isConfigured, migrationRequ
           <input type="hidden" name="versions" value={JSON.stringify(versions)} />
           {blocked && <p role="alert" className="text-sm text-amber-200">{loadError || "The settings database is unavailable. This editor is read-only."}</p>}
           <label className="text-xs font-semibold text-white/65" htmlFor="navbar-owner-name">Owner / artist name</label>
-          <input id="navbar-owner-name" autoComplete="off" maxLength={220} required disabled={blocked || pending} value={draft.artistName} aria-describedby="navbar-owner-feedback" className="min-h-12 w-full rounded-xl border border-white/15 bg-black/30 px-4 text-sm outline-none focus:border-white/60 disabled:opacity-45" onChange={(event) => {
+          <input id="navbar-owner-name" autoComplete="off" maxLength={220} required disabled={blocked || pending || needsEditorReload(state)} value={draft.artistName} aria-describedby="navbar-owner-feedback" className="min-h-12 w-full rounded-xl border border-white/15 bg-black/30 px-4 text-sm outline-none focus:border-white/60 disabled:opacity-45" onChange={(event) => {
             const value = event.target.value;
             setDraft({ artistName: value });
             if (value === saved.artistName) clearDirty(); else markDirty();
@@ -54,9 +58,9 @@ export default function NavbarNameEditor({ snapshot, isConfigured, migrationRequ
             {state.fieldErrors?.artistName?.map((error) => <p key={error} className="text-amber-200">{error}</p>)}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="submit" disabled={blocked || pending || !dirty || state.status === "conflict"} className="min-h-11 rounded-xl bg-white px-5 text-xs font-semibold text-black disabled:opacity-35">{pending ? "Saving…" : "Save owner name"}</button>
+            <button type="submit" disabled={blocked || pending || !dirty || needsEditorReload(state)} className="min-h-11 rounded-xl bg-white px-5 text-xs font-semibold text-black disabled:opacity-35">{pending ? "Saving…" : "Save owner name"}</button>
             <button type="button" disabled={pending || !dirty} className="min-h-11 rounded-xl border border-white/15 px-4 text-xs disabled:opacity-35" onClick={() => { setDraft(saved); clearDirty(); }}>Discard name changes</button>
-            {state.status === "conflict" && <button type="button" className="min-h-11 rounded-xl border border-amber-200/30 px-4 text-xs text-amber-200" onClick={() => confirmDiscard(() => window.location.reload())}>Reload saved settings</button>}
+            {needsEditorReload(state) && <button type="button" className="min-h-11 rounded-xl border border-amber-200/30 px-4 text-xs text-amber-200" onClick={() => confirmDiscard(() => window.location.reload())}>Reload saved settings</button>}
           </div>
         </form>
       </div>

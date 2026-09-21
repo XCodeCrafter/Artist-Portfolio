@@ -11,6 +11,8 @@ import {
 import { motion, useReducedMotion } from "framer-motion";
 import { FaExpand, FaPause, FaPlay, FaTimes } from "react-icons/fa";
 import ClientPortal from "@/components/ClientPortal";
+import ExternalMediaGate from "@/components/privacy/ExternalMediaGate";
+import { usePrivacyConsent } from "@/components/privacy/PrivacyProvider";
 import type { VideoItem, VideoPresentation } from "@/lib/content";
 
 const typeLabels: Record<VideoItem["videoType"], string> = {
@@ -88,6 +90,7 @@ function WorkPreview({
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const direct = isDirectVideo(item);
+  const { externalMedia } = usePrivacyConsent();
 
   useEffect(() => {
     const video = videoRef.current;
@@ -122,6 +125,7 @@ function WorkPreview({
   if (direct) {
     return (
       <video
+        data-analytics-preview="true"
         className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.025]"
         loop
         muted
@@ -134,7 +138,7 @@ function WorkPreview({
     );
   }
 
-  if (active) {
+  if (active && externalMedia) {
     return (
       <iframe
         allow="autoplay; encrypted-media; picture-in-picture"
@@ -194,7 +198,7 @@ function WorkCard({
 
   return (
     <article
-      className={wide ? "lg:col-span-2" : ""}
+      className={`min-w-0 ${wide ? "lg:col-span-2" : ""}`}
       onBlurCapture={() => setActive(false)}
       onFocusCapture={() => {
         if (interactive && !reduceMotion) setActive(true);
@@ -211,7 +215,7 @@ function WorkCard({
         type="button"
       >
         <motion.div
-          className={`relative overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_28px_90px_rgba(0,0,0,0.38)] ${wide ? "aspect-[16/7] min-h-72" : "aspect-video"}`}
+          className={`relative w-full overflow-hidden rounded-lg border border-white/10 bg-black shadow-[0_28px_90px_rgba(0,0,0,0.38)] ${wide ? "aspect-video lg:aspect-[16/7] lg:min-h-72" : "aspect-video"}`}
           data-showreel-reveal="media"
           initial={
             reduceMotion
@@ -244,11 +248,11 @@ function WorkCard({
             <FaExpand />
           </span>
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-5 sm:p-6">
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">
                 {typeLabels[item.videoType]}
               </p>
-              <h3 className="heading-ui mt-2 text-2xl font-semibold text-white sm:text-3xl">
+              <h3 className="heading-ui mt-2 break-words text-2xl font-semibold text-white sm:text-3xl">
                 {item.title}
               </h3>
             </div>
@@ -263,7 +267,7 @@ function WorkCard({
         </motion.div>
         {item.description ? (
           <motion.p
-            className="mt-3 max-w-2xl text-sm leading-6 text-white/50"
+            className="mt-3 max-w-2xl break-words text-sm leading-6 text-white/50"
             initial={reduceMotion ? false : { opacity: 0, y: 12 }}
             transition={{
               delay: rowDelay + 0.12,
@@ -420,10 +424,10 @@ export default function ShowreelWorks({
         <p className="text-xs font-semibold uppercase tracking-[0.26em] text-white/42">
           {presentation.sectionEyebrow}
         </p>
-        <h2 className="heading-ui mt-5 max-w-5xl text-5xl font-semibold leading-[0.95] text-white sm:text-7xl lg:text-8xl">
+        <h2 className="heading-ui mt-5 max-w-5xl break-words text-5xl font-semibold leading-[0.95] text-white sm:text-7xl lg:text-8xl">
           {presentation.sectionTitle}
         </h2>
-        <p className="mt-6 max-w-2xl text-base leading-7 text-white/58">
+        <p className="mt-6 max-w-2xl break-words text-base leading-7 text-white/58">
           {presentation.sectionBody}
         </p>
         <div className="mt-8 flex flex-wrap gap-2">
@@ -452,7 +456,7 @@ export default function ShowreelWorks({
         selected={selectedSection === "works"}
       >
       {visible.length ? (
-        <div className="mt-10 grid gap-x-5 gap-y-12 lg:grid-cols-2">
+        <div className="mt-10 grid grid-cols-1 gap-x-5 gap-y-12 lg:grid-cols-2">
           {visible.map((item, index) => (
             <WorkCard
               index={index}
@@ -478,6 +482,8 @@ export default function ShowreelWorks({
             animate={{ opacity: 1 }}
             aria-labelledby="showreel-dialog-title"
             aria-modal="true"
+            data-analytics-open="video_open"
+            data-analytics-label={activeItem.title}
             className="fixed inset-0 z-[120] overflow-y-auto bg-black/94 p-4 backdrop-blur-xl sm:p-6"
             initial={{ opacity: 0 }}
             role="dialog"
@@ -500,9 +506,9 @@ export default function ShowreelWorks({
           >
             <div className="relative aspect-video overflow-hidden rounded-lg border border-white/12 bg-black">
               {isDirectVideo(activeItem) ? (
-                <video autoPlay className="h-full w-full" controls loop playsInline src={activeItem.embedUrl} />
+                <video autoPlay data-analytics-play="true" data-analytics-label={activeItem.title} className="h-full w-full" controls loop playsInline src={activeItem.embedUrl} />
               ) : (
-                <iframe allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen className="h-full w-full" referrerPolicy="strict-origin-when-cross-origin" src={getEmbedUrl(activeItem.embedUrl, true)} title={activeItem.title} />
+                <ExternalMediaGate provider={activeItem.platform}><iframe allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen className="h-full w-full" referrerPolicy="strict-origin-when-cross-origin" src={getEmbedUrl(activeItem.embedUrl, true)} title={activeItem.title} /></ExternalMediaGate>
               )}
             </div>
             <div className="mt-4 flex items-start justify-between gap-5"><div><p className="text-xs uppercase tracking-[0.2em] text-[var(--accent)]">{typeLabels[activeItem.videoType]}</p><h3 className="heading-ui mt-2 text-3xl text-white" id="showreel-dialog-title">{activeItem.title}</h3></div><span className="flex items-center gap-2 text-xs text-white/45"><FaPause /> Esc to close</span></div>

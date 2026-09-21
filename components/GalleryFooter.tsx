@@ -6,6 +6,7 @@ import {
   useRef,
   type CSSProperties,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import {
   FaArrowRight,
@@ -14,8 +15,11 @@ import {
   FaPlay,
 } from "react-icons/fa";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
+import { usePrivacyConsent } from "@/components/privacy/PrivacyProvider";
+import { useFooterContent } from "@/components/FooterContentProvider";
+import { isSafeFooterHref, type FooterContent } from "@/lib/content/footer";
 import type { FooterEffect, SocialLink } from "@/lib/content";
-import { getMixedPublicCopy } from "@/lib/content/public-copy";
+import { getMixedPublicCopy, getOptionalPublicCopy } from "@/lib/content/public-copy";
 import {
   detectSocialPlatform,
   getSocialPlatformDefinition,
@@ -30,7 +34,28 @@ type GalleryFooterProps = {
   tagline?: string;
   /** Keep the real rendering and pointer effect, but disable links in admin previews. */
   preview?: boolean;
+  content?: FooterContent;
+  onSelectRegion?: (region: FooterPreviewRegion) => void;
+  selectedRegion?: FooterPreviewRegion;
 };
+
+export type FooterPreviewRegion = "identity" | "callout" | "social";
+
+function EditableRegion({ children, region, selected, onSelect }: {
+  children: ReactNode; region: FooterPreviewRegion; selected?: FooterPreviewRegion;
+  onSelect?: (region: FooterPreviewRegion) => void;
+}) {
+  if (!onSelect) return children;
+  const labels = { identity: "Profile & introduction", callout: "Footer invitation & buttons", social: "Footer social headings" };
+  return <div className="relative min-w-0" data-footer-preview-region={region}>
+    <div inert aria-hidden="true">{children}</div>
+    <button type="button" aria-label={`Edit ${labels[region]}`} aria-pressed={selected === region}
+      onClick={() => onSelect(region)}
+      className={`absolute inset-0 z-20 cursor-pointer border-2 transition hover:border-white/55 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff6049] ${selected === region ? "border-[#ff6049] bg-[#ff3b1f]/[0.025]" : "border-transparent"}`}>
+      <span className="absolute right-2 top-2 rounded-full bg-black/90 px-3 py-2 text-[10px] font-semibold text-white">{labels[region]}</span>
+    </button>
+  </div>;
+}
 
 type FooterPointerStyles = CSSProperties & {
   "--footer-pointer-x": string;
@@ -51,7 +76,14 @@ export default function GalleryFooter({
   socialLinks,
   tagline,
   preview = false,
+  content,
+  onSelectRegion,
+  selectedRegion,
 }: GalleryFooterProps) {
+  const savedContent = useFooterContent();
+  const { openPreferences } = usePrivacyConsent();
+  const copy = content ?? savedContent;
+  const selectRegion = preview ? onSelectRegion : undefined;
   const footerRef = useRef<HTMLElement>(null);
   const lightFrameRef = useRef<number | null>(null);
   const lightPositionRef = useRef({
@@ -66,10 +98,11 @@ export default function GalleryFooter({
     tagline,
     "Film · performance · music · creative collaboration"
   );
-  const publicContactBlurb = getMixedPublicCopy(
+  const publicContactBlurb = getOptionalPublicCopy(
     contactBlurb,
     "For acting, music, productions, bookings, and creative collaborations."
   );
+  const publicLocation = getOptionalPublicCopy(location, "available worldwide");
   const isSoulEffect = footerEffect === "soul";
   const touchAmbientBackground = isSoulEffect
     ? "radial-gradient(520px circle at 18% 32%, rgba(255, 243, 202, 0.11), transparent 68%), radial-gradient(460px circle at 84% 74%, rgba(255, 58, 37, 0.05), transparent 72%)"
@@ -127,8 +160,9 @@ export default function GalleryFooter({
 
     const bounds = footer.getBoundingClientRect();
     const light = lightPositionRef.current;
-    light.targetX = event.clientX - bounds.left;
-    light.targetY = event.clientY - bounds.top;
+    // Admin uses the same renderer in a scaled 1:1 canvas.
+    light.targetX = (event.clientX - bounds.left) * (footer.offsetWidth / bounds.width || 1);
+    light.targetY = (event.clientY - bounds.top) * (footer.offsetHeight / bounds.height || 1);
 
     if (light.currentX === null || light.currentY === null) {
       light.currentX = light.targetX;
@@ -226,65 +260,70 @@ export default function GalleryFooter({
         }}
       />
 
-      <div className="relative mx-auto max-w-[1540px]" inert={preview || undefined} aria-hidden={preview || undefined}>
+      <div className="relative mx-auto max-w-[1540px]" inert={(preview && !selectRegion) || undefined} aria-hidden={(preview && !selectRegion) || undefined}>
+        <EditableRegion region="identity" selected={selectedRegion} onSelect={selectRegion}>
         <div className="flex min-h-[96px] flex-col justify-center gap-5 border-b border-white/10 py-7 text-xs sm:flex-row sm:items-center sm:justify-between sm:py-0">
-          <div className="flex items-center gap-4">
+          {publicLocation ? <div className="flex items-center gap-4">
             <span className="h-2 w-2 rounded-full bg-[#ff3826] shadow-[0_0_18px_rgba(255,56,38,0.7)]" />
             <span className="font-semibold uppercase tracking-[0.2em] text-white/74">
-              Based in {location || "available worldwide"}
+              Based in {publicLocation}
             </span>
-          </div>
+          </div> : null}
           <span className="border-white/10 font-medium uppercase tracking-[0.17em] text-white/48 sm:border-l sm:pl-7">
             {publicTagline}
           </span>
         </div>
+        </EditableRegion>
 
         <div className="grid gap-14 py-14 lg:grid-cols-[minmax(0,0.92fr)_minmax(500px,1.08fr)] lg:gap-0 lg:py-14 xl:py-16">
+          <EditableRegion region="callout" selected={selectedRegion} onSelect={selectRegion}>
           <div className="relative flex flex-col items-start lg:pr-14 xl:pr-20">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ff4431]">
-              Let&apos;s make something
+              {copy.eyebrow}
             </p>
             <h2 className="heading-ui mt-7 max-w-[670px] text-[3.45rem] font-medium leading-[0.98] tracking-[-0.045em] text-white sm:text-7xl xl:text-[5.5rem]">
-              Ready for the next story
+              {copy.heading}
               <span className="text-[#ff3c28]">.</span>
             </h2>
-            <p className="mt-8 max-w-[510px] text-base leading-7 text-white/52 sm:text-lg">
+            {publicContactBlurb ? <p className="mt-8 max-w-[510px] text-base leading-7 text-white/52 sm:text-lg">
               {publicContactBlurb}
-            </p>
+            </p> : null}
 
             <div className="mt-11 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-              <Link className={primaryButtonClass} href="/booking">
+              {copy.primaryLabel && copy.primaryHref && isSafeFooterHref(copy.primaryHref) ? <Link className={primaryButtonClass} href={copy.primaryHref}>
                 <span
                   aria-hidden="true"
                   className="absolute inset-y-[-70%] left-[-45%] w-1/3 rotate-12 bg-gradient-to-r from-transparent via-white/12 to-transparent transition-transform duration-1000 ease-out group-hover:translate-x-[440%] motion-reduce:hidden"
                 />
                 <FaEnvelope aria-hidden="true" className="relative shrink-0" />
-                <span className="relative">Work together</span>
+                <span className="relative">{copy.primaryLabel}</span>
                 <FaArrowRight
                   aria-hidden="true"
                   className="relative shrink-0 text-xs transition-transform duration-500 ease-out group-hover:translate-x-1 motion-reduce:transform-none"
                 />
-              </Link>
+              </Link> : null}
 
-              <Link className={secondaryButtonClass} href="/video">
+              {copy.secondaryLabel && copy.secondaryHref && isSafeFooterHref(copy.secondaryHref) ? <Link className={secondaryButtonClass} href={copy.secondaryHref}>
                 <FaPlay
                   aria-hidden="true"
                   className="text-xs transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transform-none"
                 />
-                Showreel
-              </Link>
+                {copy.secondaryLabel}
+              </Link> : null}
             </div>
           </div>
+          </EditableRegion>
 
+          <EditableRegion region="social" selected={selectedRegion} onSelect={selectRegion}>
           <div className="border-white/10 lg:border-l lg:pl-14 xl:pl-20">
             <div className="mb-8 flex items-end justify-between gap-5">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/42">
-                  Elsewhere
+                  {copy.socialEyebrow}
                 </p>
                 <span className="mt-3 block h-px w-8 bg-[#ff3f2c]" />
                 <h3 className="heading-ui mt-6 text-3xl font-medium tracking-[-0.03em] text-white sm:text-4xl">
-                  Watch, listen &amp; connect
+                  {copy.socialHeading}
                 </h3>
               </div>
               {socialItems.length ? (
@@ -348,13 +387,13 @@ export default function GalleryFooter({
                   );
                 })}
               </div>
-            ) : (
+            ) : preview ? (
               <div className="rounded-[20px] border border-dashed border-white/14 bg-white/[0.025] p-6 text-sm leading-6 text-white/42">
-                Social profiles can be added from the Footer Links section in
-                the admin panel.
+                Add profiles in Navbar → Platform shortcuts. The empty profile list is hidden on the website.
               </div>
-            )}
+            ) : null}
           </div>
+          </EditableRegion>
         </div>
 
         <div className="relative h-px bg-white/10">
@@ -362,17 +401,18 @@ export default function GalleryFooter({
           <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-[#ff5a43] shadow-[0_0_16px_4px_rgba(255,75,53,0.42)]" />
         </div>
 
-        <div className="flex flex-col gap-5 pb-2 pt-8 text-xs text-white/38 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-5 pb-2 pt-8 text-xs text-white/38 md:flex-row md:items-center md:justify-between" inert={preview || undefined} aria-hidden={preview || undefined}>
           <span>
             © {currentYear} {artistName}. All rights reserved.
           </span>
-          <nav aria-label="Legal" className="flex items-center gap-5">
+          <nav aria-label="Legal" className="flex flex-wrap items-center gap-5">
             <Link className="transition-colors hover:text-white" href="/privacy">
               Privacy
             </Link>
             <Link className="transition-colors hover:text-white" href="/terms">
               Terms
             </Link>
+            <button className="transition-colors hover:text-white" onClick={openPreferences} type="button" data-privacy-ui="true">Privacy choices</button>
           </nav>
           <Link
             className="group inline-flex items-center gap-5 font-display text-xs font-semibold uppercase tracking-[0.28em] text-white/76 transition-colors hover:text-white"

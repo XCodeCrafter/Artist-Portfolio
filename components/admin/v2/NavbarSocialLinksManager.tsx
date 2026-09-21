@@ -5,11 +5,13 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
   FaArrowDown,
   FaArrowUp,
+  FaArchive,
   FaCheck,
   FaExclamationTriangle,
   FaEye,
@@ -19,6 +21,16 @@ import {
   FaTrash,
 } from "react-icons/fa";
 import { saveNavbarSocialLinksV2 } from "@/app/admin/v2/navigation/social-actions";
+import {
+  loadNavbarShortcutArchivePage,
+  mutateNavbarShortcutArchive,
+} from "@/app/admin/v2/navigation/archive-actions";
+import {
+  ARCHIVE_PAGE_SIZE,
+  parseArchivePage,
+  type ArchiveData,
+} from "@/lib/admin/content-archive-editor";
+import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
 import { useNavbarUnsavedChanges } from "@/components/admin/v2/NavbarUnsavedChangesProvider";
 import {
@@ -26,18 +38,20 @@ import {
   createEmptyNavbarSocialLink,
   moveNavbarSocialLink,
   parseNavbarSocialLinksDraft,
+  parseNavbarSocialLinksSubmission,
   serializeNavbarSocialLinks,
   updateNavbarSocialLinkUrl,
   type NavbarSocialLinkItem,
   type NavbarSocialLinksSnapshot,
 } from "@/lib/admin/navbar-social-links-editor";
-import { getSocialPlatformDefinition } from "@/lib/content/social-platforms";
+import { detectSocialPlatform, getSocialPlatformDefinition } from "@/lib/content/social-platforms";
 
 type Props = {
   snapshot: NavbarSocialLinksSnapshot;
   disabled: boolean;
   migrationRequired: boolean;
   loadError?: string;
+  archiveData?: ArchiveData;
 };
 
 const panelClass =
@@ -46,6 +60,13 @@ const inputClass =
   "mt-2 min-h-11 w-full rounded-2xl border border-white/10 bg-black/28 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-white/24 focus:border-white/34 focus:bg-black/38 disabled:cursor-not-allowed disabled:opacity-45";
 const labelClass =
   "text-[10px] font-semibold uppercase tracking-[0.17em] text-white/42";
+const archiveButtonClass =
+  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-white/65 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35";
+const EMPTY_ARCHIVE: ArchiveData = {
+  available: false,
+  page: { items: [], total: 0, offset: 0 },
+  message: "Shortcut archive is not available yet. Regular shortcut editing still works.",
+};
 
 function serialized(items: readonly NavbarSocialLinkItem[]) {
   return JSON.stringify(serializeNavbarSocialLinks(items));
@@ -64,30 +85,38 @@ export default function NavbarSocialLinksManager({
   disabled,
   migrationRequired,
   loadError,
+  archiveData = EMPTY_ARCHIVE,
 }: Props) {
   const [baseline, setBaseline] = useState(snapshot.items);
   const [draft, setDraft] = useState(snapshot.items);
   const [versions, setVersions] = useState(snapshot.expectedVersions);
   const [announcement, setAnnouncement] = useState("");
+  const [archive, setArchive] = useState(archiveData);
+  const [archivePending, setArchivePending] = useState(false);
+  const [archivePagePending, setArchivePagePending] = useState(false);
+  const [archiveReloadRequired, setArchiveReloadRequired] = useState(false);
+  const [archiveFeedback, setArchiveFeedback] = useState<{ message: string; error: boolean } | null>(null);
+  const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
+  const archiveInFlight = useRef<"mutation" | "page" | null>(null);
   const { clearDirty, confirmDiscard, markDirty } =
     useNavbarUnsavedChanges("shortcuts");
   const clientAction = useCallback(
     async (previousState: typeof INITIAL_NAVBAR_SOCIAL_LINKS_SAVE_STATE, formData: FormData) => {
-      const result = await saveNavbarSocialLinksV2(previousState, formData);
-      if (
-        result.status === "saved" &&
-        result.items &&
-        result.expectedVersions
-      ) {
-        setDraft(result.items);
-        setBaseline(result.items);
-        setVersions(result.expectedVersions);
-        setAnnouncement("Platform shortcuts saved and published.");
-        clearDirty();
-      }
-      return result;
+      if (archiveInFlight.current === "mutation" || archiveReloadRequired) return previousState;
+      return runEditorSave(previousState, () => saveNavbarSocialLinksV2(previousState, formData), (result) => {
+        const confirmed = parseNavbarSocialLinksSubmission(result.items, result.expectedVersions);
+        if (confirmed.success && confirmed.data.items.length === Object.keys(confirmed.data.expectedVersions).length) {
+          setDraft(confirmed.data.items);
+          setBaseline(confirmed.data.items);
+          setVersions(confirmed.data.expectedVersions);
+          setAnnouncement("Platform shortcuts saved and published.");
+          clearDirty();
+          return true;
+        }
+        return false;
+      });
     },
-    [clearDirty]
+    [archiveReloadRequired, clearDirty]
   );
   const [saveState, formAction, pending] = useActionState(
     clientAction,
@@ -103,8 +132,9 @@ export default function NavbarSocialLinksManager({
   const errors = { ...responseErrors, ...localErrors };
   const isDirty = serialized(draft) !== serialized(baseline);
   const editorDisabled =
-    disabled || pending || migrationRequired || Boolean(loadError);
+    disabled || pending || archivePending || archiveReloadRequired || needsEditorReload(saveState) || migrationRequired || Boolean(loadError);
   const canSave = isDirty && validation.success && !editorDisabled;
+  const canArchive = archive.available && !isDirty && !editorDisabled && !archivePagePending;
   const visibleLinks = draft.filter(
     (item) => item.isPublished && item.href.trim()
   );
@@ -152,6 +182,89 @@ export default function NavbarSocialLinksManager({
 
   function reloadSaved() {
     confirmDiscard(() => window.location.reload());
+  }
+
+  async function mutateArchive(operation: "archive" | "restore", itemId: string) {
+    if (!canArchive || archiveInFlight.current) return;
+    const savedItem = baseline.find(item => item.id === itemId);
+    const archivedItem = archive.page.items.find(item => item.id === itemId);
+    if (operation === "archive" && (!savedItem || confirmArchiveId !== itemId)) return;
+    if (operation === "restore" && (!archivedItem || draft.length >= 16)) return;
+
+    archiveInFlight.current = "mutation";
+    setArchivePending(true);
+    setArchiveFeedback(null);
+    try {
+      const result = await mutateNavbarShortcutArchive({
+        operation,
+        itemId,
+        expectedVersions: versions,
+        ...(operation === "restore" ? { expectedArchiveUpdatedAt: archivedItem!.updatedAt } : {}),
+      });
+      if (!result || typeof result.ok !== "boolean" || typeof result.message !== "string") {
+        throw new Error("Unverified archive response");
+      }
+      if (!result.ok) {
+        if (result.reloadRequired) setArchiveReloadRequired(true);
+        setArchiveFeedback({ message: result.message, error: true });
+        return;
+      }
+      const confirmed = result.snapshot && parseNavbarSocialLinksSubmission(
+        result.snapshot.items, result.snapshot.expectedVersions
+      );
+      const confirmedArchive = parseArchivePage(result.archive);
+      if (!confirmed?.success ||
+        confirmed.data.items.length !== Object.keys(confirmed.data.expectedVersions).length ||
+        !confirmedArchive) {
+        throw new Error("Unverified archive snapshot");
+      }
+      const restoredItem = confirmed.data.items.find(item => item.id === itemId);
+      if ((operation === "archive" && restoredItem) ||
+        (operation === "restore" && (!restoredItem || restoredItem.isPublished))) {
+        throw new Error("Unverified archive operation");
+      }
+      setDraft(confirmed.data.items);
+      setBaseline(confirmed.data.items);
+      setVersions(confirmed.data.expectedVersions);
+      setArchive({ available: true, page: confirmedArchive });
+      setConfirmArchiveId(null);
+      setArchiveFeedback({ message: result.message, error: false });
+      setAnnouncement(operation === "archive"
+        ? "Shortcut archived. It is no longer shown in the navbar or footer."
+        : "Shortcut restored as hidden. Review it, then make it visible and save when ready.");
+      clearDirty();
+    } catch {
+      setArchiveReloadRequired(true);
+      setArchiveFeedback({
+        error: true,
+        message: "The archive outcome could not be confirmed. The server may have applied it. Reload saved links before trying again.",
+      });
+    } finally {
+      archiveInFlight.current = null;
+      setArchivePending(false);
+    }
+  }
+
+  async function loadArchivePage(offset: number) {
+    if (!archive.available || editorDisabled || archiveInFlight.current ||
+      offset < 0 || offset % ARCHIVE_PAGE_SIZE !== 0) return;
+    archiveInFlight.current = "page";
+    setArchivePagePending(true);
+    setArchiveFeedback(null);
+    try {
+      const next = await loadNavbarShortcutArchivePage(offset);
+      const nextPage = next && parseArchivePage(next.page);
+      if (!next?.available || !nextPage || nextPage.offset !== offset) {
+        setArchiveFeedback({ error: true, message: next?.message || "Archived shortcuts could not be loaded. Your current page has been kept." });
+        return;
+      }
+      setArchive({ ...next, page: nextPage });
+    } catch {
+      setArchiveFeedback({ error: true, message: "Archived shortcuts could not be loaded. Your current page has been kept." });
+    } finally {
+      archiveInFlight.current = null;
+      setArchivePagePending(false);
+    }
   }
 
   const statusIsError = !["idle", "saved"].includes(saveState.status);
@@ -356,11 +469,54 @@ export default function NavbarSocialLinksManager({
                     <FaTrash /> Remove unsaved link
                   </button>
                 ) : (
-                  <span className="text-[10px] leading-4 text-white/30">
-                    Hide to remove it from the public site without deleting it.
-                  </span>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="max-w-60 text-[10px] leading-4 text-white/30">
+                      Hide to keep it here. Archive to free a shortcut slot.
+                    </span>
+                    <button
+                      aria-label={`Archive ${item.label}`}
+                      className={archiveButtonClass}
+                      disabled={!canArchive}
+                      onClick={() => {
+                        if (canArchive) setConfirmArchiveId(item.id);
+                      }}
+                      type="button"
+                    >
+                      <FaArchive aria-hidden /> Archive
+                    </button>
+                  </div>
                 )}
               </div>
+              {!isNew && confirmArchiveId === item.id ? (
+                <div
+                  className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/[0.045] p-4"
+                  aria-label={`Confirm archiving ${item.label}`}
+                  role="group"
+                >
+                  <p className="text-sm font-semibold text-amber-100/85">Archive {item.label}?</p>
+                  <p className="mt-2 text-xs leading-5 text-white/55">
+                    This immediately removes the shortcut from the navbar and shared footer.
+                    You can restore it later as hidden. No Media files are deleted.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className={`${archiveButtonClass} border-amber-300/30 text-amber-100`}
+                      disabled={!canArchive}
+                      onClick={() => mutateArchive("archive", item.id)}
+                      type="button"
+                    >
+                      {archivePending ? <FaSpinner aria-hidden className="animate-spin" /> : <FaArchive aria-hidden />}
+                      Confirm archive
+                    </button>
+                    <button
+                      className={archiveButtonClass}
+                      disabled={archivePending}
+                      onClick={() => setConfirmArchiveId(null)}
+                      type="button"
+                    >Cancel archive</button>
+                  </div>
+                </div>
+              ) : null}
             </section>
           );
         })}
@@ -376,6 +532,84 @@ export default function NavbarSocialLinksManager({
         ) : null}
       </fieldset>
 
+      <section id="shortcut-archive" aria-labelledby="shortcut-archive-heading" className="scroll-mt-24 border-t border-white/8 p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 id="shortcut-archive-heading" className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <FaArchive aria-hidden className="text-white/40" /> Archived shortcuts
+            </h3>
+            <p className="mt-2 max-w-2xl text-xs leading-5 text-white/42">
+              A recoverable content archive, separate from Media Trash. Archived shortcuts do not
+              use the 16 active slots. Restoring brings back a hidden shortcut; it does not publish it.
+            </p>
+          </div>
+          <span className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] text-white/45">
+            {draft.length}/16 active slots{archive.available ? ` · ${archive.page.total} archived` : ""}
+          </span>
+        </div>
+
+        {!archive.available ? (
+          <p className="mt-3 rounded-xl border border-amber-300/12 bg-amber-300/[0.035] px-3 py-2 text-xs leading-5 text-amber-100/65">
+            {archive.message || "Shortcut archive is unavailable. Regular shortcut editing still works."}
+          </p>
+        ) : (
+          <>
+            {isDirty ? (
+              <p className="mt-3 text-xs leading-5 text-amber-100/70">Save or discard shortcut changes before archiving or restoring.</p>
+            ) : draft.length >= 16 ? (
+              <p className="mt-3 text-xs leading-5 text-amber-100/70">All 16 active slots are used. Archive a saved shortcut before restoring another.</p>
+            ) : null}
+            {archive.page.items.length ? (
+              <ul className="mt-4 grid gap-2">
+                {archive.page.items.map(item => (
+                  <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/8 bg-black/20 p-3">
+                    <div className="min-w-0 flex-1 basis-40">
+                      <p className="break-words text-sm font-semibold text-white/70">{item.label}</p>
+                      <p className="mt-1 text-[10px] leading-4 text-white/35">
+                        {getSocialPlatformDefinition(detectSocialPlatform("", item.platform)).label} · archived {item.archivedAt.slice(0, 10)}
+                      </p>
+                    </div>
+                    <button
+                      aria-label={`Restore ${item.label} as hidden`}
+                      className={archiveButtonClass}
+                      disabled={!canArchive || draft.length >= 16}
+                      onClick={() => mutateArchive("restore", item.id)}
+                      type="button"
+                    >
+                      <FaEyeSlash aria-hidden /> Restore as hidden
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 rounded-2xl border border-dashed border-white/10 p-4 text-xs text-white/38">
+                {archive.page.total ? "No shortcuts on this archive page. Go back to see earlier entries." : "No archived shortcuts yet. Hidden links remain in the editor above until you archive them."}
+              </p>
+            )}
+            {archive.page.total > ARCHIVE_PAGE_SIZE || archive.page.offset > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Archived shortcuts pagination">
+                <button className={archiveButtonClass} disabled={editorDisabled || archivePagePending || archive.page.offset === 0}
+                  onClick={() => loadArchivePage(Math.max(0, archive.page.offset - ARCHIVE_PAGE_SIZE))} type="button">Previous archived shortcuts</button>
+                <span aria-live="polite" className="text-[10px] text-white/38">
+                  {archivePagePending ? "Loading archive…" : `Page ${Math.floor(archive.page.offset / ARCHIVE_PAGE_SIZE) + 1}`}
+                </span>
+                <button className={archiveButtonClass} disabled={editorDisabled || archivePagePending || archive.page.offset + ARCHIVE_PAGE_SIZE >= archive.page.total}
+                  onClick={() => loadArchivePage(archive.page.offset + ARCHIVE_PAGE_SIZE)} type="button">Next archived shortcuts</button>
+              </div>
+            ) : null}
+          </>
+        )}
+        {archiveFeedback ? (
+          <div className={`mt-3 rounded-xl border px-3 py-2 text-xs leading-5 ${archiveFeedback.error ? "border-amber-300/16 bg-amber-300/[0.04] text-amber-100/80" : "border-emerald-300/16 bg-emerald-300/[0.04] text-emerald-100/80"}`}
+            role={archiveFeedback.error ? "alert" : "status"}>
+            {archiveFeedback.message}
+            {archiveReloadRequired ? (
+              <button className="ml-3 underline underline-offset-4" onClick={reloadSaved} type="button">Reload saved links</button>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
       {saveState.status !== "idle" ? (
         <div
           className={`border-t px-4 py-3 text-xs leading-5 sm:px-5 ${
@@ -386,7 +620,7 @@ export default function NavbarSocialLinksManager({
           role={statusIsError ? "alert" : "status"}
         >
           {saveState.message}
-          {saveState.status === "conflict" ? (
+          {needsEditorReload(saveState) ? (
             <button
               className="ml-3 underline underline-offset-4"
               onClick={reloadSaved}
@@ -401,7 +635,9 @@ export default function NavbarSocialLinksManager({
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/8 bg-[#101012]/92 p-3 sm:p-4">
         <div>
           <p className="text-xs font-semibold text-white/62">
-            {pending
+            {archivePending
+              ? "Updating shortcut archive…"
+              : pending
               ? "Saving shortcuts…"
               : isDirty
                 ? "Shortcut changes are not saved yet"
@@ -411,6 +647,17 @@ export default function NavbarSocialLinksManager({
             {announcement || `${visibleLinks.length} visible icon links`}
           </p>
         </div>
+        <button
+          className="min-h-11 rounded-xl border border-white/15 px-4 text-xs text-white/70 disabled:opacity-35"
+          disabled={pending || archivePending || archiveReloadRequired || !isDirty}
+          type="button"
+          onClick={() => {
+            setDraft(baseline);
+            setAnnouncement("Platform shortcuts restored to the last save.");
+          }}
+        >
+          Discard shortcut changes
+        </button>
         <button
           aria-busy={pending}
           className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:min-w-[190px]"

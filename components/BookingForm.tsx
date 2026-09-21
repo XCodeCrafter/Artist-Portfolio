@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getMixedPublicCopy } from "@/lib/content/public-copy";
+import { getOptionalPublicCopy } from "@/lib/content/public-copy";
 
 type FormState =
   | { status: "idle" }
@@ -25,10 +25,11 @@ export default function BookingForm({
 }: Props) {
   const [state, setState] = useState<FormState>({ status: "idle" });
   const startedAtRef = useRef<number>(0);
-  const description = getMixedPublicCopy(
+  const description = getOptionalPublicCopy(
     contactBlurb,
     "For acting, music, productions, bookings, and creative collaborations."
   );
+  const publicLocation = getOptionalPublicCopy(location, "EU / Worldwide");
 
   const markFormStarted = () => {
     if (startedAtRef.current === 0) {
@@ -116,16 +117,16 @@ export default function BookingForm({
             Let&apos;s work together
           </h2>
 
-          <div className="mt-6 space-y-3 text-white/75">
-            <div>
+          {description || publicLocation ? <div className="mt-6 space-y-3 text-white/75">
+            {description ? <div>
               <span className="text-white/50">Collaboration:</span>{" "}
               {description}
-            </div>
-            <div>
+            </div> : null}
+            {publicLocation ? <div>
               <span className="text-white/50">Based in:</span>{" "}
-              {location}
-            </div>
-          </div>
+              {publicLocation}
+            </div> : null}
+          </div> : null}
 
           <a
             href="#contact-form"

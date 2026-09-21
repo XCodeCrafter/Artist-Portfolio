@@ -50,7 +50,41 @@ export type InquirySummary = {
   archived: number;
   current7Days: number;
   previous7Days: number;
+  /** Numeric legacy slots above are meaningful only when weekly is available. */
+  weekly?: InquiryWeeklySummary;
 };
+
+export type InquiryWeeklyWindow = {
+  asOf: string;
+  currentStart: string;
+  previousStart: string;
+};
+
+export type InquiryWeeklySummary = InquiryWeeklyWindow & (
+  | { available: true; current7Days: number; previous7Days: number }
+  | { available: false; current7Days: null; previous7Days: null; error: string }
+);
+
+/** Two adjacent, equally long UTC intervals, fixed at one server-side instant. */
+export function getInquiryWeeklyWindow(asOf = new Date()): InquiryWeeklyWindow {
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  return {
+    asOf: asOf.toISOString(),
+    currentStart: new Date(asOf.getTime() - weekMs).toISOString(),
+    previousStart: new Date(asOf.getTime() - 2 * weekMs).toISOString(),
+  };
+}
+
+function unavailableWeekly(window: InquiryWeeklyWindow): InquiryWeeklySummary {
+  return {
+    ...window, available: false, current7Days: null, previous7Days: null,
+    error: "Received-message statistics are temporarily unavailable.",
+  };
+}
+
+function isExactCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
 
 export type InquiryPagination = {
   page: number;
@@ -227,13 +261,15 @@ export async function getBookingInquiries(
   isConfigured: boolean;
   loadError?: string;
 }> {
+  await requireAdmin();
   const page = normalizeAdminInquiryPage(options.page);
   const pageSize = Math.min(50, Math.max(10, Math.floor(options.pageSize || 25)));
+  const weeklyWindow = getInquiryWeeklyWindow();
 
   if (!hasAdminServiceEnv()) {
     return {
       inquiries: [],
-      summary: { ...EMPTY_SUMMARY },
+      summary: { ...EMPTY_SUMMARY, weekly: unavailableWeekly(weeklyWindow) },
       pagination: emptyPagination(page, pageSize),
       isConfigured: false,
     };
@@ -243,17 +279,12 @@ export async function getBookingInquiries(
   if (!supabase) {
     return {
       inquiries: [],
-      summary: { ...EMPTY_SUMMARY },
+      summary: { ...EMPTY_SUMMARY, weekly: unavailableWeekly(weeklyWindow) },
       pagination: emptyPagination(page, pageSize),
       isConfigured: false,
     };
   }
 
-  const now = new Date();
-  const currentStart = new Date(now);
-  currentStart.setUTCDate(currentStart.getUTCDate() - 7);
-  const previousStart = new Date(now);
-  previousStart.setUTCDate(previousStart.getUTCDate() - 14);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
@@ -262,6 +293,22 @@ export async function getBookingInquiries(
       .from("booking_inquiries")
       .select("id", { count: "exact", head: true })
       .eq("status", status);
+
+  // A weekly reporting failure must not disable reading or triaging messages.
+  // Head-only exact counts never fetch names, addresses, notes or message bodies.
+  const countReceived = async (start: string, end: string): Promise<number | null> => {
+    try {
+      const result = await supabase
+        .from("booking_inquiries")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", start)
+        .lt("created_at", end)
+        .abortSignal(AbortSignal.timeout(5_000));
+      return !result.error && isExactCount(result.count) ? result.count : null;
+    } catch {
+      return null;
+    }
+  };
 
   const selectInquiryRows = (columns: string) =>
     supabase
@@ -297,31 +344,21 @@ export async function getBookingInquiries(
     countStatus("read"),
     countStatus("replied"),
     countStatus("archived"),
-    supabase
-      .from("booking_inquiries")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", currentStart.toISOString()),
-    supabase
-      .from("booking_inquiries")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", previousStart.toISOString())
-      .lt("created_at", currentStart.toISOString()),
+    countReceived(weeklyWindow.currentStart, weeklyWindow.asOf),
+    countReceived(weeklyWindow.previousStart, weeklyWindow.currentStart),
   ]);
 
-  const results = [
-    rowsResult,
+  const countResults = [
     totalResult,
     newResult,
     readResult,
     repliedResult,
     archivedResult,
-    currentResult,
-    previousResult,
   ];
-  if (results.some((result) => result.error)) {
+  if (rowsResult.error || countResults.some((result) => result.error || !isExactCount(result.count))) {
     return {
       inquiries: [],
-      summary: { ...EMPTY_SUMMARY },
+      summary: { ...EMPTY_SUMMARY, weekly: unavailableWeekly(weeklyWindow) },
       pagination: emptyPagination(page, pageSize),
       isConfigured: true,
       loadError: "Unable to load exact contact inquiry totals from Supabase.",
@@ -330,6 +367,9 @@ export async function getBookingInquiries(
 
   const total = totalResult.count || 0;
   const inquiries = (rowsResult.data || []).map(mapInquiry);
+  const weekly: InquiryWeeklySummary = currentResult !== null && previousResult !== null
+    ? { ...weeklyWindow, available: true, current7Days: currentResult, previous7Days: previousResult }
+    : unavailableWeekly(weeklyWindow);
 
   return {
     inquiries,
@@ -339,8 +379,9 @@ export async function getBookingInquiries(
       read: readResult.count || 0,
       replied: repliedResult.count || 0,
       archived: archivedResult.count || 0,
-      current7Days: currentResult.count || 0,
-      previous7Days: previousResult.count || 0,
+      current7Days: weekly.available ? weekly.current7Days : 0,
+      previous7Days: weekly.available ? weekly.previous7Days : 0,
+      weekly,
     },
     pagination: {
       page,

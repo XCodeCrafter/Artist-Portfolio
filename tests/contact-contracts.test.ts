@@ -179,13 +179,11 @@ describe("Batch 6D Contact migration contract", () => {
     expect(classicContentEditor).toContain('href="/admin/v2/pages/contact"');
   });
 
-  it("probes both Contact save grants without mutating content", () => {
-    expect(readinessSource).toContain('supabase.rpc("save_contact_hero_v2"');
-    expect(readinessSource).toContain('supabase.rpc("save_contact_details_v2"');
-    expect(readinessSource.match(/p_site_id: "~schema-probe"/g)).toHaveLength(2);
-    expect(readinessSource).toContain(
-      'result.error?.code === "22023"'
-    );
+  it("checks Contact through its snapshot without calling write actions on page load", () => {
+    expect(readinessSource).toContain('client.rpc("get_contact_page_v2_snapshot"');
+    expect(readinessSource).not.toContain('"save_contact_hero_v2"');
+    expect(readinessSource).not.toContain('"save_contact_details_v2"');
+    expect(readinessSource).not.toContain('"consume_security_rate_limit"');
     expect(readinessSource).toContain("process.env.RESEND_API_KEY?.trim()");
   });
 });

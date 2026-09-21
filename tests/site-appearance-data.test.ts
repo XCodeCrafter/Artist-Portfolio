@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getAdminAppearanceData, isMissingSiteAppearanceSchemaError } from "@/lib/admin/site-appearance";
+import { DEFAULT_FOOTER_CONTENT } from "@/lib/content/footer";
 
 const mocks = vi.hoisted(() => ({ requireAdmin: vi.fn(), service: vi.fn(), configured: vi.fn() }));
 vi.mock("@/lib/admin/auth", () => ({ requireAdmin: mocks.requireAdmin }));
 vi.mock("@/lib/admin/service", () => ({ createAdminServiceClient: mocks.service, hasAdminServiceEnv: mocks.configured }));
-const row = { artist_name: "Owner", display_font: "prata", body_font: "inter", ui_font: "manrope", footer_effect: "red-light", updated_at: "2026-09-20T10:00:00.123456+00:00" };
+const row = { artist_name: "Owner", display_font: "prata", body_font: "inter", ui_font: "manrope", footer_effect: "red-light", tagline: "Music producer", description: "My music", location: "Prague", contact_blurb: "Music bookings", footer_content: DEFAULT_FOOTER_CONTENT, updated_at: "2026-09-20T10:00:00.123456+00:00" };
 function database(data: unknown, error: unknown = null) {
   const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn().mockResolvedValue({ data, error }) };
   query.select.mockReturnValue(query); query.eq.mockReturnValue(query);
@@ -23,15 +24,24 @@ describe("Site appearance V2 data", () => {
     expect(await getAdminAppearanceData()).toMatchObject({ isConfigured: false, migrationRequired: false });
     expect(mocks.service).not.toHaveBeenCalled();
   });
-  it("loads only the known main-site fields and preserves the database version", async () => {
+  it("loads the main public-settings row and preserves its database version", async () => {
     const { query, client } = database(row);
     expect(await getAdminAppearanceData()).toMatchObject({
       isConfigured: true, migrationRequired: false,
       snapshot: { draft: { name: { artistName: "Owner" }, appearance: { displayFont: "prata", bodyFont: "inter", uiFont: "manrope", footerEffect: "red-light" } }, versions: { updatedAt: row.updated_at } },
     });
     expect(client.from).toHaveBeenCalledExactlyOnceWith("site_settings");
-    expect(query.select).toHaveBeenCalledExactlyOnceWith("artist_name,display_font,body_font,ui_font,footer_effect,updated_at");
+    expect(query.select).toHaveBeenCalledExactlyOnceWith("*");
     expect(query.eq).toHaveBeenCalledExactlyOnceWith("id", "main");
+  });
+  it("keeps name, identity and fonts available while footer migration is pending", async () => {
+    database({ ...row, footer_content: undefined });
+    expect(await getAdminAppearanceData()).toMatchObject({ isConfigured: true, migrationRequired: false, footerMigrationRequired: true,
+      snapshot: { draft: { identity: { tagline: "Music producer" }, footer: DEFAULT_FOOTER_CONTENT } } });
+  });
+  it("fails closed on malformed persisted footer content", async () => {
+    database({ ...row, footer_content: { ...DEFAULT_FOOTER_CONTENT, primaryHref: "javascript:alert(1)" } });
+    expect(await getAdminAppearanceData()).toMatchObject({ loadError: expect.any(String) });
   });
   it("never supplies a writable draft when legacy columns are missing", async () => {
     database(null, { code: "PGRST204", message: "Could not find display_font column of site_settings in the schema cache" });

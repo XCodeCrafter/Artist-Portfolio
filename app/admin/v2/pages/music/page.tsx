@@ -2,6 +2,7 @@ import MusicEditor from "@/components/admin/v2/MusicEditor";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getMediaAssets } from "@/lib/admin/media";
 import { getAdminMusicEditorData } from "@/lib/admin/music";
+import { getMusicContentArchiveData } from "@/lib/admin/music-content-archive";
 
 export const metadata = { title: "Music page · Admin V2" };
 export const dynamic = "force-dynamic";
@@ -9,9 +10,11 @@ export const dynamic = "force-dynamic";
 export default async function AdminV2MusicPage() {
   // Authenticate before either service-role loader starts work.
   await requireAdmin();
-  const [music, media] = await Promise.all([
+  const [music, media, platformsArchive, soundcloudArchive] = await Promise.all([
     getAdminMusicEditorData(),
     getMediaAssets(),
+    getMusicContentArchiveData("platforms"),
+    getMusicContentArchiveData("soundcloud"),
   ]);
 
   return (
@@ -38,6 +41,7 @@ export default async function AdminV2MusicPage() {
 
       <MusicEditor
         assets={media.assets}
+        archiveData={{ platforms: platformsArchive, soundcloud: soundcloudArchive }}
         disabled={
           !music.isConfigured ||
           music.migrationRequired ||

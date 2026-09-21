@@ -990,6 +990,8 @@ export default function GalleryShowcase({
           <motion.div
             animate={{ opacity: 1 }}
             aria-label={`${activeImage.title} image viewer`}
+            data-analytics-open="gallery_open"
+            data-analytics-label={activeImage.title}
             aria-modal="true"
             className="fixed inset-0 z-[120] overflow-hidden bg-black/92 p-4 backdrop-blur-2xl sm:p-6"
             initial={{ opacity: 0 }}

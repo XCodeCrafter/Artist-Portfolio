@@ -6,15 +6,17 @@ import { NavbarUnsavedChangesProvider } from "@/components/admin/v2/NavbarUnsave
 import { getAdminNavigationData } from "@/lib/admin/navigation";
 import { getAdminNavbarSocialLinksData } from "@/lib/admin/navbar-social-links";
 import { createNavigationEditorModel } from "@/lib/admin/navigation-editor";
+import { getNavbarShortcutArchiveData } from "@/lib/admin/content-archive";
 
 export const metadata = { title: "Navbar · Admin V2" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminV2NavigationPage() {
-  const [data, socialLinks, appearance] = await Promise.all([
+  const [data, socialLinks, appearance, archiveData] = await Promise.all([
     getAdminNavigationData(),
     getAdminNavbarSocialLinksData(),
     getAdminAppearanceData(),
+    getNavbarShortcutArchiveData(),
   ]);
   const model = createNavigationEditorModel(data.navigation);
   const unsupportedVersion = data.configVersion === "unsupported";
@@ -65,6 +67,7 @@ export default async function AdminV2NavigationPage() {
         />
 
         <NavbarSocialLinksManager
+          archiveData={archiveData}
           disabled={!socialLinks.isConfigured}
           loadError={socialLinks.loadError}
           migrationRequired={socialLinks.migrationRequired}

@@ -53,7 +53,7 @@ export default async function AdminV2InsightsPage({
                 ) : (
                   <FaExclamationTriangle />
                 )}
-                {analyticsAvailable ? "Analytics connected" : "Data unavailable"}
+                {analyticsAvailable ? "Stored data readable" : "Data unavailable"}
               </span>
             </div>
             <h1 className="heading-ui mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
@@ -61,7 +61,7 @@ export default async function AdminV2InsightsPage({
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-white/48">
               See what visitors open, where they engage, and which contact
-              actions succeed. Counts stay privacy-safe; messages themselves
+              actions succeed. Only consented production activity is counted; messages themselves
               belong in the separate Inbox workspace.
             </p>
           </div>
@@ -71,13 +71,13 @@ export default async function AdminV2InsightsPage({
             <p className="mt-3 text-lg font-semibold text-white">
               {analyticsAvailable
                 ? analyticsResult.summary.lastEventAt
-                  ? "Activity is flowing"
-                  : "Ready for first visit"
+                  ? "Recorded activity available"
+                  : "No corrected events yet"
                 : "Check data connection"}
             </p>
             <p className="mt-1 text-[10px] leading-4 text-white/38">
-              Reporting uses anonymous 30-minute sessions and coarse device,
-              browser, and referral groups.
+              Read access does not verify live collection. Reports use consented
+              30-minute tab sessions, not unique people; legacy data is excluded.
             </p>
           </div>
         </div>

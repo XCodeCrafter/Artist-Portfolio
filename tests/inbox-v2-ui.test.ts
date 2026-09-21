@@ -123,6 +123,12 @@ describe("Admin V2 Inbox route and navigation", () => {
 });
 
 describe("Shared Inbox UI contract", () => {
+  it("adds independent weekly reporting to V2 without changing shared message triage", () => {
+    expect(inbox).toContain('<InboxWeeklySummary weekly={inquirySummary.weekly} />');
+    expect(inbox.indexOf("<InboxWeeklySummary")).toBeGreaterThan(inbox.indexOf("export default function InquiryInbox"));
+    expect(inquiryLoader).toContain('countReceived(weeklyWindow.currentStart, weeklyWindow.asOf)');
+    expect(inquiryLoader).toContain('countReceived(weeklyWindow.previousStart, weeklyWindow.currentStart)');
+  });
   it("preserves the complete triage workflow and safety affordances", () => {
     expect(inbox).toContain("Workflow status");
     expect(inbox).toContain("Private notes");

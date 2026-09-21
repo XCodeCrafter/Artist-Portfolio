@@ -35,6 +35,7 @@ import ShowreelPreviewFrame, {
   type ShowreelPreviewDevice,
 } from "@/components/admin/v2/ShowreelPreviewFrame";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
 import {
   SHOWREEL_EDITOR_SECTIONS,
   INITIAL_SHOWREEL_SAVE_STATE,
@@ -57,11 +58,14 @@ import {
   type ShowreelWorkEditorItem,
 } from "@/lib/admin/showreel-editor";
 import type { MediaAsset } from "@/lib/admin/media";
+import { useVisualContentArchive } from "@/components/admin/v2/VisualContentArchivePanel";
+import type { VisualArchiveData } from "@/lib/admin/visual-content-archive-editor";
 import { VIDEO_TYPES } from "@/lib/content";
 
 type FieldErrors = Record<string, string[]>;
 
 type ShowreelEditorProps = {
+  archiveData?: VisualArchiveData;
   assets: MediaAsset[];
   disabled: boolean;
   loadError?: string;
@@ -195,6 +199,8 @@ type InspectorProps = {
   instance: "desktop" | "mobile";
   mediaRevision: number;
   savedWorkIds: ReadonlySet<string>;
+  archiveControl: (id: string, label: string) => ReactNode;
+  archivePanel: ReactNode;
   onAddWork: () => void;
   onDiscardWork: (id: string) => void;
   onHeroChange: (patch: Partial<ShowreelHeroDraft>) => void;
@@ -528,6 +534,7 @@ function WorkCard({
           </div>
         </div>
 
+        {saved ? props.archiveControl(item.id, item.title || "Untitled video") : null}
         <Field
           error={fieldMessage(props.errors, `items.${index}.title`)}
           label="Title"
@@ -635,7 +642,7 @@ function WorkCard({
               />
               <Link
                 className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[#ff7863] transition hover:text-white"
-                href="/admin/media?view=library#upload"
+                href="/admin/v2/media#upload"
               >
                 Upload another video <FaExternalLinkAlt />
               </Link>
@@ -731,7 +738,8 @@ function WorksInspector(props: InspectorProps) {
         </div>
         <p className="mt-3 text-xs leading-5 text-white/38">
           Visitor order sets visual priority: the first shown video becomes the
-          large opening card. Saved videos stay recoverable when hidden.
+          large opening card. Hide saved videos to keep them here, or archive
+          them to free an active slot. Music videos are included too.
         </p>
       </div>
       {items.map((item, index) => (
@@ -753,6 +761,7 @@ function WorksInspector(props: InspectorProps) {
           </p>
         </div>
       ) : null}
+      {props.archivePanel}
     </div>
   );
 }
@@ -810,6 +819,7 @@ function formatSavedAt(value: string) {
 }
 
 export default function ShowreelEditor({
+  archiveData,
   assets,
   disabled,
   loadError,
@@ -842,6 +852,9 @@ export default function ShowreelEditor({
   const desktopCloseRef = useRef<HTMLButtonElement | null>(null);
   const handledEventIdsRef = useRef(new Set<string>());
   const latestSaveEventIdRef = useRef("");
+  const archiveOperationRef = useRef<"mutation" | "page" | null>(null);
+  const archiveReloadRef = useRef(false);
+  const saveInFlight = useRef(false);
   const { clearDirty, confirmDiscard, hasUnsavedChanges, markDirty } =
     useUnsavedChangesGuard(
       "You have unsaved Showreel page changes. Leave and discard them?",
@@ -850,7 +863,7 @@ export default function ShowreelEditor({
 
   const applySaveResult = useCallback(
     (result: ShowreelSaveState) => {
-      if (!result.eventId || handledEventIdsRef.current.has(result.eventId)) return;
+      if (!result.eventId || handledEventIdsRef.current.has(result.eventId)) return false;
       handledEventIdsRef.current.add(result.eventId);
       if (
         result.status !== "saved" ||
@@ -858,7 +871,7 @@ export default function ShowreelEditor({
         !result.canonicalSection ||
         !result.versions
       ) {
-        return;
+        return false;
       }
       const confirmed = parseShowreelSectionSubmission(
         result.section,
@@ -866,13 +879,13 @@ export default function ShowreelEditor({
         result.versions,
         { requireExactCollectionVersions: true }
       );
-      if (!confirmed.success) return;
+      if (!confirmed.success) return false;
       const nextDraft = applyCanonicalSection(
         draftRef.current,
         result.section,
         confirmed.data.payload
       );
-      if (!nextDraft) return;
+      if (!nextDraft) return false;
       const nextBaseline = {
         ...baselineRef.current,
         [result.section]: nextDraft[result.section],
@@ -894,22 +907,26 @@ export default function ShowreelEditor({
       });
       setAnnouncement(`${SECTION_META[result.section].label} saved.`);
       if (!getDirtyShowreelSections(nextBaseline, nextDraft).length) clearDirty();
+      return true;
     },
     [clearDirty]
   );
 
   const clientAction = useCallback(
     async (previousState: ShowreelSaveState, formData: FormData) => {
+      if (archiveOperationRef.current === "mutation" || archiveReloadRef.current || saveInFlight.current) return previousState;
+      saveInFlight.current = true;
       const section = SHOWREEL_EDITOR_SECTIONS.find(
         (candidate) => candidate === formData.get("section")
       );
       setSavingSection(section || null);
       try {
-        const result = await saveShowreelSectionV2(previousState, formData);
+        const result = await runEditorSave(previousState, () => saveShowreelSectionV2(previousState, formData), (response) => response.section === formData.get("section") && applySaveResult(response));
         latestSaveEventIdRef.current = result.eventId;
-        applySaveResult(result);
+        if (needsEditorReload(result)) archiveReloadRef.current = true;
         return result;
       } finally {
+        saveInFlight.current = false;
         setSavingSection(null);
       }
     },
@@ -947,18 +964,46 @@ export default function ShowreelEditor({
     [activeSection, draft]
   );
   const responseVisible =
-    Boolean(saveState.eventId) && saveState.eventId !== dismissedEventId;
+    needsEditorReload(saveState) || (Boolean(saveState.eventId) && saveState.eventId !== dismissedEventId);
   const responseErrors =
     responseVisible && saveState.section === activeSection
       ? saveState.fieldErrors || {}
       : {};
   const errors = mergeErrors(validation.errors, responseErrors);
-  const editorDisabled = disabled || pending;
+  const baseDisabled = disabled || migrationRequired || Boolean(loadError) || pending || needsEditorReload(saveState);
+  const archive = useVisualContentArchive({
+    collection: "showreel",
+    initialData: archiveData,
+    disabled: baseDisabled,
+    locks: { operation: archiveOperationRef, reload: archiveReloadRef, save: saveInFlight },
+    readActive: () => ({ items: draftRef.current.works.items, versions: versionsRef.current.works }),
+    isDirty: () => isShowreelSectionDirty(baselineRef.current, draftRef.current, "works"),
+    onReload: () => confirmDiscard(() => window.location.reload()),
+    onAdopt: (confirmed, message) => {
+      if (confirmed.collection !== "showreel") throw new Error("Wrong archive collection");
+      const nextDraft = { ...draftRef.current, works: confirmed.payload };
+      const nextBaseline = { ...baselineRef.current, works: confirmed.payload };
+      const nextVersions = { ...versionsRef.current, works: confirmed.versions };
+      draftRef.current = nextDraft;
+      baselineRef.current = nextBaseline;
+      versionsRef.current = nextVersions;
+      setDraft(nextDraft);
+      setBaseline(nextBaseline);
+      setVersions(nextVersions);
+      setMediaRevision(revision => revision + 1);
+      setAnnouncement(message);
+      if (latestSaveEventIdRef.current) setDismissedEventId(latestSaveEventIdRef.current);
+      if (getDirtyShowreelSections(nextBaseline, nextDraft).length) markDirty();
+      else clearDirty();
+    },
+  });
+  const editorDisabled = baseDisabled || archive.pending || archive.reloadRequired;
   const canSave = !editorDisabled && activeDirty && validation.ok;
   const statusIsError =
     responseVisible && !["idle", "saved"].includes(saveState.status);
 
   function commitDraft(next: ShowreelEditorDraft) {
+    if (archiveOperationRef.current === "mutation" || archiveReloadRef.current || saveInFlight.current) return;
     if (next === draftRef.current) return;
     draftRef.current = next;
     setDraft(next);
@@ -1012,7 +1057,7 @@ export default function ShowreelEditor({
   }
 
   function discardWork(id: string) {
-    if (id in versionsRef.current.works.items) return;
+    if (Object.hasOwn(versionsRef.current.works.items, id)) return;
     commitDraft({
       ...draftRef.current,
       works: {
@@ -1038,7 +1083,7 @@ export default function ShowreelEditor({
 
   const selectSection = useCallback(
     (section: ShowreelEditorSection, itemId?: string) => {
-      if (pending || savingSection) return;
+      if (pending || savingSection || archiveOperationRef.current === "mutation") return;
       setActiveSection(section);
       setFocusRequestId((value) => value + 1);
       if (window.matchMedia("(min-width: 1280px)").matches) {
@@ -1089,6 +1134,8 @@ export default function ShowreelEditor({
     errors,
     mediaRevision,
     savedWorkIds,
+    archiveControl: archive.control,
+    archivePanel: archive.panel,
     onAddWork: addWork,
     onDiscardWork: discardWork,
     onHeroChange: updateHero,
@@ -1097,7 +1144,11 @@ export default function ShowreelEditor({
     onWorkChange: updateWork,
   };
 
-  const statusLabel = pending
+  const statusLabel = archive.reloadRequired
+    ? "Reload required before further changes"
+    : archive.pending
+      ? "Updating Showreel archive..."
+      : pending
     ? `Saving ${SECTION_META[savingSection || activeSection].label}...`
     : disabled
       ? "Editor is read-only"
@@ -1125,7 +1176,7 @@ export default function ShowreelEditor({
                 : "Select a section in the preview or use the tabs above.";
 
   return (
-    <form action={formAction} data-unsaved-guard-bypass="true">
+    <form action={formAction} data-unsaved-guard-bypass="true" id="showreel-content-archive">
       <input name="section" readOnly type="hidden" value={activeSection} />
       <input
         name="payload"
@@ -1215,7 +1266,7 @@ export default function ShowreelEditor({
               <button
                 aria-pressed={active}
                 className={`relative min-h-10 shrink-0 rounded-xl border px-3 text-xs font-semibold transition ${active ? "border-[#ff583f]/32 bg-[#ff3b1f] text-white" : "border-white/9 bg-white/[0.035] text-white/48 hover:border-white/20 hover:text-white"}`}
-                disabled={pending}
+                disabled={pending || archive.pending}
                 key={section}
                 onClick={() => selectSection(section)}
                 type="button"
@@ -1331,6 +1382,7 @@ export default function ShowreelEditor({
                 ) : null}
               </fieldset>
               <div className="shrink-0 border-t border-white/9 bg-[#111113] p-4 shadow-[0_-18px_50px_rgba(0,0,0,0.34)]">
+                {archive.feedbackPanel}
                 <p className="text-xs font-semibold text-white/72">{statusLabel}</p>
                 <p className="mt-1 text-[11px] leading-5 text-white/38">
                   {responseVisible && saveState.status !== "idle"
@@ -1354,6 +1406,7 @@ export default function ShowreelEditor({
         </div>
       </dialog>
 
+      {archive.feedbackPanel}
       {responseVisible && saveState.status !== "idle" ? (
         <section
           className={`mt-4 rounded-[18px] border px-4 py-3 text-sm leading-6 ${saveState.status === "saved" ? "border-emerald-300/16 bg-emerald-400/[0.06] text-emerald-50/76" : "border-red-300/16 bg-red-400/[0.06] text-red-50/76"}`}
@@ -1368,7 +1421,7 @@ export default function ShowreelEditor({
               )}
               {saveState.message}
             </span>
-            {saveState.status === "conflict" ? (
+            {needsEditorReload(saveState) ? (
               <button
                 className="min-h-10 rounded-xl border border-red-100/16 px-3 text-xs font-semibold transition hover:bg-white hover:text-black"
                 onClick={reloadAfterConflict}

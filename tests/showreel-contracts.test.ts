@@ -146,6 +146,15 @@ describe("Batch 6C Showreel migration contract", () => {
 });
 
 describe("Showreel shared public and preview contract", () => {
+  it("keeps an intentionally empty catalog empty instead of reviving demo reels", () => {
+    const start = publicContentLoader.indexOf("function mapVideos");
+    const mapper = publicContentLoader.slice(start, publicContentLoader.indexOf("\nfunction normalizeVideoType", start));
+    expect(mapper).toContain("if (!rows.length) return [];");
+    expect(mapper).not.toContain("FALLBACK_CONTENT.videos");
+    expect(mapper).not.toContain("allowFallback");
+    expect(publicContentLoader).toContain("videos: mapVideos(videos.data ?? [])");
+  });
+
   it("renders the public page and editor preview through one page view", () => {
     expect(publicPage).toContain(
       'from "@/components/video/ShowreelPageView"'
@@ -255,9 +264,9 @@ describe("Admin V2 Showreel UI and V1 handoff contract", () => {
     expect(editor).toContain("VIDEO_TYPES.map");
     expect(editor).toContain("isPublished: !item.isPublished");
     expect(editor).toContain(
-      "if (id in versionsRef.current.works.items) return;"
+      "if (Object.hasOwn(versionsRef.current.works.items, id)) return;"
     );
-    expect(editor).toContain("Saved videos stay recoverable when hidden.");
+    expect(editor).toContain("Hide saved videos to keep them here, or archive");
     expect(editor).toContain("moveShowreelEditorItem");
     expect(editor).not.toContain("deleteShowreelVideo");
   });

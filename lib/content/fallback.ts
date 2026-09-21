@@ -1,8 +1,10 @@
 import type { PortfolioContent } from "./types";
 import { createMixedReviewNavigationConfig } from "./navigation";
+import { DEFAULT_FOOTER_CONTENT } from "./footer";
 
 export const FALLBACK_CONTENT: PortfolioContent = {
   settings: {
+    footerContent: DEFAULT_FOOTER_CONTENT,
     portfolioType: "musician",
     navigationConfigVersion: 1,
     hiddenNavPageSlugs: [],

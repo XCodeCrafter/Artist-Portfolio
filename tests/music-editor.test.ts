@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveSpotifyEmbedUrl,
+  createMusicPageViewDataFromEditor,
+  createFallbackMusicEditorSnapshot,
+  getMusicFieldErrors,
   getMusicSectionPayload,
   parseMusicHeroDraft,
   parseMusicPlatformsDraft,
@@ -69,6 +72,16 @@ const soundcloudDraft = {
 };
 
 describe("Admin V2 Music editor parsers", () => {
+  it("explains empty platform fields without exposing validator jargon", () => {
+    const result = parseMusicPlatformsDraft({ items: [{ ...platformsDraft.items[0], title: "", href: "", imageSrc: "" }] });
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    const errors = getMusicFieldErrors(result.error);
+    expect(errors["items.0.title"]).toContain("Add a title.");
+    expect(errors["items.0.href"]).toContain("Paste the destination URL.");
+    expect(errors["items.0.imageSrc"]).toContain("Choose a platform image from the Media Library.");
+    expect(JSON.stringify(errors)).not.toContain("Too small");
+  });
   it("accepts focused drafts and trims human-facing copy", () => {
     const hero = parseMusicHeroDraft({
       ...heroDraft,
@@ -127,7 +140,7 @@ describe("Admin V2 Music editor parsers", () => {
     expect(
       parseMusicSpotifyDraft({
         ...spotifyDraft,
-        embedUrl: "https://open.spotify.com/artist/1234567890",
+        embedUrl: "https://open.spotify.com/search/not-a-player",
       }).success
     ).toBe(false);
     expect(
@@ -138,7 +151,7 @@ describe("Admin V2 Music editor parsers", () => {
     ).toBe(false);
   });
 
-  it("derives the Spotify player URL from one normal artist link", () => {
+  it("derives an artist player only when requested and preserves the selected playlist on save", () => {
     expect(
       deriveSpotifyEmbedUrl(
         "https://open.spotify.com/artist/1234567890?si=share-token"
@@ -151,7 +164,7 @@ describe("Admin V2 Music editor parsers", () => {
           platforms: platformsDraft,
           spotify: {
             ...spotifyDraft,
-            embedUrl: "https://open.spotify.com/embed/playlist/outdated",
+            embedUrl: "https://open.spotify.com/embed/playlist/selected?theme=0",
           },
           soundcloud: soundcloudDraft,
         },
@@ -159,10 +172,44 @@ describe("Admin V2 Music editor parsers", () => {
       )
     ).toMatchObject({
       artistUrl: spotifyDraft.artistUrl,
-      embedUrl: "https://open.spotify.com/embed/artist/1234567890",
+      embedUrl: "https://open.spotify.com/embed/playlist/selected?theme=0",
     });
     expect(deriveSpotifyEmbedUrl("https://example.com/artist/123")).toBe("");
     expect(deriveSpotifyEmbedUrl("javascript:alert(1)")).toBe("");
+  });
+
+  it.each(["artist", "playlist", "album", "track", "show", "episode"])("normalizes a normal %s link before sending the existing RPC payload", (kind) => {
+    const parsed = parseMusicSectionSubmission("spotify", {
+      ...spotifyDraft,
+      embedUrl: `https://open.spotify.com/${kind}/chosen?si=share`,
+    }, { settingsUpdatedAt: UPDATED_AT, presentationUpdatedAt: PRESENTATION_UPDATED_AT });
+    expect(parsed).toMatchObject({ success: true, data: { payload: {
+      ...spotifyDraft, embedUrl: `https://open.spotify.com/embed/${kind}/chosen`,
+    } } });
+  });
+
+  it.each(["https://open.spotify.com/embed/playlist/chosen?theme=0&utm_source=generator", ""])("keeps chosen and intentionally empty players identical in preview and payload: %s", (embedUrl) => {
+    const snapshot = createFallbackMusicEditorSnapshot();
+    const draft = { ...snapshot.draft, spotify: { ...spotifyDraft, releasesHeading: "New heading", embedUrl } };
+    expect(getMusicSectionPayload(draft, "spotify")).toEqual(draft.spotify);
+    expect(createMusicPageViewDataFromEditor(draft, snapshot.footer).spotify.embedUrl).toBe(embedUrl);
+    expect(parseMusicSpotifyDraft(draft.spotify)).toMatchObject({ success: true, data: { embedUrl } });
+  });
+
+  it("blocks foreign URLs at both preview boundaries without replacing them with the artist player", () => {
+    const snapshot = createFallbackMusicEditorSnapshot();
+    const draft = { ...snapshot.draft, spotify: { ...spotifyDraft, embedUrl: "https://example.com/embed/track/123" } };
+    expect(parseMusicSpotifyDraft(draft.spotify).success).toBe(false);
+    expect(createMusicPageViewDataFromEditor(draft, snapshot.footer).spotify.embedUrl).toBe("");
+    const message = parseMusicPreviewUpdateMessage({ type: "music-preview-update", draft, footer: snapshot.footer, selectedSection: "spotify", focusRequestId: 0 });
+    expect(message).not.toBeNull();
+    expect(message?.draft.spotify.embedUrl).toBe("");
+  });
+
+  it("checks the database length limit after converting a normal link", () => {
+    const prefix = "https://open.spotify.com/track/";
+    const embedUrl = prefix + "a".repeat(2048 - prefix.length);
+    expect(parseMusicSpotifyDraft({ ...spotifyDraft, embedUrl }).success).toBe(false);
   });
 
   it("accepts SoundCloud track URLs and rejects unrelated or unsafe URLs", () => {

@@ -6,19 +6,21 @@ import {
   parseAppearanceEditorSnapshot,
   type AppearanceEditorSnapshot,
 } from "@/lib/admin/site-appearance-editor";
+import { DEFAULT_FOOTER_CONTENT } from "@/lib/content/footer";
 
 type DatabaseErrorLike = { code?: string | null; message?: string | null; details?: string | null; hint?: string | null };
 export function isMissingSiteAppearanceSchemaError(error?: DatabaseErrorLike | null) {
   if (!error) return false;
   const message = [error.message, error.details, error.hint].filter(Boolean).join(" ");
   return ["42703", "42P01", "PGRST204", "PGRST205"].includes(error.code || "")
-    && /site_settings|artist_name|display_font|body_font|ui_font|footer_effect|updated_at/i.test(message);
+    && /site_settings|artist_name|display_font|body_font|ui_font|footer_effect|footer_content|updated_at/i.test(message);
 }
 
 export type AdminAppearanceData = {
   snapshot: AppearanceEditorSnapshot;
   isConfigured: boolean;
   migrationRequired: boolean;
+  footerMigrationRequired?: boolean;
   loadError?: string;
 };
 
@@ -29,8 +31,10 @@ export async function getAdminAppearanceData(): Promise<AdminAppearanceData> {
   const supabase = createAdminServiceClient();
   if (!supabase) return { snapshot, isConfigured: false, migrationRequired: false };
 
+  // Read * so adding footer content does not disable existing name/font controls
+  // on deployments awaiting migration 0039. Missing legacy fields still fail closed.
   const { data, error } = await supabase.from("site_settings")
-    .select("artist_name,display_font,body_font,ui_font,footer_effect,updated_at")
+    .select("*")
     .eq("id", "main")
     .maybeSingle();
   if (error) {
@@ -47,6 +51,8 @@ export async function getAdminAppearanceData(): Promise<AdminAppearanceData> {
     draft: {
       name: { artistName: data.artist_name },
       appearance: { displayFont: data.display_font, bodyFont: data.body_font, uiFont: data.ui_font, footerEffect: data.footer_effect },
+      identity: { tagline: data.tagline, description: data.description, location: data.location, contactBlurb: data.contact_blurb },
+      footer: data.footer_content === undefined ? DEFAULT_FOOTER_CONTENT : data.footer_content,
     },
     versions: { updatedAt: data.updated_at },
   });
@@ -54,5 +60,5 @@ export async function getAdminAppearanceData(): Promise<AdminAppearanceData> {
     snapshot, isConfigured: true, migrationRequired: false,
     loadError: "The saved site settings are missing or invalid. Reload before editing; nothing can be saved from this view.",
   };
-  return { snapshot: confirmed, isConfigured: true, migrationRequired: false };
+  return { snapshot: confirmed, isConfigured: true, migrationRequired: false, footerMigrationRequired: data?.footer_content === undefined };
 }

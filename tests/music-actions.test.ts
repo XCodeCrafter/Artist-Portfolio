@@ -90,6 +90,34 @@ beforeEach(() => {
 });
 
 describe("Admin V2 Music section action", () => {
+  it.each([
+    ["https://open.spotify.com/embed/playlist/chosen?theme=0", "https://open.spotify.com/embed/playlist/chosen?theme=0"],
+    ["https://open.spotify.com/album/chosen?si=shared", "https://open.spotify.com/embed/album/chosen"],
+    ["", ""],
+  ])("keeps the selected player through validation, RPC and canonical save response: %s", async (input, expected) => {
+    const rpc = vi.fn(async () => ({ data: { versions: spotifyVersions }, error: null }));
+    actionMocks.createAdminServiceClient.mockReturnValue({ rpc });
+    const state = await saveMusicSectionV2(INITIAL_MUSIC_SAVE_STATE, validSpotifyForm({
+      payload: JSON.stringify({ ...spotifyPayload, releasesHeading: "New heading", embedUrl: input }),
+    }));
+    expect(state).toMatchObject({ status: "saved", canonicalSection: { releasesHeading: "New heading", embedUrl: expected } });
+    expect(rpc).toHaveBeenCalledWith("save_music_spotify_v2", expect.objectContaining({
+      p_expected_settings_updated_at: SETTINGS_UPDATED_AT,
+      p_expected_presentation_updated_at: PRESENTATION_UPDATED_AT,
+      p_payload: { ...spotifyPayload, releasesHeading: "New heading", embedUrl: expected },
+    }));
+  });
+
+  it("rejects a foreign player before invoking the database", async () => {
+    const rpc = vi.fn();
+    actionMocks.createAdminServiceClient.mockReturnValue({ rpc });
+    const state = await saveMusicSectionV2(INITIAL_MUSIC_SAVE_STATE, validSpotifyForm({
+      payload: JSON.stringify({ ...spotifyPayload, embedUrl: "https://example.com/embed/track/123" }),
+    }));
+    expect(state).toMatchObject({ status: "invalid", fieldErrors: { embedUrl: expect.any(Array) } });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("authenticates before opening a service-role client", async () => {
     actionMocks.requireAdmin.mockRejectedValueOnce(new Error("unauthorized"));
     actionMocks.createAdminServiceClient.mockReturnValue({ rpc: vi.fn() });

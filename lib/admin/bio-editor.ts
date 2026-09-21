@@ -394,6 +394,25 @@ export function parseBioCreditsDraft(value: unknown) {
   return bioCreditsDraftSchema.safeParse(value);
 }
 
+// Archive/restore preserve readable legacy portraits. Ordinary publishing
+// continues to require the stricter managed-media save schema above.
+export function parseBioCollectionSnapshotPayload(section: "biography" | "credits", value: unknown) {
+  if (section === "credits") {
+    const parsed = bioCreditsDraftSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+  }
+  const parsed = z.object({
+    topLabel: text(220), introText: text(6_000), caption: text(220),
+    galleryImages: z.array(snapshotGallerySchema.omit({ updatedAt: true })).max(32),
+    paragraphs: z.array(bioParagraphItemSchema).max(50),
+  }).strict().safeParse(value);
+  if (!parsed.success) return null;
+  for (const items of [parsed.data.galleryImages, parsed.data.paragraphs]) {
+    if (new Set(items.map((item) => item.id)).size !== items.length) return null;
+  }
+  return parsed.data;
+}
+
 function issueMap(error: z.ZodError) {
   const errors: Record<string, string[]> = {};
   for (const issue of error.issues) {

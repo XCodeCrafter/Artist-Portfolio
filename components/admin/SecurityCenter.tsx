@@ -211,15 +211,17 @@ function StatusNotice({
   );
 }
 
-function SecurityCheckCard({ check }: { check: SecurityCheck }) {
+export function SecurityCheckCard({ check }: { check: SecurityCheck }) {
   return (
     <div className={itemClass}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-semibold text-white">{check.label}</h3>
         <span
           className={`rounded-md border px-2 py-1 text-xs ${
             check.verification === "implemented"
               ? "border-sky-300/20 bg-sky-400/[0.07] text-sky-100/72"
+              : check.status === "unknown"
+                ? "border-amber-300/25 bg-amber-500/10 text-amber-100"
               : check.ok
                 ? "border-emerald-300/25 bg-emerald-500/10 text-emerald-100"
                 : "border-red-300/25 bg-red-500/10 text-red-100"
@@ -227,12 +229,15 @@ function SecurityCheckCard({ check }: { check: SecurityCheck }) {
         >
           {check.verification === "implemented"
             ? "Implemented"
+            : check.status === "unknown"
+              ? "Not verified"
             : check.ok
               ? "Verified"
               : "Needs attention"}
         </span>
       </div>
       <p className="mt-3 text-sm leading-6 text-white/55">{check.detail}</p>
+      {check.critical === false ? <p className="mt-2 text-xs text-white/35">Optional setup</p> : null}
     </div>
   );
 }
@@ -252,6 +257,12 @@ function CheckGrid({ checks }: { checks: SecurityCheck[] }) {
       <div className="mb-5">
         <p className={labelClass}>Configuration</p>
         <h2 className="heading-ui mt-2 text-2xl text-white">Security Health</h2>
+        <p className="mt-2 text-sm leading-6 text-white/50">
+          Read-only checks for this environment. Not verified means the result
+          is unknown, not that the setting is wrong. A passing configuration
+          check does not prove email delivery, scheduled cleanup or publishing.
+          Refresh this page to check again; no settings are changed here.
+        </p>
       </div>
       {attentionChecks.length ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -262,9 +273,9 @@ function CheckGrid({ checks }: { checks: SecurityCheck[] }) {
       ) : null}
       <AdminDisclosure
         className={attentionChecks.length ? "mt-4" : ""}
-        description="Live verification and built-in code coverage stay explicitly separated."
+        description="Read the scope of each result. Configuration and read access are not end-to-end production tests."
         id="passing-security-checks"
-        title={`${verifiedChecks.length} live verified · ${builtInChecks.length} built-in`}
+        title={`${verifiedChecks.length} checks passed · ${builtInChecks.length} built-in`}
         variant="advanced"
       >
         <div className="grid gap-4 md:grid-cols-2">
@@ -967,7 +978,7 @@ function AuditLogSection({
   );
 }
 
-function SecurityPosture({
+export function SecurityPosture({
   checks,
   profiles,
   summary,
@@ -984,6 +995,8 @@ function SecurityPosture({
   );
   const verified = liveChecks.filter((check) => check.ok).length;
   const attention = liveChecks.length - verified;
+  const unknown = liveChecks.filter((check) => check.status === "unknown").length;
+  const failed = attention - unknown;
   const score = liveChecks.length
     ? Math.round((verified / liveChecks.length) * 100)
     : 0;
@@ -1000,16 +1013,16 @@ function SecurityPosture({
         <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.09),transparent_67%)]" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className={labelClass}>Live security posture</p>
+            <p className={labelClass}>Configuration and runtime checks</p>
             <h2 className="heading-ui mt-2 text-2xl font-semibold text-white">
-              {attention ? "Attention recommended" : "Portfolio protected"}
+              {attention ? "Review recommended" : "Checks passing"}
             </h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-white/46">
               {attention
-                ? `${attention} live check${attention === 1 ? "" : "s"} need review.`
-                : "Every live runtime check is passing."}
-              {" "}Built-in controls are reported separately and never pad
-              this score.
+                ? `${failed} need attention · ${unknown} not verified.`
+                : "All listed checks passed within their stated scope."}
+              {" "}This is check coverage, not a security guarantee. Built-in
+              controls are reported separately.
             </p>
           </div>
           <div
@@ -1024,7 +1037,7 @@ function SecurityPosture({
                   {score}%
                 </span>
                 <span className="text-[9px] uppercase tracking-[0.12em] text-white/32">
-                  live
+                  checks
                 </span>
               </span>
             </div>
@@ -1034,7 +1047,7 @@ function SecurityPosture({
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
         <div className="rounded-[18px] border border-white/9 bg-white/[0.04] p-4">
-          <p className={labelClass}>Live verified</p>
+          <p className={labelClass}>Checks passed</p>
           <p className="mt-3 text-3xl font-semibold text-white">
             {verified}/{liveChecks.length}
           </p>

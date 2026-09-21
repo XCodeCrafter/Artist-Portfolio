@@ -13,14 +13,14 @@ const exampleEnv = readFileSync(
 describe("Batch 7A media configuration readiness", () => {
   it("probes the additive media-pipeline schema without reading private tables", () => {
     expect(readinessSource).toContain(
-      'supabase.rpc("get_media_pipeline_v1_snapshot", {'
+      'client.rpc("get_media_pipeline_v1_snapshot", {'
     );
     expect(readinessSource).toContain('p_asset_id: "~schema-probe"');
     expect(readinessSource).toContain(
-      'mediaPipelineResult.error.code === "23503"'
+      'errorCode(pipeline.error) === "23503"'
     );
     expect(readinessSource).toContain(
-      '"Apply all current Supabase migrations through 0038, including Home V2 and admin session hardening."'
+      'footer content (0039) and Media usage (0040)'
     );
     expect(readinessSource).not.toContain(
       '.from("media_physical_objects")'

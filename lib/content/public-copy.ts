@@ -12,11 +12,16 @@ export function isSingleDisciplineCopy(value?: string | null) {
   return mentionsMusic !== mentionsActing;
 }
 
-/** Keeps custom generic/mixed copy while shielding public pages from old one-track defaults. */
+/** Saved owner copy is authoritative. Discipline detection must never rewrite it. */
 export function getMixedPublicCopy(
   value: string | null | undefined,
   fallback: string
 ) {
   const text = (value || "").replace(/\s+/g, " ").trim();
-  return !text || isSingleDisciplineCopy(text) ? fallback : text;
+  return text || fallback;
+}
+
+/** Missing legacy copy uses a default; an explicitly cleared optional field stays hidden. */
+export function getOptionalPublicCopy(value: string | null | undefined, fallback: string) {
+  return value == null ? fallback : value.replace(/\s+/g, " ").trim();
 }

@@ -25,6 +25,7 @@ export default async function AdminV2SecurityPage({
   const activeAdminCount = security.profiles.filter(
     (profile) => profile.isActive
   ).length;
+  const unknownCount = security.checks.filter((check) => check.status === "unknown").length;
   const healthy =
     security.isConfigured && !security.loadError && attentionCount === 0;
 
@@ -44,14 +45,14 @@ export default async function AdminV2SecurityPage({
                 }`}
               >
                 {healthy ? <FaCheckCircle /> : <FaExclamationTriangle />}
-                {healthy ? "Protection healthy" : "Review recommended"}
+                {healthy ? "Checks passing" : "Review recommended"}
               </span>
             </div>
             <h1 className="heading-ui mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
               Security &amp; access
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-white/48">
-              See whether protection is healthy, who can enter the dashboard,
+              Review configuration, who can enter the dashboard,
               and what needs attention. Start with Overview; technical checks
               stay out of the way under Advanced.
             </p>
@@ -64,7 +65,7 @@ export default async function AdminV2SecurityPage({
                 {attentionCount}
               </p>
               <p className="mt-1 text-[10px] leading-4 text-white/38">
-                live checks need attention
+                checks to review · {unknownCount} not verified
               </p>
             </div>
             <div className="min-w-0 rounded-2xl border border-white/9 bg-black/24 p-3.5">

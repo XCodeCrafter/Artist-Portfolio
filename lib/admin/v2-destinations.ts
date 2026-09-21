@@ -19,6 +19,22 @@ export type AdminV2Destination = {
  */
 export const ADMIN_V2_DESTINATIONS = [
   {
+    id: "media",
+    label: "Media library",
+    description: "Upload photos and videos, edit file details, check usage, replace and remove files.",
+    href: "/admin/v2/media",
+    group: "Site-wide settings",
+    keywords: ["media", "upload", "storage", "file", "files", "trash", "delete", "remove", "uloziste", "nahrat", "smazat"],
+  },
+  {
+    id: "cnc-programs",
+    label: "Code in motion programs",
+    description: "HOME code preview, program source, order and visibility.",
+    href: "/admin/v2/pages/home/programs",
+    group: "Portfolio pages",
+    keywords: ["cnc", "code", "program", "programs", "controller", "source"],
+  },
+  {
     id: "home",
     label: "Home page",
     description: "Home section order, visibility, text, and images with a live preview.",
@@ -208,8 +224,8 @@ export const ADMIN_V2_DESTINATIONS = [
   },
   {
     id: "brand",
-    label: "Fonts & appearance",
-    description: "Headline, body, and UI fonts, with a live footer effect preview.",
+    label: "Appearance, identity & footer",
+    description: "Fonts, site tagline and description, footer content and light effect with a live preview.",
     href: "/admin/v2/settings/appearance",
     group: "Site-wide settings",
     badge: "V2",
@@ -218,12 +234,14 @@ export const ADMIN_V2_DESTINATIONS = [
       "font",
       "fonts",
       "typography",
-      "color",
-      "colours",
+      "tagline",
+      "description",
+      "identity",
+      "seo",
       "style",
       "footer",
       "pismo",
-      "barvy",
+      "paticka",
     ],
   },
   {

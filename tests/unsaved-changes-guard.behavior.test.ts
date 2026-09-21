@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const reactHarness = vi.hoisted(() => ({
   cleanups: [] as Array<() => void>,
+  confirm: vi.fn<(...args: unknown[]) => Promise<boolean>>(),
+}));
+
+vi.mock("@/components/admin/discardConfirmation", () => ({
+  requestDiscardConfirmation: reactHarness.confirm,
 }));
 
 vi.mock("react", () => ({
@@ -258,6 +263,7 @@ let fakeDocument: FakeDocument;
 let fakeWindow: FakeWindow;
 
 beforeEach(() => {
+  reactHarness.confirm.mockReset().mockResolvedValue(false);
   fakeDocument = new FakeDocument();
   fakeWindow = new FakeWindow();
 
@@ -285,6 +291,81 @@ function renderGuard(guardOtherFormSubmissions = false) {
 }
 
 describe("useUnsavedChangesGuard behavior", () => {
+  it("keeps a draft while confirmation is open and after cancellation", async () => {
+    const guard = renderGuard();
+    const continuation = vi.fn();
+    guard.markDirty();
+    expect(guard.confirmDiscard(continuation)).toBe(false);
+    expect(continuation).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(continuation).not.toHaveBeenCalled();
+    expect(fakeWindow.history.back).not.toHaveBeenCalled();
+    const unload = new FakeEvent();
+    fakeWindow.dispatch("beforeunload", unload);
+    expect(unload.defaultPrevented).toBe(true);
+    expect(fakeWindow.confirm).not.toHaveBeenCalled();
+  });
+
+  it("waits for async acceptance and history compaction before continuing", async () => {
+    const guard = renderGuard();
+    const continuation = vi.fn();
+    reactHarness.confirm.mockResolvedValue(true);
+    guard.markDirty();
+    guard.confirmDiscard(continuation);
+    guard.confirmDiscard(vi.fn());
+    expect(reactHarness.confirm).toHaveBeenCalledTimes(1);
+    expect(continuation).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(continuation).not.toHaveBeenCalled();
+    fakeWindow.history.flushNextTraversal();
+    expect(continuation).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the guarded entry before prompting for browser Back", async () => {
+    const guard = renderGuard();
+    guard.markDirty();
+    fakeWindow.history.back();
+    fakeWindow.history.flushNextTraversal();
+    expect(reactHarness.confirm).not.toHaveBeenCalled();
+    expect(fakeWindow.history.forward).toHaveBeenCalledTimes(1);
+    fakeWindow.history.flushNextTraversal();
+    expect(reactHarness.confirm).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    expect(fakeWindow.history.state.__portfolioEditorGuard).toBeTruthy();
+    expect(fakeWindow.location.pathname).toBe("/admin/v2/pages/music");
+  });
+
+  it("replays a confirmed foreign form once with its original submitter", async () => {
+    const guard = renderGuard(true);
+    const form = new FakeForm(fakeDocument);
+    const submitter = new FakeButton();
+    submitter.form = form;
+    reactHarness.confirm.mockResolvedValue(true);
+    guard.markDirty();
+    const event = new FakeEvent();
+    event.target = form;
+    event.submitter = submitter;
+    fakeDocument.dispatch("submit", event);
+    expect(event.defaultPrevented).toBe(true);
+    await Promise.resolve();
+    fakeWindow.history.flushNextTraversal();
+    expect(form.requestSubmit).toHaveBeenCalledExactlyOnceWith(submitter);
+    expect(form.observedResubmissionFlags).toEqual(["true"]);
+  });
+
+  it("aborts a pending confirmation on unmount without navigating", async () => {
+    const guard = renderGuard();
+    const continuation = vi.fn();
+    reactHarness.confirm.mockResolvedValue(true);
+    guard.markDirty();
+    guard.confirmDiscard(continuation);
+    const signal = reactHarness.confirm.mock.calls[0][1] as AbortSignal;
+    reactHarness.cleanups.splice(0).forEach((cleanup) => cleanup());
+    expect(signal.aborted).toBe(true);
+    await Promise.resolve();
+    expect(continuation).not.toHaveBeenCalled();
+  });
+
   it("arms one base and one guard entry when marked dirty", () => {
     const guard = renderGuard();
 

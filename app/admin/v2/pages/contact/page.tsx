@@ -2,15 +2,17 @@ import ContactEditor from "@/components/admin/v2/ContactEditor";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminContactEditorData } from "@/lib/admin/contact";
 import { getMediaAssets } from "@/lib/admin/media";
+import { getContactCopyCapability } from "@/lib/admin/contact-copy";
 
 export const metadata = { title: "Contact page · Admin V2" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminV2ContactPage() {
   await requireAdmin();
-  const [contact, media] = await Promise.all([
+  const [contact, media, optionalCopy] = await Promise.all([
     getAdminContactEditorData(),
     getMediaAssets(),
+    getContactCopyCapability(),
   ]);
 
   return (
@@ -36,6 +38,7 @@ export default async function AdminV2ContactPage() {
       </header>
 
       <ContactEditor
+        optionalCopy={optionalCopy}
         assets={media.assets}
         delivery={contact.delivery}
         disabled={

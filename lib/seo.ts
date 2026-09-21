@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
 import type { PageSlug, PortfolioContent } from "@/lib/content";
-import { isSingleDisciplineCopy } from "@/lib/content/public-copy";
 import {
   getSiteUrl,
   isNonProductionVercelDeployment,
 } from "@/lib/site-url";
 
 export type PublicSeoPage = PageSlug | "privacy" | "terms";
-
-const STALE_FALLBACK_NAME = "franky fugazi";
 
 const PAGE_PATHS: Record<PublicSeoPage, string> = {
   home: "/",
@@ -75,22 +72,15 @@ export function getSeoIdentity(content: PortfolioContent) {
   const personName = cleanText(content.heroes.home.title) || brandName;
   const location = cleanText(content.settings.location);
   const configuredDescription = cleanText(content.settings.description);
-  const staleDescription =
-    (normalizeIdentity(configuredDescription).includes(STALE_FALLBACK_NAME) &&
-      !normalizeIdentity(brandName).includes(STALE_FALLBACK_NAME) &&
-      !normalizeIdentity(personName).includes(STALE_FALLBACK_NAME)) ||
-    isSingleDisciplineCopy(configuredDescription);
-  const description =
-    !configuredDescription || staleDescription
-      ? neutralSiteDescription(location)
-      : configuredDescription;
+  // The owner controls saved copy. Demo cleanup belongs in an explicit migration,
+  // never a rendering heuristic that silently rewrites custom descriptions.
+  const description = configuredDescription || neutralSiteDescription(location);
 
   return {
     brandName,
     description,
     location,
     personName,
-    staleDescription,
   };
 }
 

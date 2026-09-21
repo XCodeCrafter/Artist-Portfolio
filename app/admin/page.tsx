@@ -136,7 +136,7 @@ function ReadinessPanel({ readiness }: { readiness: ProductionReadiness }) {
   return (
     <section className={panelClass}>
       <div className="flex items-start justify-between gap-4">
-        <div><p className={labelClass}>Production readiness</p><h2 className="heading-ui mt-2 text-xl font-semibold text-white">{readiness.ready ? "Ready for visitors" : "Action required"}</h2><p className="mt-2 text-sm text-white/42">{passed} of {critical.length} critical live checks pass.</p></div>
+        <div><p className={labelClass}>Production readiness</p><h2 className="heading-ui mt-2 text-xl font-semibold text-white">{readiness.ready ? "Listed checks pass" : "Review required"}</h2><p className="mt-2 text-sm text-white/42">{passed} of {critical.length} critical checks pass · {readiness.criticalUnknown} not verified.</p></div>
         <span className={`text-2xl ${readiness.ready ? "text-emerald-300" : "text-amber-300"}`}>{percentage}%</span>
       </div>
       <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className={readiness.ready ? "h-full rounded-full bg-emerald-300/78" : "h-full rounded-full bg-amber-300/78"} style={{ width: `${percentage}%` }} /></div>
@@ -145,7 +145,7 @@ function ReadinessPanel({ readiness }: { readiness: ProductionReadiness }) {
           {failed.slice(0, 3).map((check) => <Link className="flex items-center justify-between gap-3 rounded-xl border border-amber-300/12 bg-amber-400/[0.045] px-3 py-2.5 text-xs text-amber-100/68 transition hover:bg-amber-400/[0.08]" href={check.href} key={check.id}><span className="truncate">{check.label}</span><FaArrowRight /></Link>)}
           {failed.length > 3 ? <Link className="text-center text-[10px] font-semibold text-white/38 hover:text-white" href="/admin/security#health">+ {failed.length - 3} more critical checks</Link> : null}
         </div>
-      ) : <p className="mt-4 text-xs text-emerald-100/52">URL, database, storage, access, email, and rate limits are verified.</p>}
+      ) : <p className="mt-4 text-xs text-emerald-100/52">Configuration and read-only checks passed. Publishing, delivery and scheduled cleanup still require separate testing.</p>}
     </section>
   );
 }

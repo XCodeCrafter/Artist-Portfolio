@@ -1,5 +1,6 @@
 // artist-portfolio/app/layout.tsx
 import "@/styles/globals.css";
+import "@/styles/privacy.css";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { connection } from "next/server";
@@ -8,6 +9,8 @@ import AnalyticsTracker from "@/components/AnalyticsTracker";
 import ScrollReveal from "@/components/ScrollReveal";
 import SmoothScroll from "@/components/SmoothScroll";
 import TopNav from "@/components/TopNav";
+import FooterContentProvider from "@/components/FooterContentProvider";
+import PrivacyProvider from "@/components/privacy/PrivacyProvider";
 import { getPortfolioContent } from "@/lib/content";
 import { getVisiblePublicPageNavigationItems } from "@/lib/content/navigation";
 import { hasPublishedCncPrograms } from "@/lib/content/cnc-programs.server";
@@ -71,6 +74,7 @@ export default async function RootLayout({
         <link href={typographyStylesheet} rel="stylesheet" />
       </head>
       <body className="min-h-screen antialiased">
+        <PrivacyProvider>
         <AnalyticsTracker />
         <SmoothScroll />
         <ScrollReveal />
@@ -83,8 +87,9 @@ export default async function RootLayout({
         />
 
         <div className="relative z-10">
-          <MotionShell>{children}</MotionShell>
+          <FooterContentProvider content={content.settings.footerContent}><MotionShell>{children}</MotionShell></FooterContentProvider>
         </div>
+        </PrivacyProvider>
       </body>
     </html>
   );

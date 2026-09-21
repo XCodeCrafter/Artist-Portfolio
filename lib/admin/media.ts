@@ -186,7 +186,7 @@ export async function getMediaAssets(options?: {
   return {
     assets: (data || [])
       .map(mapAsset)
-      .filter((asset) => options?.includeDeleted || !asset.deletedAt),
+      .filter((asset) => options?.includeDeleted || (!asset.deletedAt && asset.isPublished)),
     isConfigured: true,
   };
 }

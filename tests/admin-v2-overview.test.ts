@@ -126,7 +126,9 @@ describe("Admin V2 task-first overview", () => {
     expect(overviewLoader).toContain("await requireAdmin()");
     expect(overviewLoader).toContain("getAdminMusicEditorData()");
     expect(overviewLoader).toContain("getAdminNewInquiryCount()");
-    expect(overviewLoader).not.toContain("getProductionReadiness");
+    expect(overviewLoader).toContain("getAdminAppearanceData()");
+    expect(overviewLoader).toContain("getMediaLibraryV2Data()");
+    expect(overviewLoader).toContain("getProductionReadiness({ includeSchema: false })");
     expect(overviewLoader).not.toContain("getSecurityCenterData");
     expect(overviewLoader).not.toContain("getAnalyticsSummary");
   });
@@ -166,6 +168,9 @@ describe("Admin V2 task-first overview", () => {
     expect(overviewLoader).toContain('key: "music"');
     expect(overviewPage).not.toContain("Workspace status");
     expect(overviewPage).not.toContain("V1 remains available for every existing editor");
+    expect(overviewPage).not.toContain("Everything is ready");
+    expect(overviewPage).toContain("No setup issues found");
+    expect(overviewPage).toContain("This is not a full production test");
     expect(overviewPage.indexOf('id="dashboard-next-actions"')).toBeLessThan(
       overviewPage.lastIndexOf("<DashboardDestinationFinder")
     );
@@ -180,7 +185,10 @@ describe("Admin V2 Settings information architecture", () => {
   });
 
   it("groups brand, access, security, audit, and technical health", () => {
-    expect(settingsPage).toContain("Fonts &amp; appearance");
+    expect(settingsPage).toContain("Appearance, profile &amp; footer");
+    expect(settingsPage).toContain("footer headings and buttons");
+    expect(settingsPage).toContain("Owner name &amp; navigation");
+    expect(settingsPage).toContain('href="/admin/v2/navigation"');
     expect(settingsPage).toContain('href="/admin/v2/settings/appearance"');
     expect(settingsPage).toContain('href="/admin/v2/security#access"');
     expect(settingsPage).toContain('href="/admin/v2/security#activity"');

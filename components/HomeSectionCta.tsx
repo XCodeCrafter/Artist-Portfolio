@@ -20,6 +20,7 @@ export default function HomeSectionCta({
     <Link
       className={`group inline-flex items-center gap-5 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--accent)] transition-colors duration-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/45 ${className}`}
       href={href}
+      data-analytics-event="cta_click"
     >
       <span>{label}</span>
       <span

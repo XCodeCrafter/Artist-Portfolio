@@ -31,6 +31,7 @@ vi.mock("resend", () => ({
 }));
 
 import { POST as postBooking } from "../app/api/booking/route";
+import { serializeConsentCookie } from "@/lib/privacy/consent";
 
 type DatabaseResult = {
   data: unknown;
@@ -103,6 +104,7 @@ function bookingRequest(
       "content-type": "application/json",
       origin: "https://portfolio.example",
       "user-agent": "Mozilla/5.0 ContactFormTest",
+      cookie: serializeConsentCookie({ analytics: true, externalMedia: false }, false),
       ...headers,
     },
     body: JSON.stringify({
@@ -129,6 +131,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("VERCEL", "");
+  vi.stubEnv("VERCEL_ENV", "");
   vi.stubEnv("SITE_URL", "https://portfolio.example");
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://portfolio.example");
   vi.stubEnv("RESEND_API_KEY", "");
@@ -144,6 +147,23 @@ afterEach(() => {
 });
 
 describe("POST /api/booking", () => {
+  it("still accepts essential contact submissions without analytics consent", async () => {
+    const service = createServiceFixture();
+    routeMocks.createAdminServiceClient.mockReturnValue(service.client);
+    const response = await postBooking(bookingRequest({}, { cookie: "" }));
+    expect(response.status).toBe(202);
+    expect(service.inquiryInsert).toHaveBeenCalledTimes(1);
+    expect(service.analyticsInsert).not.toHaveBeenCalled();
+  });
+
+  it("keeps refused analytics out of the event store while preserving the inbox", async () => {
+    const service = createServiceFixture();
+    routeMocks.createAdminServiceClient.mockReturnValue(service.client);
+    const response = await postBooking(bookingRequest({}, { cookie: serializeConsentCookie({ analytics: false, externalMedia: true }, false) }));
+    expect(response.status).toBe(202);
+    expect(service.inquiryInsert).toHaveBeenCalledTimes(1);
+    expect(service.analyticsInsert).not.toHaveBeenCalled();
+  });
   it("accepts an inbox-persisted inquiry when email is not configured", async () => {
     const service = createServiceFixture();
     routeMocks.createAdminServiceClient.mockReturnValue(service.client);

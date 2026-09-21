@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { FALLBACK_CONTENT } from "./fallback";
+import { normalizeFooterContent } from "./footer";
 import { PAGE_SLUGS, normalizeHiddenNavPageSlugs } from "./modules";
 import {
   normalizeBodyFont,
@@ -46,6 +47,7 @@ import type {
 } from "./types";
 
 type SiteSettingsRow = {
+  footer_content?: unknown;
   portfolio_type?: string | null;
   navigation_config_version?: number | null;
   hidden_nav_page_slugs_actor?: unknown;
@@ -216,6 +218,7 @@ function mapSettings(row?: SiteSettingsRow): SiteSettings {
         : row.hidden_nav_page_slugs_musician
     ),
     footerEffect: normalizeFooterEffect(row.footer_effect),
+    footerContent: normalizeFooterContent(row.footer_content),
     artistName: row.artist_name,
     displayFont: normalizeDisplayFont(row.display_font),
     bodyFont: normalizeBodyFont(row.body_font),
@@ -443,8 +446,10 @@ function mapBioParagraphs(rows: BioParagraphRow[]): BioParagraph[] {
   }));
 }
 
-function mapVideos(rows: VideoRow[], allowFallback = true): VideoItem[] {
-  if (!rows.length) return allowFallback ? FALLBACK_CONTENT.videos : [];
+function mapVideos(rows: VideoRow[]): VideoItem[] {
+  // A successful empty catalog is intentional (hidden or archived), not a
+  // reason to resurrect demo reels. Whole-site offline fallback stays separate.
+  if (!rows.length) return [];
 
   return rows.map((row) => ({
     id: row.id,
@@ -732,7 +737,7 @@ async function readSupabaseContent(
     videoPresentation: mapVideoPresentation(
       videoPresentationAsset.data?.[0]?.metadata
     ),
-    videos: mapVideos(videos.data ?? [], allowFallback),
+    videos: mapVideos(videos.data ?? []),
     hasActorResume: Boolean(actorResume.data?.[0]),
     actorResume: mapActorResume(actorResume.data?.[0]),
     actorCredits: mapActorCredits(actorCredits.data ?? []),

@@ -57,10 +57,16 @@ describe("Admin V2 Contact editor parsers", () => {
     );
   });
 
-  it("requires visible details and enforces their storage limits", () => {
+  it("allows empty optional details and enforces their storage limits", () => {
     expect(
       parseContactDetailsDraft({ location: "", contactBlurb: "" }).success
-    ).toBe(false);
+    ).toBe(true);
+    expect(parseContactDetailsDraft({ location: " \t ", contactBlurb: " \n " })).toMatchObject({
+      success: true, data: { location: "", contactBlurb: "" },
+    });
+    for (const invalid of [{ location: null, contactBlurb: "" }, { location: "" }, { location: "", contactBlurb: 0 }]) {
+      expect(parseContactDetailsDraft(invalid).success).toBe(false);
+    }
     expect(
       parseContactDetailsDraft({
         location: "x".repeat(221),

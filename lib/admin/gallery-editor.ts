@@ -393,6 +393,13 @@ export function parseGallerySectionSubmission(
   };
 }
 
+// Archive responses reuse readable legacy rows, not the stricter save rules.
+export function parseGalleryArchivePayload(value: unknown): GalleryFramesDraft | null {
+  const parsed = z.object({ items: z.array(snapshotFrameSchema.omit({ updatedAt: true })).max(120) }).strict().safeParse(value);
+  if (!parsed.success || new Set(parsed.data.items.map(item => item.id)).size !== parsed.data.items.length) return null;
+  return parsed.data;
+}
+
 export function parseGalleryEditorSnapshot(
   value: unknown
 ): GalleryEditorSnapshot | null {
