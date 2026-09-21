@@ -25,7 +25,7 @@ vi.mock("react", async (original) => {
 });
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
 vi.mock("@/app/admin/v2/media/actions", () => ({ saveMediaDetailsV2: mocks.save, mutateMediaAssetV2: mocks.mutate }));
-vi.mock("@/app/admin/media/actions", () => ({ prepareMediaUpload: vi.fn(), finalizeMediaUpload: vi.fn() }));
+vi.mock("@/lib/admin/media-upload-actions", () => ({ prepareMediaUpload: vi.fn(), finalizeMediaUpload: vi.fn() }));
 vi.mock("@/components/admin/useUnsavedChangesGuard", () => ({ default: () => ({
   hasUnsavedChanges: mocks.dirty, markDirty: mocks.markDirty, clearDirty: mocks.clearDirty, confirmDiscard: mocks.confirmDiscard,
 }) }));

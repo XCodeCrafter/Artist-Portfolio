@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useMemo, useRef, useState } from "react";
+import HeroMedia from "@/components/HeroMedia";
+import { normalizeHeroFraming, type HeroFraming } from "@/lib/content/hero-framing";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -14,6 +16,7 @@ type Props = {
   ctaHref: string;
   backgroundSrc: string;
   subtitle?: string;
+  framing?: HeroFraming | null;
 
   /**
    * Optional: override background focal point (object-position).
@@ -31,9 +34,11 @@ export default function HeroCinematic({
   ctaHref,
   backgroundSrc,
   subtitle,
+  framing,
   bgPosMobile = "50% 20%",
   bgPosDesktop = "50% 50%",
 }: Props) {
+  const customFraming = normalizeHeroFraming(framing);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState<number | null>(null);
 
@@ -109,36 +114,40 @@ export default function HeroCinematic({
     >
       {/* BG */}
       <div className="absolute inset-0">
-        <Image
-          src={backgroundSrc}
-          alt=""
-          aria-hidden="true"
-          fill
-          priority
-          sizes="100vw"
-          className={[
-            "object-cover",
-            // ✅ Mobile: no zoom (show MORE). Desktop: slight cinematic zoom if you want it.
-            "scale-100 sm:scale-[1.02] lg:scale-[1.04]",
-          ].join(" ")}
-          style={{
-            objectPosition: bgPosMobile,
-          }}
-        />
+        {customFraming ? (
+          <HeroMedia backgroundSrc={backgroundSrc} framing={customFraming} mediaType="image" />
+        ) : (
+          <>
+            <Image
+              src={backgroundSrc}
+              alt=""
+              aria-hidden="true"
+              fill
+              priority
+              sizes="100vw"
+              className={[
+                "object-cover",
+                // Preserve the original framing until the owner configures it.
+                "scale-100 sm:scale-[1.02] lg:scale-[1.04]",
+              ].join(" ")}
+              style={{ objectPosition: bgPosMobile }}
+            />
 
-        {/* Desktop focal point override (separate layer for responsive objectPosition) */}
-        <div className="pointer-events-none absolute inset-0 hidden sm:block">
-          <Image
-            src={backgroundSrc}
-            alt=""
-            aria-hidden="true"
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-            style={{ objectPosition: bgPosDesktop }}
-          />
-        </div>
+            {/* Preserve the original desktop focal-point layer for existing content. */}
+            <div className="pointer-events-none absolute inset-0 hidden sm:block">
+              <Image
+                src={backgroundSrc}
+                alt=""
+                aria-hidden="true"
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover"
+                style={{ objectPosition: bgPosDesktop }}
+              />
+            </div>
+          </>
+        )}
 
         <div className="absolute inset-0 bg-black/35" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/80" />

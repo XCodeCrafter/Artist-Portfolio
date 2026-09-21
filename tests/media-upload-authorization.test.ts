@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { finalizeMediaUpload, prepareMediaUpload, updateMediaAsset } from "@/app/admin/media/actions";
+import { finalizeMediaUpload, prepareMediaUpload } from "@/lib/admin/media-upload-actions";
+import {
+  updateMediaAsset,
+  prepareMediaUpload as prepareClassicMediaUpload,
+  finalizeMediaUpload as finalizeClassicMediaUpload,
+} from "@/app/admin/media/actions";
+import { revalidatePath } from "next/cache";
 
 const mocks = vi.hoisted(() => ({
   requireAdmin: vi.fn(async () => ({ id: "admin-one" })),
@@ -69,6 +75,54 @@ describe("Supabase upload finalization authority", () => {
     expect(await finalizeMediaUpload(ticket)).toEqual({ ok: true });
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ id: ticket.id, file_size: 8 }));
     expect(storage.remove).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/v2/media");
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/media");
+    expect(revalidatePath).toHaveBeenCalledWith("/gallery");
+  });
+
+  it("keeps Classic compatibility tickets interchangeable with the shared actions", async () => {
+    const { insert } = setupClient();
+    const prepared = await prepareClassicMediaUpload(details);
+    if (!prepared.ok) throw new Error(prepared.error);
+    expect(await finalizeMediaUpload(prepared.ticket)).toEqual({ ok: true });
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ id: prepared.ticket.id }));
+
+    const sharedTicket = await prepare();
+    expect(await finalizeClassicMediaUpload(sharedTicket)).toEqual({ ok: true });
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ id: sharedTicket.id }));
+  });
+
+  it.each([
+    ["prepare", prepareMediaUpload], ["finalize", finalizeMediaUpload],
+    ["Classic prepare", prepareClassicMediaUpload], ["Classic finalize", finalizeClassicMediaUpload],
+  ])("returns an origin error from %s before accessing storage", async (_label, action) => {
+    const { client } = setupClient();
+    mocks.verifyOrigin.mockResolvedValue(false);
+    expect(await action(details)).toEqual({
+      ok: false,
+      error: "The request origin was blocked. Refresh the admin and try again.",
+    });
+    expect(mocks.requireAdmin).toHaveBeenCalledTimes(1);
+    expect(mocks.verifyOrigin).toHaveBeenCalledWith("admin-one", "media");
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(client.storage.listBuckets).not.toHaveBeenCalled();
+    expect(client.storage.from).not.toHaveBeenCalled();
+    expect(client.from).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["prepare", prepareMediaUpload], ["finalize", finalizeMediaUpload],
+    ["Classic prepare", prepareClassicMediaUpload], ["Classic finalize", finalizeClassicMediaUpload],
+  ])("returns a configuration error from %s without redirecting to Classic", async (_label, action) => {
+    mocks.createClient.mockReturnValue(null);
+    expect(await action(details)).toEqual({ ok: false, error: "Media uploads are not configured." });
+    expect(mocks.requireAdmin).toHaveBeenCalledTimes(1);
+    expect(mocks.verifyOrigin).toHaveBeenCalledWith("admin-one", "media");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -163,6 +217,9 @@ describe("Supabase upload finalization authority", () => {
     mocks.requireAdmin.mockRejectedValue(new Error("unauthorized"));
     await expect(prepareMediaUpload(null)).rejects.toThrow("unauthorized");
     await expect(finalizeMediaUpload(null)).rejects.toThrow("unauthorized");
+    await expect(prepareClassicMediaUpload(null)).rejects.toThrow("unauthorized");
+    await expect(finalizeClassicMediaUpload(null)).rejects.toThrow("unauthorized");
+    expect(mocks.verifyOrigin).not.toHaveBeenCalled();
     expect(mocks.createClient).not.toHaveBeenCalled();
   });
 

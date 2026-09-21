@@ -7,6 +7,7 @@ import GalleryFooter, { type FooterPreviewRegion } from "@/components/GalleryFoo
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import { saveSiteAppearanceV2 } from "@/app/admin/v2/settings/appearance/actions";
 import { INITIAL_APPEARANCE_SAVE_STATE, parseAppearanceSubmission, type AppearanceSaveState, type AppearanceEditorDraft } from "@/lib/admin/site-appearance-editor";
+import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
 import type { AdminAppearanceData } from "@/lib/admin/site-appearance";
 import { DISPLAY_FONT_OPTIONS, BODY_FONT_OPTIONS, UI_FONT_OPTIONS, getFontFamily, getGoogleFontsStylesheetUrl } from "@/lib/content/fonts";
 import type { SiteSettings, SocialLink } from "@/lib/content/types";
@@ -56,34 +57,23 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
   const [versions, setVersions] = useState(data.snapshot.versions);
   const [section, setSection] = useState<Section>("appearance");
   const [footerRegion, setFooterRegion] = useState<FooterPreviewRegion>("callout");
-  const [saveUncertain, setSaveUncertain] = useState(false);
   const { markDirty, clearDirty, confirmDiscard } = useUnsavedChangesGuard(undefined, true);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const sectionDirty = JSON.stringify(draft[section]) !== JSON.stringify(saved[section]);
   const [state, action, pending] = useActionState(async (previous: AppearanceSaveState, form: FormData) => {
-    let result: AppearanceSaveState;
-    try {
-      result = await saveSiteAppearanceV2(previous, form);
-    } catch {
-      // The request may have committed before its response was lost. Keep every
-      // draft and require an explicit reload instead of retrying a stale version.
-      setSaveUncertain(true);
-      return { ...INITIAL_APPEARANCE_SAVE_STATE, status: "error" as const, message: "The save response was lost. Your draft was kept. Reload saved settings to verify whether it was published before trying again." };
-    }
-    if (result.status === "error") setSaveUncertain(true);
-    if (result.status === "saved" && result.section && result.versions && result.canonicalSection) {
+    const submittedSection = form.get("section");
+    return runEditorSave(previous, () => saveSiteAppearanceV2(previous, form), (result) => {
       const confirmed = parseAppearanceSubmission(result.section, result.canonicalSection, result.versions);
-      if (!confirmed.success) {
-        setSaveUncertain(true);
-        return { ...result, status: "error" as const, message: "The saved response could not be confirmed. Reload before editing again." };
-      }
-      const nextSaved = { ...saved, [result.section]: confirmed.data.payload };
-      const nextDraft = { ...draft, [result.section]: confirmed.data.payload };
-      setSaved(nextSaved); setDraft(nextDraft); setVersions(result.versions);
+      // A success for another section is not confirmation of this submission.
+      // Keep every draft and the original CAS until an explicit reload.
+      if (!confirmed.success || confirmed.data.section !== submittedSection) return false;
+      const nextSaved = { ...saved, [confirmed.data.section]: confirmed.data.payload };
+      const nextDraft = { ...draft, [confirmed.data.section]: confirmed.data.payload };
+      setSaved(nextSaved); setDraft(nextDraft); setVersions(confirmed.data.versions);
       if (JSON.stringify(nextSaved) === JSON.stringify(nextDraft)) clearDirty(); else markDirty();
       router.refresh();
-    }
-    return result;
+      return true;
+    });
   }, INITIAL_APPEARANCE_SAVE_STATE);
   const unavailable = !data.isConfigured || data.migrationRequired || Boolean(data.loadError);
   const footerBlocked = Boolean(data.footerMigrationRequired) && section === "footer";
@@ -191,9 +181,9 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
     <div className="sticky bottom-3 z-30 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/15 bg-[#111113]/95 p-4 shadow-xl backdrop-blur-xl">
       <div role="status" aria-live="polite" className="text-sm text-white/70"><p>{sectionDirty ? `${sectionLabel} has unsaved changes` : `${sectionLabel} matches the saved settings`}</p>{dirty && !sectionDirty && <p className="mt-1 text-xs text-amber-200">Another section has unsaved changes.</p>}{state.message && <p className={`mt-1 text-xs ${state.status === "saved" ? "text-emerald-200" : "text-amber-200"}`}>{state.message}</p>}</div>
       <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-        {(state.status === "conflict" || saveUncertain) && <button type="button" onClick={() => confirmDiscard(() => window.location.reload())} className={buttonClass}>Reload saved settings</button>}
+        {needsEditorReload(state) && <button type="button" onClick={() => confirmDiscard(() => window.location.reload())} className={buttonClass}>Reload saved settings</button>}
         <button type="button" disabled={pending || !sectionDirty} onClick={() => confirmDiscard(() => change(section, saved[section]))} className={buttonClass}>Discard this section</button>
-        <button type="submit" disabled={blocked || pending || !sectionDirty || saveUncertain || state.status === "conflict"} className="min-h-11 flex-1 rounded-xl bg-white px-3 text-xs font-semibold text-black disabled:opacity-35 sm:flex-none">{pending ? "Saving…" : section === "appearance" ? "Save appearance" : section === "identity" ? "Save profile & introduction" : "Save footer content"}</button>
+        <button type="submit" disabled={blocked || pending || !sectionDirty || needsEditorReload(state)} className="min-h-11 flex-1 rounded-xl bg-white px-3 text-xs font-semibold text-black disabled:opacity-35 sm:flex-none">{pending ? "Saving…" : section === "appearance" ? "Save appearance" : section === "identity" ? "Save profile & introduction" : "Save footer content"}</button>
       </div>
     </div>
   </form>;

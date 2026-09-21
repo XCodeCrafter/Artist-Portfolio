@@ -1,4 +1,5 @@
 import "server-only";
+import { loadHeroEditorSnapshot } from "@/lib/admin/hero-framing";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -369,9 +370,7 @@ export async function getAdminBioEditorData(): Promise<AdminBioEditorData> {
     };
   }
 
-  const { data, error } = await supabase.rpc("get_bio_page_v2_snapshot", {
-    p_site_id: "main",
-  });
+  const { data, error } = await loadHeroEditorSnapshot(supabase, "bio", "get_bio_page_v2_snapshot");
 
   if (error && isMissingBioEditorSchemaError(error)) {
     const legacy = await loadLegacyBioSnapshot(supabase);

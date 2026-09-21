@@ -1,4 +1,5 @@
 "use client";
+import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
 
 import Link from "next/link";
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
@@ -212,6 +213,13 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
     </> : <>
       {!draft.layout.find((row) => row.id === activeSection)?.enabled ? <p className="rounded-2xl bg-amber-300/5 p-3 text-xs leading-5 text-amber-100/70">This section is hidden. You can still edit its content. Enable it in Page sections when ready.</p> : null}
       <ContentInspector section={activeSection} draft={draft} assets={assets} errors={errors} instance={instance} onChange={change} />
+      {activeSection === "hero" ? <HeroFramingControls
+        value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
+        mediaType={draft.hero.mediaType} onChange={(framing) => change({ ...draft, hero: { ...draft.hero, framing } })}
+        device={device} onDeviceChange={setDevice}
+        disabled={locked || snapshot.draft.hero.framing === undefined}
+        unavailableReason={snapshot.draft.hero.framing === undefined ? "Apply migration 0046 and reload to enable Hero framing. Other Hero fields remain editable." : undefined}
+      /> : null}
     </>}
   </fieldset>;
   const saveButton = <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-35"

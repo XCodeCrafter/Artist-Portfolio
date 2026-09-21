@@ -1,4 +1,5 @@
 "use client";
+import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
 
 import Link from "next/link";
 import {
@@ -673,6 +674,7 @@ export default function ContactEditor({
 
   const inspector = (instance: "desktop" | "mobile") =>
     activeSection === "hero" ? (
+      <div className="grid gap-5">
       <HeroInspector
         assets={assets}
         draft={draft.hero}
@@ -681,6 +683,14 @@ export default function ContactEditor({
         mediaRevision={mediaRevision}
         onChange={updateHero}
       />
+      <HeroFramingControls
+        value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
+        mediaType={draft.hero.mediaType} onChange={(framing) => updateHero({ framing })}
+        device={device} onDeviceChange={setDevice}
+        disabled={editorDisabled || snapshot.draft.hero.framing === undefined}
+        unavailableReason={snapshot.draft.hero.framing === undefined ? "Apply migration 0046 and reload to enable Hero framing. Other Hero fields remain editable." : undefined}
+      />
+      </div>
     ) : (
       <DetailsInspector
         optionalCopy={optionalCopy}
@@ -1033,12 +1043,6 @@ export default function ContactEditor({
           <p aria-live="polite" className="sr-only">
             {announcement}
           </p>
-          <Link
-            className="mt-2 inline-flex items-center gap-2 text-[10px] font-semibold text-white/58 underline decoration-white/22 underline-offset-4 transition hover:text-white"
-            href="/admin/content#booking"
-          >
-            Open classic Contact editor <FaExternalLinkAlt />
-          </Link>
         </div>
         <div className="mt-3 flex items-center gap-2 sm:mt-0">
           {!inspectorOpen ? (

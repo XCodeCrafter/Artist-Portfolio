@@ -35,6 +35,10 @@ const v2Actions = readFileSync(
   new URL("../app/admin/v2/inbox/actions.ts", import.meta.url),
   "utf8"
 );
+const sharedActions = readFileSync(
+  new URL("../lib/admin/inquiry-server-actions.ts", import.meta.url),
+  "utf8"
+);
 const overview = readFileSync(
   new URL("../app/admin/v2/page.tsx", import.meta.url),
   "utf8"
@@ -85,11 +89,22 @@ describe("Admin Inbox surface routing", () => {
   });
 
   it("uses separate server-owned action wrappers rather than a return URL", () => {
-    expect(classicActions).toContain('updateInquiryOnSurface("classic"');
-    expect(classicActions).toContain('deleteInquiryOnSurface("classic"');
-    expect(v2Actions).toContain('updateInquiryOnSurface("v2"');
-    expect(v2Actions).toContain('deleteInquiryOnSurface("v2"');
-    expect(classicActions + v2Actions).not.toMatch(/returnUrl|redirectUrl/);
+    expect(sharedActions).toContain('updateInquiryOnSurface("classic"');
+    expect(sharedActions).toContain('deleteInquiryOnSurface("classic"');
+    expect(sharedActions).toContain('updateInquiryOnSurface("v2"');
+    expect(sharedActions).toContain('deleteInquiryOnSurface("v2"');
+    expect(classicActions).toContain("return updateClassicInquiry(formData)");
+    expect(classicActions).toContain("return deleteClassicInquiry(formData)");
+    expect(v2Actions).toContain("return updateV2Inquiry(formData)");
+    expect(v2Actions).toContain("return deleteV2Inquiry(formData)");
+    expect(classicActions + v2Actions + sharedActions).not.toMatch(/returnUrl|redirectUrl/);
+  });
+
+  it("loads shared Inbox actions without importing either route implementation", () => {
+    expect(inbox).toContain('from "@/lib/admin/inquiry-server-actions"');
+    expect(inbox).not.toMatch(/from ["']@\/app\/admin\//);
+    expect(sharedActions).not.toMatch(/from ["']@\/app\//);
+    expect(sharedActions.startsWith('"use server";')).toBe(true);
   });
 });
 

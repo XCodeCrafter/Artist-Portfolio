@@ -3,6 +3,8 @@
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import Image from "next/image";
 import { useMemo, useRef, useState, type CSSProperties } from "react";
+import HeroMedia from "@/components/HeroMedia";
+import { normalizeHeroFraming, type HeroFraming } from "@/lib/content/hero-framing";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -16,6 +18,7 @@ type Props = {
   subtitle?: string;
   poster?: string; // optional fallback poster (e.g. "/images/hero.jpg")
   staticPreview?: boolean;
+  framing?: HeroFraming | null;
 
   /**
    * Optional: override video focal point (object-position).
@@ -35,9 +38,11 @@ export default function VideoHero({
   subtitle,
   poster,
   staticPreview = false,
+  framing,
   videoPosMobile = "50% 20%",
   videoPosDesktop = "50% 50%",
 }: Props) {
+  const customFraming = normalizeHeroFraming(framing);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState<number | null>(null);
 
@@ -105,7 +110,15 @@ export default function VideoHero({
     >
       {/* BG (VIDEO) */}
       <div className="absolute inset-0">
-        {staticPreview ? (
+        {customFraming ? (
+          <HeroMedia
+            backgroundSrc={backgroundSrc}
+            framing={customFraming}
+            mediaType="video"
+            posterSrc={poster}
+            staticPreview={staticPreview}
+          />
+        ) : staticPreview ? (
           poster ? (
             <Image
               alt=""

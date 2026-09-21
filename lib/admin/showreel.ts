@@ -1,4 +1,5 @@
 import "server-only";
+import { loadHeroEditorSnapshot } from "@/lib/admin/hero-framing";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -273,9 +274,7 @@ export async function getAdminShowreelEditorData(): Promise<AdminShowreelEditorD
     };
   }
 
-  const { data, error } = await supabase.rpc("get_showreel_page_v2_snapshot", {
-    p_site_id: "main",
-  });
+  const { data, error } = await loadHeroEditorSnapshot(supabase, "video", "get_showreel_page_v2_snapshot");
 
   if (error && isMissingShowreelEditorSchemaError(error)) {
     const legacy = await loadLegacyShowreelSnapshot(supabase);

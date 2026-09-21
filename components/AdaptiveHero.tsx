@@ -10,6 +10,7 @@ export default function AdaptiveHero({
   backgroundSrc,
   ctaHref,
   ctaLabel,
+  framing,
   mediaType,
   posterSrc,
   staticPreview = false,
@@ -22,6 +23,7 @@ export default function AdaptiveHero({
         backgroundSrc={backgroundSrc}
         ctaHref={ctaHref}
         ctaLabel={ctaLabel}
+        framing={framing}
         poster={posterSrc || undefined}
         staticPreview={staticPreview}
         subtitle={subtitle}
@@ -35,6 +37,7 @@ export default function AdaptiveHero({
       backgroundSrc={backgroundSrc}
       ctaHref={ctaHref}
       ctaLabel={ctaLabel}
+      framing={framing}
       subtitle={subtitle}
       title={title}
     />

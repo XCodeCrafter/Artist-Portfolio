@@ -1,4 +1,5 @@
 "use server";
+import { getHeroSaveCall, isMissingHeroFramingSchemaError, HERO_FRAMING_MIGRATION_MESSAGE } from "@/lib/admin/hero-framing";
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -30,10 +31,12 @@ export async function saveHomeSectionV2(_previousState: HomeSaveState, formData:
   if (!supabase) return result("missing-service", "Supabase admin access is not configured, so nothing was saved.", { section });
   // This service-only RPC validates and locks live Media Library rows, then
   // checks the page version and changes only this section in one transaction.
-  const { data, error } = await supabase.rpc("save_home_section_v2", {
+  const saveCall = getHeroSaveCall("home", section, "save_home_section_v2", {
     p_site_id: "main", p_section: section, p_expected_updated_at: parsed.data.versions.updatedAt, p_payload: parsed.data.payload,
   });
+  const { data, error } = await supabase.rpc(saveCall.name, saveCall.args);
   if (error) {
+    if (isMissingHeroFramingSchemaError(error)) return result("migration-required", HERO_FRAMING_MIGRATION_MESSAGE, { section });
     if (isHomeEditorWriteConflict(error)) return result("conflict", "Home changed in another admin session. Your draft was kept. Reload before saving again.", { section });
     if (isMissingHomeEditorSchemaError(error)) return result("migration-required", "The Home editor needs database migration 0037 before it can save.", { section });
     if (error.code === "22023" || error.code === "23514") return result("invalid", "Review this section's content and select available Media Library files before saving.", { section });

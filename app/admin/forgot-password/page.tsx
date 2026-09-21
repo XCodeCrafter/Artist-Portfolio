@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import AdminAuthShell from "@/components/admin/AdminAuthShell";
 import ForgotPasswordForm from "@/components/admin/ForgotPasswordForm";
 import { getCurrentAdmin } from "@/lib/admin/auth";
+import { ADMIN_ENTRY_PATH } from "@/lib/admin/entry-routes";
 import { getPortfolioContent } from "@/lib/content";
 
 export const metadata = {
@@ -22,7 +23,7 @@ export default async function ForgotPasswordPage({
   ]);
 
   if (admin) {
-    redirect("/admin");
+    redirect(ADMIN_ENTRY_PATH);
   }
 
   const homeHero = content.heroes.home;

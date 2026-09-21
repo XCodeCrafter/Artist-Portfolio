@@ -1,4 +1,5 @@
 "use client";
+import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -192,6 +193,7 @@ function Field({
 }
 
 type InspectorProps = {
+  framingControls: ReactNode;
   activeSection: ShowreelEditorSection;
   assets: MediaAsset[];
   draft: ShowreelEditorDraft;
@@ -255,6 +257,7 @@ function HeroInspector(props: InspectorProps) {
         showPreview={isSafeShowreelAssetSource(hero.backgroundSrc)}
         value={hero.backgroundSrc}
       />
+      {props.framingControls}
       <details className="rounded-[20px] border border-white/9 bg-black/22 p-4">
         <summary className="cursor-pointer text-xs font-semibold text-white/62">
           Button and video options
@@ -1129,6 +1132,13 @@ export default function ShowreelEditor({
   }
 
   const inspectorProps: Omit<InspectorProps, "activeSection" | "instance"> = {
+    framingControls: <HeroFramingControls
+      value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
+      mediaType={draft.hero.mediaType} onChange={(framing) => updateHero({ framing })}
+      device={device} onDeviceChange={setDevice}
+      disabled={editorDisabled || snapshot.draft.hero.framing === undefined}
+      unavailableReason={snapshot.draft.hero.framing === undefined ? "Apply migration 0046 and reload to enable Hero framing. Other Hero fields remain editable." : undefined}
+    />,
     assets,
     draft,
     errors,
@@ -1449,12 +1459,6 @@ export default function ShowreelEditor({
           <p aria-live="polite" className="sr-only">
             {announcement}
           </p>
-          <Link
-            className="mt-2 inline-flex items-center gap-2 text-[10px] font-semibold text-white/42 underline decoration-white/18 underline-offset-4 transition hover:text-white"
-            href="/admin/media?view=showreel"
-          >
-            Open classic Showreel Studio <FaExternalLinkAlt />
-          </Link>
         </div>
         <button
           aria-busy={pending}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { heroFramingSchema } from "@/lib/content/hero-framing";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import type { HeroContent } from "@/lib/content/types";
 import {
@@ -121,7 +122,7 @@ const contactHeroDraftSchema = z
     ctaHref: optionalHref,
     backgroundSrc: assetSource,
     posterSrc: optionalAssetSource,
-    mediaType: z.enum(["image", "video"]),
+    framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
   })
   .strict()
   .superRefine((hero, context) => {
@@ -154,7 +155,7 @@ const snapshotHeroSchema = z
     ctaHref: text(4_096),
     backgroundSrc: requiredText(4_096),
     posterSrc: text(4_096),
-    mediaType: z.enum(["image", "video"]),
+    framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
     updatedAt: timestamp,
   })
   .strict();
@@ -260,6 +261,7 @@ export function parseContactEditorSnapshot(
         backgroundSrc: parsed.data.hero.backgroundSrc,
         posterSrc: parsed.data.hero.posterSrc,
         mediaType: parsed.data.hero.mediaType,
+        ...(parsed.data.hero.framing !== undefined ? { framing: parsed.data.hero.framing } : {}),
       },
       details: {
         location: parsed.data.details.location,
@@ -337,7 +339,7 @@ const previewDraftSchema = z
         ctaHref: previewHref,
         backgroundSrc: previewMediaSource,
         posterSrc: previewMediaSource,
-        mediaType: z.enum(["image", "video"]),
+        framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
       })
       .strict(),
     details: z

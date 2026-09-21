@@ -1,4 +1,5 @@
 import "server-only";
+import { loadHeroEditorSnapshot } from "@/lib/admin/hero-framing";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -254,9 +255,7 @@ export async function getAdminGalleryEditorData(): Promise<AdminGalleryEditorDat
     };
   }
 
-  const { data, error } = await supabase.rpc("get_gallery_page_v2_snapshot", {
-    p_site_id: "main",
-  });
+  const { data, error } = await loadHeroEditorSnapshot(supabase, "gallery", "get_gallery_page_v2_snapshot");
 
   if (error && isMissingGalleryEditorSchemaError(error)) {
     const legacy = await loadLegacyGallerySnapshot(supabase);

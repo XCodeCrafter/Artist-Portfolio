@@ -7,6 +7,12 @@ import {
   deleteInquiry as deleteV2Inquiry,
   updateInquiry as updateV2Inquiry,
 } from "@/app/admin/v2/inbox/actions";
+import {
+  deleteClassicInquiry as sharedDeleteClassicInquiry,
+  updateClassicInquiry as sharedUpdateClassicInquiry,
+  deleteV2Inquiry as sharedDeleteV2Inquiry,
+  updateV2Inquiry as sharedUpdateV2Inquiry,
+} from "@/lib/admin/inquiry-server-actions";
 
 const actionMocks = vi.hoisted(() => ({
   requireAdmin: vi.fn(async () => ({
@@ -141,6 +147,23 @@ beforeEach(() => {
 });
 
 describe("admin inquiry actions", () => {
+  it.each([
+    [sharedUpdateClassicInquiry, "/admin/analytics?status=saved#inquiries"],
+    [sharedDeleteClassicInquiry, "/admin/analytics?status=deleted#inquiries"],
+    [sharedUpdateV2Inquiry, "/admin/v2/inbox?status=saved#messages"],
+    [sharedDeleteV2Inquiry, "/admin/v2/inbox?status=deleted#messages"],
+  ] as const)("keeps the neutral action destination fixed despite submitted redirect fields (%#)", async (action, destination) => {
+    const service = createMutationClient();
+    actionMocks.createAdminServiceClient.mockReturnValue(service.client);
+    const form = updateForm();
+    form.set("surface", "https://evil.example");
+    form.set("returnUrl", "https://evil.example");
+    await expectRedirect(action(form), destination);
+    expect(actionMocks.requireAdmin).toHaveBeenCalledTimes(1);
+    expect(actionMocks.verifyOrigin).toHaveBeenCalledTimes(1);
+    expect(service.eq).toHaveBeenCalledWith("updated_at", VERSION);
+  });
+
   it("keeps invalid input on its server-owned surface without authenticating", async () => {
     await expectRedirect(
       updateV2Inquiry(updateForm({ id: "not-a-uuid" })),

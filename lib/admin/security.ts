@@ -156,6 +156,18 @@ function isReadableAuthUser(value: unknown) {
       factor && typeof factor === "object" && typeof factor.status === "string")));
 }
 
+const AUTH_DIRECTORY_PAGE_SIZE = 1000;
+
+/** A bounded first page cannot prove that an absent profile has no Auth user. */
+function isCompleteAuthDirectoryPage(value: unknown, loadedCount: number) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const page = value as Record<string, unknown>;
+  return loadedCount < AUTH_DIRECTORY_PAGE_SIZE &&
+    !(typeof page.nextPage === "number" && page.nextPage > 1) &&
+    !(typeof page.lastPage === "number" && page.lastPage > 1) &&
+    !(typeof page.total === "number" && page.total > loadedCount);
+}
+
 const SECURITY_EVENT_SET = new Set<string>(SECURITY_EVENT_ACTIONS);
 const ADMIN_AUTH_RATE_LIMIT_EVENT_SET = new Set<SecurityEventAction>([
   "security_admin_login_rate_limited",
@@ -393,7 +405,7 @@ function getSecurityChecks(
       verification: "runtime",
       detail: authDirectoryReady
         ? "Supabase Auth users, MFA enrollment, and sign-in metadata are readable."
-        : "Admin Auth metadata could not be verified with the server key.",
+        : "Some Admin Auth metadata could not be verified from the bounded directory read. Unverified users are not reported as missing.",
     },
     {
       id: "audit-read-path",
@@ -552,7 +564,7 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
       .catch(() => ({ data: null, error: true })),
     getSecurityEventLogs()
       .catch(() => ({ logs: [], isCapped: false, error: true })),
-    supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    supabase.auth.admin.listUsers({ page: 1, perPage: AUTH_DIRECTORY_PAGE_SIZE })
       .catch(() => ({ data: null, error: true })),
     readinessPromise,
   ]);
@@ -561,20 +573,24 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
     Array.isArray(profilesResult.data) && profilesResult.data.every(isAdminProfileRow);
   const auditReadReady = !logsResult.error &&
     Array.isArray(logsResult.data) && logsResult.data.every(isAuditLogRow);
-  const authDirectoryReady = !authDirectoryResult.error &&
+  const authDirectoryReadable = !authDirectoryResult.error &&
     Array.isArray(authDirectoryResult.data?.users) &&
     authDirectoryResult.data.users.every(isReadableAuthUser);
   const authUsersById = new Map(
-    (authDirectoryReady ? authDirectoryResult.data?.users || [] : [])
+    (authDirectoryReadable ? authDirectoryResult.data?.users || [] : [])
       .map((user) => [user.id, user])
   );
+  const authDirectoryComplete = authDirectoryReadable &&
+    isCompleteAuthDirectoryPage(authDirectoryResult.data, authDirectoryResult.data?.users.length || 0);
+  const authDirectoryReady = authDirectoryReadable && profilesReadReady &&
+    (authDirectoryComplete || (profilesResult.data || []).every(row => authUsersById.has(row.user_id)));
   const profiles = (profilesReadReady ? profilesResult.data || [] : []).map((row) => {
     const profile = mapAdminProfile(row);
     const authUser = authUsersById.get(profile.userId);
 
     return {
       ...profile,
-      authUserFound: authDirectoryReady ? Boolean(authUser) : null,
+      authUserFound: authUser ? true : authDirectoryComplete ? false : null,
       authCreatedAt: authUser?.created_at || "",
       lastSignInAt: authUser?.last_sign_in_at || "",
       mfaEnrolled: authUser
@@ -607,7 +623,7 @@ export async function getSecurityCenterData(currentAdmin: AdminUser): Promise<{
     loadError:
       !profilesReadReady ||
       !auditReadReady ||
-      !authDirectoryReady ||
+      !authDirectoryReadable ||
       securityLogsResult.error
         ? "Unable to load security data from Supabase."
         : undefined,

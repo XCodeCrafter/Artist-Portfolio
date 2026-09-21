@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { FALLBACK_CONTENT } from "./fallback";
 import { normalizeFooterContent } from "./footer";
+import { normalizeHeroFraming } from "./hero-framing";
 import { PAGE_SLUGS, normalizeHiddenNavPageSlugs } from "./modules";
 import {
   normalizeBodyFont,
@@ -66,6 +67,7 @@ type SiteSettingsRow = {
 };
 
 type PageHeroRow = {
+  media_framing?: unknown;
   page_slug: string;
   title: string;
   subtitle: string;
@@ -246,6 +248,7 @@ function mapHeroes(rows: PageHeroRow[]): Record<PageSlug, HeroContent> {
       backgroundSrc: row.background_src,
       posterSrc: row.poster_src,
       mediaType: row.media_type,
+      ...(row.media_framing !== undefined ? { framing: normalizeHeroFraming(row.media_framing) } : {}),
     };
   }
 

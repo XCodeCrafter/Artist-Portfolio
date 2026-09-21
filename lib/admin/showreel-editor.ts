@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { heroFramingSchema } from "@/lib/content/hero-framing";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import type {
   FooterEffect,
@@ -228,7 +229,7 @@ const heroFieldsSchema = z
     ctaHref: optionalHref,
     backgroundSrc: assetSource,
     posterSrc: optionalAssetSource,
-    mediaType: z.enum(["image", "video"]),
+    framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
   })
   .strict();
 
@@ -358,7 +359,7 @@ const snapshotHeroSchema = z
     ctaHref: text(2_048),
     backgroundSrc: requiredText(2_048),
     posterSrc: text(2_048),
-    mediaType: z.enum(["image", "video"]),
+    framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
     updatedAt: timestamp,
   })
   .strict();
@@ -566,6 +567,7 @@ export function parseShowreelEditorSnapshot(
         backgroundSrc: snapshot.hero.backgroundSrc,
         posterSrc: snapshot.hero.posterSrc,
         mediaType: snapshot.hero.mediaType,
+        ...(snapshot.hero.framing !== undefined ? { framing: snapshot.hero.framing } : {}),
       },
       introduction: {
         sectionEyebrow: snapshot.introduction.sectionEyebrow,
@@ -710,7 +712,7 @@ const previewDraftSchema = z
         ctaHref: previewHref,
         backgroundSrc: previewAssetSource,
         posterSrc: previewAssetSource,
-        mediaType: z.enum(["image", "video"]),
+        framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
       })
       .strict(),
     introduction: z

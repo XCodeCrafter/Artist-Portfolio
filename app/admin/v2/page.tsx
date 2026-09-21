@@ -49,7 +49,6 @@ const EDITOR_STATE_LABELS: Record<AdminV2PageEditorState, string> = {
   ready: "Editor ready",
   "setup-required": "Setup required",
   unavailable: "Unavailable",
-  classic: "Classic editor",
 };
 
 const EDITOR_STATE_CLASSES: Record<AdminV2PageEditorState, string> = {
@@ -57,7 +56,6 @@ const EDITOR_STATE_CLASSES: Record<AdminV2PageEditorState, string> = {
   "setup-required":
     "border-amber-300/16 bg-amber-400/[0.06] text-amber-100/70",
   unavailable: "border-red-300/16 bg-red-400/[0.06] text-red-100/70",
-  classic: "border-white/9 bg-white/[0.035] text-white/40",
 };
 
 function AttentionRow({ issue }: { issue: AdminV2OverviewIssue }) {

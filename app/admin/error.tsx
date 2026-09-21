@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { FaExclamationTriangle, FaRedo } from "react-icons/fa";
+import { ADMIN_ENTRY_PATH } from "@/lib/admin/entry-routes";
 
 export default function AdminError({
   error,
@@ -40,7 +41,7 @@ export default function AdminError({
           </button>
           <Link
             className="inline-flex min-h-11 items-center rounded-xl border border-white/15 px-4 text-sm font-semibold text-white transition hover:bg-white/10"
-            href="/admin"
+            href={ADMIN_ENTRY_PATH}
           >
             Dashboard
           </Link>

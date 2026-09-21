@@ -39,6 +39,12 @@ const details = {
   contactBlurb: "For acting, music, productions, and creative collaborations.",
 };
 
+function withoutFramingMigration(rpc: (...args: unknown[]) => unknown) {
+  return vi.fn((name: string, args: unknown) => name === "get_hero_editor_with_framing_v2"
+    ? { abortSignal: vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST202", message: "Could not find get_hero_editor_with_framing_v2 in schema cache" } }) }
+    : { abortSignal: vi.fn(() => rpc(name, args)) });
+}
+
 function legacyQuery(result: { data: unknown; error: unknown }) {
   const builder = {
     select: vi.fn(),
@@ -108,7 +114,7 @@ describe("Admin V2 Contact data loader", () => {
       },
       error: null,
     }));
-    contactMocks.createAdminServiceClient.mockReturnValue({ rpc });
+    contactMocks.createAdminServiceClient.mockReturnValue({ rpc: withoutFramingMigration(rpc) });
 
     const result = await getAdminContactEditorData();
 
@@ -140,13 +146,13 @@ describe("Admin V2 Contact data loader", () => {
     });
     const heroQuery = legacyQuery({ data: null, error: null });
     const client = {
-      rpc: vi.fn(async () => ({
+      rpc: withoutFramingMigration(vi.fn(async () => ({
         data: null,
         error: {
           code: "PGRST202",
           message: "Could not find get_contact_page_v2_snapshot in schema cache",
         },
-      })),
+      }))),
       from: vi.fn((table: string) =>
         table === "site_settings" ? settingsQuery : heroQuery
       ),
@@ -170,7 +176,7 @@ describe("Admin V2 Contact data loader", () => {
 
   it("fails the editor closed when an RPC returns an unexpected snapshot", async () => {
     contactMocks.createAdminServiceClient.mockReturnValue({
-      rpc: vi.fn(async () => ({ data: { hero: null }, error: null })),
+      rpc: withoutFramingMigration(vi.fn(async () => ({ data: { hero: null }, error: null }))),
     });
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -185,13 +191,13 @@ describe("Admin V2 Contact data loader", () => {
 
   it("reports a missing required singleton as data corruption, not a migration retry", async () => {
     contactMocks.createAdminServiceClient.mockReturnValue({
-      rpc: vi.fn(async () => ({
+      rpc: withoutFramingMigration(vi.fn(async () => ({
         data: null,
         error: {
           code: "23503",
           message: "contact_page_snapshot_missing",
         },
-      })),
+      }))),
     });
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 

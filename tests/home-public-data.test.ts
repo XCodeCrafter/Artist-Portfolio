@@ -23,7 +23,8 @@ describe("published HOME configuration", () => {
     const client = clientResult(data);
     await expect(getPublishedHomeDraft(FALLBACK_CONTENT)).rejects.toThrow("Missing HOME configuration.");
     expect(client.from).toHaveBeenCalledWith("home_page_config");
-    expect(client.select).toHaveBeenCalledWith("draft");
+    // '*' reads framing when present without requesting a missing 0046 column.
+    expect(client.select).toHaveBeenCalledWith("*");
     expect(client.eq).toHaveBeenCalledWith("id", "main");
   });
 

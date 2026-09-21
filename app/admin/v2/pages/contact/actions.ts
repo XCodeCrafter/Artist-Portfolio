@@ -1,4 +1,5 @@
 "use server";
+import { getHeroSaveCall, isMissingHeroFramingSchemaError, HERO_FRAMING_MIGRATION_MESSAGE } from "@/lib/admin/hero-framing";
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -132,12 +133,13 @@ export async function saveContactSectionV2(
     }
   }
 
-  const { data, error } = await supabase.rpc(
-    rpcName(section),
-    rpcArguments(section, payload, versions)
-  );
+  const saveCall = getHeroSaveCall("booking", section, rpcName(section), rpcArguments(section, payload, versions));
+  const { data, error } = await supabase.rpc(saveCall.name, saveCall.args);
 
   if (error) {
+    if (isMissingHeroFramingSchemaError(error)) {
+      return result("migration-required", HERO_FRAMING_MIGRATION_MESSAGE, { section });
+    }
     if (isContactEditorWriteConflict(error)) {
       return result(
         "conflict",

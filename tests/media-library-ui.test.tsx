@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
 vi.mock("@/app/admin/v2/media/actions", () => ({ saveMediaDetailsV2: mocks.save, mutateMediaAssetV2: mocks.mutate }));
-vi.mock("@/app/admin/media/actions", () => ({ prepareMediaUpload: mocks.prepare, finalizeMediaUpload: mocks.finalize }));
+vi.mock("@/lib/admin/media-upload-actions", () => ({ prepareMediaUpload: mocks.prepare, finalizeMediaUpload: mocks.finalize }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: mocks.createClient }));
 vi.mock("@/components/admin/useUnsavedChangesGuard", () => ({
   default: () => ({ markDirty: vi.fn(), clearDirty: vi.fn(), confirmDiscard: vi.fn(), hasUnsavedChanges: mocks.dirty }),

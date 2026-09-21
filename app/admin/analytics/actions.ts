@@ -1,14 +1,14 @@
 "use server";
 
 import {
-  deleteInquiryOnSurface,
-  updateInquiryOnSurface,
-} from "@/lib/admin/inquiry-actions";
+  deleteClassicInquiry,
+  updateClassicInquiry,
+} from "@/lib/admin/inquiry-server-actions";
 
 export async function updateInquiry(formData: FormData) {
-  return updateInquiryOnSurface("classic", formData);
+  return updateClassicInquiry(formData);
 }
 
 export async function deleteInquiry(formData: FormData) {
-  return deleteInquiryOnSurface("classic", formData);
+  return deleteClassicInquiry(formData);
 }

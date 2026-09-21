@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SecurityCheckCard, SecurityPosture } from "@/components/admin/SecurityCenter";
 import type { SecurityCheck, SecurityEventSummary } from "@/lib/admin/security";
 
-vi.mock("@/app/admin/security/actions", () => ({ deleteAdminProfile: vi.fn(), resetAdminMfa: vi.fn(), revokeAdminSessions: vi.fn(), saveAdminProfile: vi.fn() }));
+vi.mock("@/lib/admin/security-actions", () => ({ deleteAdminProfile: vi.fn(), resetAdminMfa: vi.fn(), revokeAdminSessions: vi.fn(), saveAdminProfile: vi.fn() }));
 
 describe("Honest readiness presentation", () => {
   it.each([

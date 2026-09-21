@@ -1,6 +1,6 @@
 "use client";
+import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
 
-import Link from "next/link";
 import {
   useActionState,
   useCallback,
@@ -18,7 +18,6 @@ import {
   FaChevronLeft,
   FaDesktop,
   FaExclamationTriangle,
-  FaExternalLinkAlt,
   FaEye,
   FaEyeSlash,
   FaMobileAlt,
@@ -324,6 +323,7 @@ function VisibilityToggle({
 }
 
 type InspectorFieldsProps = {
+  framingControls: ReactNode;
   activeSection: MusicEditorSection;
   assets: MediaAsset[];
   draft: MusicEditorDraft;
@@ -354,6 +354,7 @@ type InspectorFieldsProps = {
 };
 
 function HeroInspector({
+  framingControls,
   assets,
   draft,
   errors,
@@ -362,6 +363,7 @@ function HeroInspector({
   onHeroChange,
 }: Pick<
   InspectorFieldsProps,
+  | "framingControls"
   | "assets"
   | "draft"
   | "errors"
@@ -426,6 +428,7 @@ function HeroInspector({
         ) : null}
       </div>
 
+      {framingControls}
       <details className="rounded-2xl border border-white/9 bg-black/22 p-4">
         <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.16em] text-white/58">
           Advanced hero settings
@@ -1382,6 +1385,13 @@ export default function MusicEditor({
   }
 
   const inspectorProps: Omit<InspectorFieldsProps, "instance"> = {
+    framingControls: <HeroFramingControls
+      value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
+      mediaType={draft.hero.mediaType} onChange={(framing) => updateHero({ framing })}
+      device={device} onDeviceChange={setDevice}
+      disabled={editorDisabled || snapshot.draft.hero.framing === undefined}
+      unavailableReason={snapshot.draft.hero.framing === undefined ? "Apply migration 0046 and reload to enable Hero framing. Other Hero fields remain editable." : undefined}
+    />,
     activeSection,
     assets,
     draft,
@@ -1789,12 +1799,6 @@ export default function MusicEditor({
           <p aria-live="polite" className="sr-only">
             {announcement}
           </p>
-          <Link
-            className="mt-2 inline-flex items-center gap-2 text-[10px] font-semibold text-white/42 underline decoration-white/18 underline-offset-4 transition hover:text-white"
-            href="/admin/content#music-links"
-          >
-            Open classic Music editor <FaExternalLinkAlt />
-          </Link>
         </div>
 
         <div className="mt-3 flex items-center gap-2 sm:mt-0">

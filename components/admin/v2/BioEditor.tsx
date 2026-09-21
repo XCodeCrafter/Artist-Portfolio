@@ -1,6 +1,6 @@
 "use client";
+import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
 
-import Link from "next/link";
 import {
   cloneElement,
   useActionState,
@@ -22,7 +22,6 @@ import {
   FaChevronLeft,
   FaDesktop,
   FaExclamationTriangle,
-  FaExternalLinkAlt,
   FaEye,
   FaEyeSlash,
   FaMobileAlt,
@@ -369,6 +368,7 @@ function VisibilityToggle({
 }
 
 type InspectorProps = {
+  framingControls: ReactNode;
   archiveControl: (collection: BioArchiveCollection, id: string, label: string) => ReactNode;
   archivePanel: (collection: BioArchiveCollection) => ReactNode;
   assets: MediaAsset[];
@@ -407,6 +407,7 @@ type InspectorProps = {
 };
 
 function HeroInspector({
+  framingControls,
   assets,
   draft,
   errors,
@@ -415,7 +416,7 @@ function HeroInspector({
   onHeroChange,
 }: Pick<
   InspectorProps,
-  "assets" | "draft" | "errors" | "instance" | "mediaRevision" | "onHeroChange"
+  "assets" | "draft" | "errors" | "instance" | "mediaRevision" | "onHeroChange" | "framingControls"
 >) {
   const hero = draft.hero;
   const advancedErrors = ["ctaHref", "mediaType", "posterSrc"].filter(
@@ -478,6 +479,7 @@ function HeroInspector({
           value={hero.backgroundSrc}
         />
       </div>
+      {framingControls}
       <details
         className="rounded-2xl border border-white/9 bg-black/22 p-4"
         ref={advancedRef}
@@ -1502,6 +1504,13 @@ export default function BioEditor({
   }
 
   const inspectorProps: Omit<InspectorProps, "instance"> = {
+    framingControls: <HeroFramingControls
+      value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
+      mediaType={draft.hero.mediaType} onChange={(framing) => updateHero({ framing })}
+      device={device} onDeviceChange={setDevice}
+      disabled={editorDisabled || snapshot.draft.hero.framing === undefined}
+      unavailableReason={snapshot.draft.hero.framing === undefined ? "Apply migration 0046 and reload to enable Hero framing. Other Hero fields remain editable." : undefined}
+    />,
     archiveControl,
     archivePanel,
     assets,
@@ -1749,9 +1758,6 @@ export default function BioEditor({
           </p>
           <p className="mt-1 text-[10px] leading-4 text-white/34">{statusDetail}</p>
           <p aria-live="polite" className="sr-only">{announcement}</p>
-          <Link className="mt-2 inline-flex items-center gap-2 text-[10px] font-semibold text-white/42 underline decoration-white/18 underline-offset-4 transition hover:text-white" href="/admin/content#bio-intro">
-            Open classic Bio editor <FaExternalLinkAlt />
-          </Link>
         </div>
         <div className="mt-3 flex items-center gap-2 sm:mt-0">
           {!inspectorOpen ? (

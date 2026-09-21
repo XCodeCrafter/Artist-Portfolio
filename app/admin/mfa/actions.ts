@@ -6,6 +6,7 @@ import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { enforceAuthRateLimit } from "@/lib/admin/auth-rate-limit";
 import { getCurrentAdminCandidate } from "@/lib/admin/auth";
 import { writeAuditLog } from "@/lib/admin/audit";
+import { ADMIN_ENTRY_PATH } from "@/lib/admin/entry-routes";
 import { createClient } from "@/lib/supabase/server";
 
 const TotpSchema = z.object({
@@ -179,7 +180,7 @@ export async function verifyMfaCode(
   }
 
   const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (assurance.error || assurance.data.currentLevel !== "aal2") {
+  if (assurance.error || assurance.data?.currentLevel !== "aal2") {
     return { ok: false, message: "Verification did not complete. Try again." };
   }
 
@@ -191,5 +192,5 @@ export async function verifyMfaCode(
     metadata: rateLimit.auditMetadata,
   });
 
-  redirect("/admin");
+  redirect(ADMIN_ENTRY_PATH);
 }

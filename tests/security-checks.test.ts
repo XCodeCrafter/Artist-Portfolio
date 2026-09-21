@@ -125,6 +125,65 @@ describe("Shared production checks in Security", () => {
     expect((await getSecurityCenterData({ ...owner, role: "admin" })).canManageAdmins).toBe(false);
   });
 
+  it("reports a missing Auth user only after a complete readable directory page", async () => {
+    mocks.listUsers.mockResolvedValue({ data: { users: [], nextPage: null, lastPage: 0, total: 0 }, error: null });
+    const result = await getSecurityCenterData(owner);
+    expect(result.profiles[0]).toMatchObject({ authUserFound: false, mfaEnrolled: null });
+    expect(result.checks.find(check => check.id === "admin-auth-directory"))
+      .toMatchObject({ status: "pass", ok: true });
+    expect(result.loadError).toBeUndefined();
+  });
+
+  it("does not mistake absence from a capped first page for a missing Auth user", async () => {
+    mocks.listUsers.mockResolvedValue({ data: { users: Array.from({ length: 1000 }, (_, index) => ({
+      id: `public-user-${index}`, created_at: profile.created_at,
+    })) }, error: null });
+    const result = await getSecurityCenterData(owner);
+    expect(result.profiles[0]).toMatchObject({ authUserFound: null, mfaEnrolled: null });
+    expect(result.checks.find(check => check.id === "admin-auth-directory"))
+      .toMatchObject({ status: "unknown", ok: false });
+    // A partial diagnostic is not a failure to read profiles or an excuse to
+    // disable owner controls. Never enumerate the entire public user directory.
+    expect(result.canManageAdmins).toBe(true);
+    expect(result.loadError).toBeUndefined();
+    expect(mocks.listUsers).toHaveBeenCalledExactlyOnceWith({ page: 1, perPage: 1000 });
+  });
+
+  it.each([
+    { nextPage: 2 }, { lastPage: 2 }, { total: 2 },
+  ])("honors pagination metadata even below the requested page size: %j", async (pagination) => {
+    mocks.listUsers.mockResolvedValue({ data: { users: [{
+      id: "another-user", created_at: profile.created_at,
+    }], ...pagination }, error: null });
+    const result = await getSecurityCenterData(owner);
+    expect(result.profiles[0].authUserFound).toBeNull();
+    expect(result.checks.find(check => check.id === "admin-auth-directory"))
+      .toMatchObject({ status: "unknown" });
+    expect(mocks.listUsers).toHaveBeenCalledOnce();
+  });
+
+  it("keeps verified metadata for admins actually present on a capped page", async () => {
+    mocks.listUsers.mockResolvedValue({ data: { users: [
+      { id: owner.id, created_at: profile.created_at, factors: [{ status: "verified" }] },
+      ...Array.from({ length: 999 }, (_, index) => ({ id: `public-user-${index}`, created_at: profile.created_at })),
+    ], nextPage: 2, total: 1001 }, error: null });
+    const result = await getSecurityCenterData(owner);
+    expect(result.profiles[0]).toMatchObject({ authUserFound: true, mfaEnrolled: true });
+    expect(result.checks.find(check => check.id === "admin-auth-directory"))
+      .toMatchObject({ status: "pass", ok: true });
+    expect(result.loadError).toBeUndefined();
+  });
+
+  it.each(["error", "throw"])("keeps Auth presence unknown after a directory %s", async (failure) => {
+    const error = new Error("private-auth-diagnostic");
+    if (failure === "throw") mocks.listUsers.mockRejectedValue(error);
+    else mocks.listUsers.mockResolvedValue({ data: null, error });
+    const result = await getSecurityCenterData(owner);
+    expect(result.profiles[0]).toMatchObject({ authUserFound: null, mfaEnrolled: null });
+    expect(result.loadError).toBeDefined();
+    expect(JSON.stringify(result)).not.toContain(error.message);
+  });
+
   it("classifies failed profile, audit, and directory reads as unknown and hides raw errors", async () => {
     const error = { message: "private-token-should-never-be-rendered" };
     mocks.profiles.mockResolvedValue({ data: null, error });

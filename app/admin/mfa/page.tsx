@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import AdminAuthShell from "@/components/admin/AdminAuthShell";
 import MfaForm from "@/components/admin/MfaForm";
 import LogoutButton from "@/components/admin/LogoutButton";
+import { ADMIN_ENTRY_PATH } from "@/lib/admin/entry-routes";
 import {
   getCurrentAdmin,
   getCurrentAdminCandidate,
@@ -19,7 +20,7 @@ export default async function AdminMfaPage() {
     getPortfolioContent(),
   ]);
 
-  if (admin) redirect("/admin");
+  if (admin) redirect(ADMIN_ENTRY_PATH);
   if (!candidate) redirect("/admin/login");
 
   const supabase = await createClient();

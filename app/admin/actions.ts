@@ -12,6 +12,7 @@ import {
   verifyPublicAuthActionOrigin,
 } from "@/lib/admin/action-security";
 import { enforceAuthRateLimit } from "@/lib/admin/auth-rate-limit";
+import { ADMIN_ENTRY_PATH } from "@/lib/admin/entry-routes";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { consumeAdminRecoveryChallenge } from "@/lib/admin/recovery";
 import { getSiteUrl } from "@/lib/site-url";
@@ -168,9 +169,9 @@ export async function loginAdmin(
     metadata: rateLimit.auditMetadata,
   });
 
-  const { data: assurance } =
+  const { data: assurance, error: assuranceError } =
     await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  redirect(assurance?.currentLevel === "aal2" ? "/admin" : "/admin/mfa");
+  redirect(!assuranceError && assurance?.currentLevel === "aal2" ? ADMIN_ENTRY_PATH : "/admin/mfa");
 }
 
 export async function requestPasswordReset(
@@ -339,7 +340,7 @@ export async function logoutAdmin() {
   // This endpoint is callable without a session. Validate the origin without
   // writing a security event before performing any Auth or audit operation.
   if (!(await verifyPublicAuthActionOrigin("logout"))) {
-    redirect("/admin");
+    redirect(ADMIN_ENTRY_PATH);
   }
 
   const supabase = await createClient();

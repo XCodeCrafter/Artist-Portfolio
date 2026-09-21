@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import AdminAuthShell from "@/components/admin/AdminAuthShell";
 import LoginForm from "@/components/admin/LoginForm";
+import { ADMIN_ENTRY_PATH } from "@/lib/admin/entry-routes";
 import {
   getCurrentAdmin,
   getCurrentAdminCandidate,
@@ -27,7 +28,7 @@ export default async function AdminLoginPage({
   ]);
 
   if (admin) {
-    redirect("/admin");
+    redirect(ADMIN_ENTRY_PATH);
   }
   if (candidate) {
     redirect("/admin/mfa");

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { heroFramingSchema } from "@/lib/content/hero-framing";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import {
   ACTOR_CREDIT_TYPES,
@@ -200,7 +201,7 @@ const bioHeroDraftSchema = z
     ctaHref: optionalHref,
     backgroundSrc: assetSource,
     posterSrc: optionalAssetSource,
-    mediaType: z.enum(["image", "video"]),
+    framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
   })
   .strict();
 
@@ -574,6 +575,7 @@ export function parseBioEditorSnapshot(value: unknown): BioEditorSnapshot | null
         backgroundSrc: snapshot.hero.backgroundSrc,
         posterSrc: snapshot.hero.posterSrc,
         mediaType: snapshot.hero.mediaType,
+        ...(snapshot.hero.framing !== undefined ? { framing: snapshot.hero.framing } : {}),
       },
       biography: {
         topLabel: snapshot.biography.topLabel,
@@ -790,7 +792,7 @@ const previewDraftSchema = z
         ctaHref: previewHref,
         backgroundSrc: previewMediaSource,
         posterSrc: previewMediaSource,
-        mediaType: z.enum(["image", "video"]),
+        framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
       })
       .strict(),
     biography: z

@@ -46,9 +46,7 @@ import useUnsavedChangesGuard, {
 import {
   deleteMediaGalleryImage,
   deleteShowreelVideo,
-  finalizeMediaUpload,
   moveGalleryImage,
-  prepareMediaUpload,
   restoreMediaAsset,
   saveGalleryHero,
   saveGalleryPresentation,
@@ -58,6 +56,7 @@ import {
   saveMediaGalleryImage,
   updateMediaAsset,
 } from "@/app/admin/media/actions";
+import { prepareMediaUpload, finalizeMediaUpload } from "@/lib/admin/media-upload-actions";
 import type {
   EditableGalleryImage,
   EditablePortfolioContent,
@@ -1326,7 +1325,7 @@ function AssetCard({
           <div>
             <p className="text-sm font-semibold text-amber-50">Stored safely in Trash</p>
             <p className="mt-1 text-xs leading-5 text-white/45">
-              The storage object is intact. Restore it to make the asset available in editors again.
+              The storage object is intact. Open V2, select Trash, and review the latest file state before restoring it.
             </p>
           </div>
           <form action={restoreMediaAsset}>
@@ -1334,9 +1333,9 @@ function AssetCard({
             <ActionButton
               className={secondaryButtonClass}
               disabled={disabled}
-              pendingLabel="Restoring..."
+              pendingLabel="Opening V2..."
             >
-              <FaUndo /> Restore
+              <FaUndo /> Review Trash in V2
             </ActionButton>
           </form>
         </div>

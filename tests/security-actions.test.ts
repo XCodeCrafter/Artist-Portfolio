@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  deleteAdminProfile,
   resetAdminMfa,
+  revokeAdminSessions,
   saveAdminProfile,
+} from "@/lib/admin/security-actions";
+import {
+  deleteAdminProfile as deleteClassicAdminProfile,
+  resetAdminMfa as resetClassicAdminMfa,
+  revokeAdminSessions as revokeClassicAdminSessions,
+  saveAdminProfile as saveClassicAdminProfile,
 } from "@/app/admin/security/actions";
 
 const actionMocks = vi.hoisted(() => ({
@@ -108,7 +116,7 @@ async function expectRedirect(
 }
 
 function createProfileSaveClient(authEmail = "admin@example.com") {
-  const upsert = vi.fn(async () => ({ error: null }));
+  const upsert = vi.fn(async (): Promise<{ error: { message: string } | null }> => ({ error: null }));
   const from = vi.fn(() => ({ upsert }));
   const getUserById = vi.fn(async () => ({
     data: { user: { email: authEmail } },
@@ -126,6 +134,25 @@ function createProfileSaveClient(authEmail = "admin@example.com") {
   };
 }
 
+function createManagedProfileClient(revokeError: { code: string } | null = null) {
+  const maybeSingle = vi.fn(async () => ({ data: { user_id: TARGET_ID }, error: null }));
+  const limit = vi.fn(() => ({ maybeSingle }));
+  const selectEq = vi.fn(() => ({ limit }));
+  const select = vi.fn(() => ({ eq: selectEq }));
+  const deleteEq = vi.fn(async () => ({ error: null }));
+  const deleteRow = vi.fn(() => ({ eq: deleteEq }));
+  const from = vi.fn(() => ({ select, delete: deleteRow }));
+  const listFactors = vi.fn(async () => ({
+    data: { factors: [{ id: "factor-one" }] }, error: null,
+  }));
+  const deleteFactor = vi.fn(async () => ({ error: null }));
+  const rpc = vi.fn(async () => ({ error: revokeError }));
+  return {
+    client: { from, rpc, auth: { admin: { mfa: { listFactors, deleteFactor } } } },
+    from, rpc, deleteRow, deleteEq, listFactors, deleteFactor,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   actionMocks.requireAdmin.mockResolvedValue({
@@ -138,6 +165,118 @@ beforeEach(() => {
 });
 
 describe("Admin Security actions", () => {
+  it.each([
+    ["save", saveAdminProfile],
+    ["delete", deleteAdminProfile],
+    ["revoke", revokeAdminSessions],
+    ["reset MFA", resetAdminMfa],
+  ] as const)("checks origin before service access for the shared %s entrypoint", async (_label, action) => {
+    actionMocks.verifyOrigin.mockResolvedValue(false);
+    await expectRedirect(
+      action(profileForm({ securitySurface: "v2" })),
+      "/admin/v2/security?status=security-error#access"
+    );
+    expect(actionMocks.createAdminServiceClient).not.toHaveBeenCalled();
+  });
+
+  it("protects the owner's own profile from deletion before database mutation", async () => {
+    const service = createManagedProfileClient();
+    actionMocks.createAdminServiceClient.mockReturnValue(service.client);
+    await expectRedirect(
+      deleteAdminProfile(userForm({ securitySurface: "v2", userId: OWNER_ID })),
+      "/admin/v2/security?status=self-protected#access"
+    );
+    expect(service.from).not.toHaveBeenCalled();
+    expect(service.rpc).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the database last-owner guard without a success audit", async () => {
+    const service = createProfileSaveClient();
+    service.upsert.mockResolvedValueOnce({ error: { message: "At least one active owner must remain" } });
+    actionMocks.createAdminServiceClient.mockReturnValue(service.client);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expectRedirect(
+        saveAdminProfile(profileForm({ securitySurface: "v2" })),
+        "/admin/v2/security?status=last-owner-required#access"
+      );
+      expect(actionMocks.writeAuditLog).not.toHaveBeenCalled();
+      expect(actionMocks.revalidatePath).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("retains a profile when session revocation fails before its deletion", async () => {
+    const service = createManagedProfileClient({ code: "XX000" });
+    actionMocks.createAdminServiceClient.mockReturnValue(service.client);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expectRedirect(
+        deleteAdminProfile(userForm({ securitySurface: "v2" })),
+        "/admin/v2/security?status=session-revoke-error#access"
+      );
+      expect(service.rpc).toHaveBeenCalledWith("revoke_admin_user_sessions", { target_user_id: TARGET_ID });
+      expect(service.deleteRow).not.toHaveBeenCalled();
+      expect(actionMocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "security_admin_session_revoke_failed" }));
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("retains every MFA factor if session revocation cannot be verified", async () => {
+    const service = createManagedProfileClient({ code: "XX000" });
+    actionMocks.createAdminServiceClient.mockReturnValue(service.client);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expectRedirect(
+        resetAdminMfa(userForm({ securitySurface: "v2" })),
+        "/admin/v2/security?status=mfa-reset-error#access"
+      );
+      expect(service.listFactors).toHaveBeenCalledWith({ userId: TARGET_ID });
+      expect(service.deleteFactor).not.toHaveBeenCalled();
+      expect(actionMocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "security_admin_mfa_session_revoke_failed" }));
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("revokes sessions before deleting any MFA factor", async () => {
+    const service = createManagedProfileClient();
+    actionMocks.createAdminServiceClient.mockReturnValue(service.client);
+    await expectRedirect(
+      resetAdminMfa(userForm({ securitySurface: "v2" })),
+      "/admin/v2/security?status=mfa-reset#access"
+    );
+    expect(service.rpc.mock.invocationCallOrder[0]).toBeLessThan(service.deleteFactor.mock.invocationCallOrder[0]);
+  });
+
+  it.each([
+    ["save", saveAdminProfile],
+    ["delete", deleteAdminProfile],
+    ["revoke", revokeAdminSessions],
+    ["reset MFA", resetAdminMfa],
+  ] as const)("denies non-owners before service access for the shared %s entrypoint", async (_label, action) => {
+    actionMocks.requireAdmin.mockResolvedValue({ id: OWNER_ID, email: "admin@example.com", role: "admin" });
+    await expectRedirect(
+      action(profileForm({ securitySurface: "v2" })),
+      "/admin/v2/security?status=owner-required#access"
+    );
+    expect(actionMocks.createAdminServiceClient).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["save", saveClassicAdminProfile],
+    ["delete", deleteClassicAdminProfile],
+    ["revoke", revokeClassicAdminSessions],
+    ["reset MFA", resetClassicAdminMfa],
+  ] as const)("preserves the guarded Classic %s compatibility entrypoint", async (_label, action) => {
+    actionMocks.verifyOrigin.mockResolvedValue(false);
+    await expectRedirect(action(profileForm()), "/admin/security?status=security-error#access");
+    expect(actionMocks.requireAdmin).toHaveBeenCalledTimes(1);
+    expect(actionMocks.createAdminServiceClient).not.toHaveBeenCalled();
+  });
+
   it("falls back to the classic route for a forged surface value", async () => {
     await expectRedirect(
       saveAdminProfile(

@@ -21,8 +21,7 @@ import { getProductionReadiness } from "@/lib/admin/readiness";
 export type AdminV2PageEditorState =
   | "ready"
   | "setup-required"
-  | "unavailable"
-  | "classic";
+  | "unavailable";
 
 export type AdminV2NavbarState = "shown" | "hidden" | "unknown";
 

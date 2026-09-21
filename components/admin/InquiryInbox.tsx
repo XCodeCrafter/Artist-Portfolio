@@ -12,13 +12,11 @@ import {
   FaSearch,
 } from "react-icons/fa";
 import {
-  deleteInquiry as deleteClassicInquiry,
-  updateInquiry as updateClassicInquiry,
-} from "@/app/admin/analytics/actions";
-import {
-  deleteInquiry as deleteV2Inquiry,
-  updateInquiry as updateV2Inquiry,
-} from "@/app/admin/v2/inbox/actions";
+  deleteClassicInquiry,
+  updateClassicInquiry,
+  deleteV2Inquiry,
+  updateV2Inquiry,
+} from "@/lib/admin/inquiry-server-actions";
 import ActionButton from "@/components/admin/ActionButton";
 import AdminDisclosure from "@/components/admin/AdminDisclosure";
 import VersionedDraftNotice from "@/components/admin/VersionedDraftNotice";

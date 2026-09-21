@@ -21,7 +21,7 @@ import {
   resetAdminMfa,
   revokeAdminSessions,
   saveAdminProfile,
-} from "@/app/admin/security/actions";
+} from "@/lib/admin/security-actions";
 import type {
   AdminProfile,
   AuditLogEntry,

@@ -57,6 +57,8 @@ export type HeroContent = {
   backgroundSrc: string;
   posterSrc: string;
   mediaType: "image" | "video";
+  /** Undefined: legacy schema; null: automatic framing; object: custom crop. */
+  framing?: import("./hero-framing").HeroFraming | null;
 };
 
 export type SiteSettings = {

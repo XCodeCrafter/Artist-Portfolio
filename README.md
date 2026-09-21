@@ -492,13 +492,27 @@ consistent in the admin content.
 
 ## Production Readiness
 
-1. The owner has confirmed manual rollout through `0045_contact_optional_copy.sql`
-   on the currently linked project, including the matching read-only checks for
-   migrations `0039`–`0045`. For another deployment, apply only missing forward
+Admin V2 is now the default successful sign-in destination. Classic remains
+available as rollback; legacy redirects are prepared but not activated. See
+[the Classic cutover plan](docs/classic-cutover.md) for the final audit,
+owner-approval gate and rollback instructions. This UI preparation adds no
+database migration.
+
+1. The owner has reported manual rollout through `0046_hero_media_framing.sql`
+   on the currently linked project. Screenshots confirm matching read-only
+   checks for `0041`–`0046`; live check results for `0039`/`0040` still need to be
+   explicitly recorded (their rollout was reported). For another deployment, apply only missing forward
    migrations in order and run their corresponding `supabase/checks/` scripts;
    never replay older migrations over newer functions or registries. Take a full
    backup and reconcile the pre-existing empty CLI history before using `db push`.
    `TODO.md` records remaining rollout, browser-audit and production gates.
+   Hero position/zoom uses `0046_hero_media_framing.sql`, verified by
+   `supabase/checks/0046_hero_media_framing.sql` (all eight results true).
+   On older deployments, only framing controls are disabled; ordinary Hero editing works.
+   The migration adds optional per-placement settings without modifying media
+   files or existing Hero content. Reload V2 after applying it.
+   The [final Classic/V2 audit](docs/admin-v2-final-audit-2026-09-21.md) records
+   repaired defects and the still-open disposable write/auth acceptance gates.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
    enrollment/verification enabled, set the password minimum to at least 12,
    enable leaked-password protection when available, and configure Cloudflare

@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { prepareMediaUpload, finalizeMediaUpload } from "@/app/admin/media/actions";
+import { prepareMediaUpload, finalizeMediaUpload } from "@/lib/admin/media-upload-actions";
 import { createClient } from "@/lib/supabase/client";
 import { formatMediaBytes, validateMediaUploadFiles } from "@/lib/admin/media-library-editor";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";

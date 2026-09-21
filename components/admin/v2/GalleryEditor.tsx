@@ -1,7 +1,7 @@
 "use client";
+import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
 
 import Image from "next/image";
-import Link from "next/link";
 import {
   useActionState,
   useCallback,
@@ -19,7 +19,6 @@ import {
   FaChevronLeft,
   FaDesktop,
   FaExclamationTriangle,
-  FaExternalLinkAlt,
   FaEye,
   FaEyeSlash,
   FaMobileAlt,
@@ -220,6 +219,7 @@ function InspectorHeader({
 }
 
 type InspectorProps = {
+  framingControls: ReactNode;
   activeSection: GalleryEditorSection;
   assets: MediaAsset[];
   draft: GalleryEditorDraft;
@@ -280,6 +280,7 @@ function HeroInspector(props: InspectorProps) {
         required
         value={hero.backgroundSrc}
       />
+      {props.framingControls}
       <section className="grid gap-4 rounded-[20px] border border-white/9 bg-black/22 p-4">
         <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-white/34">
           Hero button
@@ -934,6 +935,13 @@ export default function GalleryEditor({
   }
 
   const inspectorProps: Omit<InspectorProps, "activeSection" | "instance"> = {
+    framingControls: <HeroFramingControls
+      value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
+      mediaType={draft.hero.mediaType} onChange={(framing) => updateHero({ framing })}
+      device={device} onDeviceChange={setDevice}
+      disabled={editorDisabled || snapshot.draft.hero.framing === undefined}
+      unavailableReason={snapshot.draft.hero.framing === undefined ? "Apply migration 0046 and reload to enable Hero framing. Other Hero fields remain editable." : undefined}
+    />,
     assets,
     draft,
     errors,
@@ -1250,12 +1258,6 @@ export default function GalleryEditor({
           </p>
           <p className="mt-1 text-[10px] leading-4 text-white/34">{statusDetail}</p>
           <p aria-live="polite" className="sr-only">{announcement}</p>
-          <Link
-            className="mt-2 inline-flex items-center gap-2 text-[10px] font-semibold text-white/42 underline decoration-white/18 underline-offset-4 transition hover:text-white"
-            href="/admin/media?view=studio"
-          >
-            Open classic Gallery Studio <FaExternalLinkAlt />
-          </Link>
         </div>
         <div className="mt-3 flex items-center gap-2 sm:mt-0">
           {!inspectorOpen ? (

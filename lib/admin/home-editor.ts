@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { heroFramingSchema } from "@/lib/content/hero-framing";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import type { AboutHomeContent, HeroContent, PortfolioContent } from "@/lib/content/types";
 import { isSafeLocalMediaPath, isSafeManagedMediaSource } from "@/lib/media-source";
@@ -74,7 +75,7 @@ const schemas = {
   hero: z.object({
     title: text(220).min(1), subtitle: text(500), ctaLabel: text(220), ctaHref: href,
     backgroundSrc: media.refine(Boolean, "Choose a hero image or video."), posterSrc: media,
-    mediaType: z.enum(["image", "video"]),
+    framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
   }).strict().superRefine(requireCtaDestination),
   about: z.object({
     heading: text(500), body: text(10_000), ctaLabel: text(220), ctaHref: href,
@@ -97,7 +98,7 @@ const schemas = {
 const legacyText = z.string().max(50_000);
 const legacyDraftSchema = z.object({
   layout: layoutSchema,
-  hero: z.object({ title: legacyText, subtitle: legacyText, ctaLabel: legacyText, ctaHref: legacyText, backgroundSrc: legacyText, posterSrc: legacyText, mediaType: z.enum(["image", "video"]) }).strict(),
+  hero: z.object({ title: legacyText, subtitle: legacyText, ctaLabel: legacyText, ctaHref: legacyText, backgroundSrc: legacyText, posterSrc: legacyText, framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]) }).strict(),
   about: z.object({ heading: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, imageSrc: legacyText, imageAlt: legacyText }).strict(),
   cnc: z.object({ eyebrow: legacyText, title: legacyText, body: legacyText }).strict(),
   feature: z.object({ title: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, videoSrc: legacyText, posterSrc: legacyText, label: legacyText, meta: legacyText, eyebrow: legacyText }).strict(),

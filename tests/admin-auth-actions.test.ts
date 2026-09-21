@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { logoutAdmin } from "@/app/admin/actions";
-import { startMfaEnrollment } from "@/app/admin/mfa/actions";
+import { loginAdmin, logoutAdmin } from "@/app/admin/actions";
+import { startMfaEnrollment, verifyMfaCode } from "@/app/admin/mfa/actions";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   verifyPublicAuthActionOrigin: vi.fn(),
   enforceAuthRateLimit: vi.fn(),
   writeAuditLog: vi.fn(),
+  hasSupabaseBrowserEnv: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
@@ -27,6 +28,7 @@ vi.mock("@/lib/admin/auth-rate-limit", () => ({
 }));
 vi.mock("@/lib/admin/audit", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/lib/admin/recovery", () => ({ consumeAdminRecoveryChallenge: vi.fn() }));
+vi.mock("@/lib/supabase/env", () => ({ hasSupabaseBrowserEnv: mocks.hasSupabaseBrowserEnv }));
 vi.mock("next/navigation", () => ({
   redirect: (destination: string) => {
     throw Object.assign(new Error("NEXT_REDIRECT"), { destination });
@@ -41,7 +43,10 @@ function makeClient(user: typeof ADMIN | null = ADMIN) {
     auth: {
       getUser: vi.fn(async () => ({ data: { user }, error: null })),
       signOut: vi.fn(async () => ({ error: null })),
+      signInWithPassword: vi.fn().mockResolvedValue({ data: { user }, error: null }),
       mfa: {
+        challengeAndVerify: vi.fn().mockResolvedValue({ data: {}, error: null }),
+        getAuthenticatorAssuranceLevel: vi.fn().mockResolvedValue({ data: { currentLevel: "aal2" }, error: null }),
         listFactors: vi.fn().mockResolvedValue({
           data: { totp: [], all: [] }, error: null,
         }),
@@ -71,12 +76,104 @@ beforeEach(() => {
   mocks.verifyPublicAuthActionOrigin.mockResolvedValue(true);
   mocks.enforceAuthRateLimit.mockResolvedValue({ allowed: true, configured: true });
   mocks.writeAuditLog.mockResolvedValue({ ok: true });
+  mocks.hasSupabaseBrowserEnv.mockReturnValue(true);
+});
+
+describe("verified admin entry is V2", () => {
+  function login() {
+    const form = new FormData();
+    form.set("email", ADMIN.email);
+    form.set("password", "a-valid-password");
+    form.set("next", "https://evil.test");
+    return loginAdmin({ ok: false, message: "" }, form);
+  }
+
+  function verifyCode() {
+    const form = new FormData();
+    form.set("factorId", FACTOR_ID);
+    form.set("code", "123456");
+    form.set("next", "/admin/content");
+    return verifyMfaCode({ ok: false, message: "" }, form);
+  }
+
+  it("enters V2 after approved password sign-in with AAL2, ignoring next", async () => {
+    const client = makeClient();
+    mocks.createClient.mockResolvedValue(client);
+    await expect(login()).rejects.toMatchObject({ destination: "/admin/v2" });
+    expect(mocks.isAllowedAdmin).toHaveBeenCalledWith(ADMIN);
+    expect(client.auth.mfa.getAuthenticatorAssuranceLevel).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { data: { currentLevel: "aal1" }, error: null },
+    { data: null, error: null },
+    { data: { currentLevel: "aal2" }, error: new Error("Auth unavailable") },
+  ])("never skips MFA with uncertain or insufficient assurance %j", async (assurance) => {
+    const client = makeClient();
+    client.auth.mfa.getAuthenticatorAssuranceLevel.mockResolvedValue(assurance);
+    mocks.createClient.mockResolvedValue(client);
+    await expect(login()).rejects.toMatchObject({ destination: "/admin/mfa" });
+  });
+
+  it("does not enter V2 for an unapproved account", async () => {
+    const client = makeClient();
+    mocks.createClient.mockResolvedValue(client);
+    mocks.isAllowedAdmin.mockResolvedValue(false);
+    await expect(login()).resolves.toMatchObject({ ok: false });
+    expect(client.auth.signOut).toHaveBeenCalledOnce();
+    expect(client.auth.mfa.getAuthenticatorAssuranceLevel).not.toHaveBeenCalled();
+  });
+
+  it("does not contact Auth when login origin validation fails", async () => {
+    mocks.verifyPublicAuthActionOrigin.mockResolvedValue(false);
+    await expect(login()).resolves.toMatchObject({ ok: false });
+    expect(mocks.createClient).not.toHaveBeenCalled();
+  });
+
+  it("enters V2 only after MFA code and AAL2 validation, ignoring next", async () => {
+    const client = makeClient();
+    mocks.createClient.mockResolvedValue(client);
+    await expect(verifyCode()).rejects.toMatchObject({ destination: "/admin/v2" });
+    expect(client.auth.mfa.challengeAndVerify).toHaveBeenCalledWith({ factorId: FACTOR_ID, code: "123456" });
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "admin_mfa_verified" }));
+  });
+
+  it("does not enter V2 when MFA verification fails", async () => {
+    const client = makeClient();
+    client.auth.mfa.challengeAndVerify.mockResolvedValue({ error: new Error("Invalid code") });
+    mocks.createClient.mockResolvedValue(client);
+    await expect(verifyCode()).resolves.toMatchObject({ ok: false });
+    expect(client.auth.mfa.getAuthenticatorAssuranceLevel).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { data: { currentLevel: "aal1" }, error: null },
+    { data: null, error: null },
+    { data: { currentLevel: "aal2" }, error: new Error("Auth unavailable") },
+  ])("does not enter V2 if post-MFA assurance is not confirmed %j", async (assurance) => {
+    const client = makeClient();
+    client.auth.mfa.getAuthenticatorAssuranceLevel.mockResolvedValue(assurance);
+    mocks.createClient.mockResolvedValue(client);
+    await expect(verifyCode()).resolves.toMatchObject({ ok: false });
+    expect(mocks.writeAuditLog).not.toHaveBeenCalledWith(expect.objectContaining({ action: "admin_mfa_verified" }));
+  });
+
+  it("does not verify an MFA code from an unapproved candidate or blocked origin", async () => {
+    mocks.getCurrentAdminCandidate.mockResolvedValue(null);
+    await expect(verifyCode()).resolves.toMatchObject({ ok: false });
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    mocks.getCurrentAdminCandidate.mockResolvedValue(ADMIN);
+    mocks.verifyAdminActionOrigin.mockResolvedValue(false);
+    await expect(verifyCode()).resolves.toMatchObject({ ok: false });
+    expect(mocks.createClient).not.toHaveBeenCalled();
+    expect(mocks.enforceAuthRateLimit).not.toHaveBeenCalled();
+  });
 });
 
 describe("logout abuse protection", () => {
   it("rejects a foreign origin before contacting Auth or writing an audit row", async () => {
     mocks.verifyPublicAuthActionOrigin.mockResolvedValue(false);
-    await expect(logoutAdmin()).rejects.toMatchObject({ destination: "/admin" });
+    await expect(logoutAdmin()).rejects.toMatchObject({ destination: "/admin/v2" });
     expect(mocks.verifyPublicAuthActionOrigin).toHaveBeenCalledWith("logout");
     expect(mocks.createClient).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();

@@ -1488,10 +1488,10 @@ place until the final parity/production audit gate is complete.
       then `supabase/checks/0044_content_archive_gallery_showreel.sql` (all ten
       results true, confirmed by two owner screenshots). Reload Gallery/Showreel
       V2 before live use.
-- [ ] Authenticated desktop/mobile browser QA: retry when the in-app browser
-      attaches again; this turn's two background-tab attempts timed out before
-      any page UI could be inspected. Include disposable-fixture lifecycle
-      writes at the final 13G gate, not experiments on the owner's real content.
+- [x] Authenticated desktop/mobile UI verified during 13G: Gallery draft
+      switching/discard, both archive panels, Showreel card selection and mobile
+      inspectors. Earlier browser attachment failures are resolved. Actual
+      disposable-fixture lifecycle writes remain an open 13G acceptance gate.
 
 Implementation: both 1:1 inspectors now provide explicit Archive confirmation,
 20-item archive pages and hidden restore with original row data/order. Gallery
@@ -1541,9 +1541,9 @@ before removing Classic.
       then `supabase/checks/0045_contact_optional_copy.sql` (all six results true,
       confirmed by owner screenshot).
       Reload Contact V2. No earlier migration needs to be reapplied.
-- [ ] Authenticated desktop/mobile browser verification. The in-app browser
-      again failed to attach before any UI could be inspected this turn; do not
-      treat automated component tests as completed live browser QA.
+- [x] Authenticated desktop/mobile UI checked during 13G: Bio Advanced timing
+      validation/discard, optional Contact copy controls and Inbox weekly metric.
+      Save/reload on disposable content remains a separate acceptance gate.
 
 Implementation: each BIO paragraph has a collapsed Advanced animation delay
 control (whole milliseconds, 0–5000). Existing defaults and saved values remain
@@ -1576,31 +1576,158 @@ existing Edge Runtime deprecation/static-generation warnings remain. Read-only
 peer review found no actionable regressions. Live browser QA remains deferred.
 No remote SQL, owner-content writes, media changes or commit/push were performed.
 
-0045 rollout/checks confirmed. Next: 13F cutover preparation, followed by the explicitly
-announced final 13G parity/production audit. Classic remains until owner approval.
+0046 rollout/checks confirmed by owner screenshot (all eight true). Hero framing
+14A is implemented; its disposable save/reload check stays on the final audit.
+13F cutover preparation is complete. 13G audit and repairs are recorded below;
+its live write/auth acceptance gates remain open. Classic stays until those
+checks and owner approval, not merely until code-parity tests pass.
 
 ### 13F — Prepare the Classic cutover (retain rollback)
 
-- [ ] Extract retained upload, security and Inbox actions from Classic route
+- [x] Extract retained upload, security and Inbox actions from Classic route
       modules; inventory all V2 imports before removing any old route files.
-- [ ] Prepare V2 login/MFA destinations and legacy route/hash redirects, including
-      the old Insights inquiries anchor; remove Classic fallback links.
-- [ ] Preserve auth/recovery/callback routes, authorization, shared layouts,
+- [x] Prepare V2 login/MFA destinations and legacy route/hash redirects, including
+      the old Insights inquiries anchor; remove editor Classic fallback links.
+      Keep the explicit sidebar rollback link. Bookmark mappings are tested but
+      not activated; Classic routes still work normally.
+- [x] Preserve auth/recovery/callback routes, authorization, shared layouts,
       noindex protections and shared tables. Do not delete data with screens.
-- [ ] Do not restore obsolete actor/musician, raw IDs, unused featured/story
+- [x] Do not restore obsolete actor/musician, raw IDs, unused featured/story
       controls or unrestricted iframe/media sources merely to match Classic.
+
+Implementation: Media upload, Security and Inbox now use neutral shared server
+actions, with thin Classic compatibility wrappers. A recursive import-graph
+regression prevents V2 from depending on those Classic route modules. Existing
+authorization, upload proofs, validation, concurrency guards, audit and cache
+behavior remain. Upload origin/service failures return inline errors rather
+than sending the V2 uploader into Classic. Signed-out authorization still works
+normally. No Classic screen, content table or file was deleted.
+
+Approved AAL2 authentication now enters `/admin/v2`; assurance errors or missing
+payloads fail closed. Password recovery, callback and enrollment flows remain.
+The pure allowlisted legacy bookmark mapper preserves supported Insights,
+Inbox and Security state without accepting arbitrary return URLs. It is not
+mounted in routes or middleware. `docs/classic-cutover.md` records the route/hash
+inventory, browser-only fragment limitation, activation gate and rollback.
+
+Verification: all 2,539 tests across 140 files pass, along with TypeScript,
+ESLint and the production build. Only the existing Edge Runtime deprecation /
+static-generation warnings remain. Independent reviews checked extraction of
+upload, Security and Inbox behavior. Authenticated browser smoke on port 3001
+verified the already-signed-in login redirect to V2, Media's empty upload form,
+Security's Admin access tab, the connected Inbox and the still-working Classic
+overview at `/admin`. No console errors were
+observed. It did not exercise real OTP/recovery, uploads or privileged writes.
+
+The same browser run confirmed 0046 enables Home framing; Fit whole showed the
+complete portrait in the 1:1 preview. All local test drafts were discarded,
+leaving owner content unchanged. Desktop/mobile persistence and archive / Trash
+lifecycle writes on disposable fixtures remain mandatory 13G work, not passed
+by this smoke test. No new migration, remote SQL, provider configuration,
+commit or push was performed in 13F.
 
 ### 13G — Final audit gate (announce to owner when 13A–13F are ready)
 
-- [ ] Repeat Classic/V2 feature parity and public editability audit.
-- [ ] Run full regression/build and authenticated desktop/mobile browser QA;
-      verify saves/conflicts/uploads/replace/Trash/restore on disposable fixtures.
-- [ ] Verify migrations/check scripts and list remaining production blockers;
-      distinguish cutover readiness from ImageKit/email/analytics completion.
-- [ ] Report findings to owner and fix blockers before proposing removal.
+Audit performed 2026-09-21; see `docs/admin-v2-final-audit-2026-09-21.md` for the
+coverage matrix, evidence, three repaired defects and exact open gates. There
+is no new SQL migration. This is not authorization to remove Classic.
+
+- [x] Repeat Classic/V2 feature parity and public editability audit. No important
+      active Classic workflow missing from V2 was found; code-owned product
+      boundaries are explicitly documented rather than called 100% editable.
+- [x] Fix Classic restore's unversioned write by handing it to V2 for fresh-state
+      review; keep admin/origin checks and accurate legacy UI copy.
+- [x] Fix Appearance's incomplete/wrong-section success recovery; keep drafts/CAS
+      and block retries until explicit reload on an unconfirmed outcome.
+- [x] Fix Security's false Missing classification beyond the first Auth page;
+      bounded reads report unknown instead of making up an absence.
+- [x] Full regression/build: 2,569 tests / 141 files, TypeScript, ESLint and
+      production build pass. Production dependency audit reports 0 known issues.
+- [x] Authenticated desktop/mobile draft-only browser QA, including the deferred
+      Gallery/Showreel archive UI and Bio/Contact/Inbox controls. Verify discard,
+      sibling drafts, 1:1 inspector clicks and 390px overflow; no owner writes.
+- [x] Run all eight isolated PostgreSQL suites 0039–0046 and record the difference
+      between local checks, owner rollout evidence and production acceptance.
+      On the final 0046 schema, all 50 predecessor checks plus 8 Hero checks
+      pass; predecessor checks run read-only without changing content/versions.
+- [x] Report findings and separate Classic parity from ImageKit/email/analytics
+      readiness; repair the three confirmed code defects before removal review.
+- [ ] Live acceptance on isolated/owner-approved disposable fixtures:
+      save/reload/conflicts/upload/replace/Trash/restore/archive. No experiments
+      on owner-used media or actual singleton Hero placements.
+- [ ] Fresh password/MFA/recovery acceptance with an approved test account or
+      owner; do not change or revoke actual owner access merely for testing.
+- [ ] Explicitly record live 0039/0040 read-only check results (owner reported
+      applying them; live UI and local SQL success are not every live grant).
+      0041–0046 checks are confirmed by screenshots. Do not rerun old migrations.
+
+Morning reminders: disable public signup in Supabase Auth (live readiness
+reports it enabled); verify canonical HTTPS URL on deployment; return to
+ImageKit 7A.2f and Gmail/Resend 7B. Analytics aggregation/coverage and provider-aware
+permanent cleanup remain separate work. Next is acceptance, then an explicit
+owner decision on 13H. No push/deployment occurred in this audit.
+
+Release follow-up (owner request, 2026-09-21): publish the pending Hero 14A,
+13F cutover preparation and all three 13G code repairs together on
+`codex/admin-studio-redesign`. Rechecked 2,569 tests / 141 files, ESLint,
+TypeScript via production build, and the isolated 0046 lifecycle/latest-schema
+checks (50 predecessor + 8 Hero checks). Independent release review found no
+remaining code blocker, unexpected deleted files, temporary runtime fixtures or
+common secret/token patterns in the release candidates. Only code/docs/tests and
+the already-confirmed 0046 migration are included; do not apply SQL as part of
+Git publishing. Manual/live acceptance gates above remain open and Classic is
+retained. ImageKit, email and production Auth configuration are not silently
+marked complete by a successful push.
 
 ### 13H — Retire Classic only after audit and owner approval
 
 - [ ] Make V2 the sole admin interface with working legacy redirects.
 - [ ] Remove obsolete Classic UI without deleting shared services or content.
 - [ ] Run post-cutover smoke/security checks and document the rollback path.
+
+## Batch 14A — Hero position & zoom (owner priority before 13F)
+
+- [x] Add image/video position and zoom to all six V2 Hero inspectors: Home, Bio,
+      Music, Gallery, Showreel and Contact. Preserve original files and old crops
+      until the owner explicitly changes a placement.
+- [x] Provide drag, keyboard/position sliders, 100–300% zoom, Fill Hero / Fit whole,
+      per-device reset and reset to original; separate desktop/mobile settings.
+      Fit whole displays the complete portrait at 100% with black unused space.
+- [x] Reuse the public media renderer for the crop stage, update the 1:1 draft
+      preview and keep existing Save/discard/unsaved guards. Video preview plays
+      only on request; existing static page previews do not load video players.
+- [x] Add strict bounded framing validation, atomic service-only save wrappers,
+      parent-row CAS and consistent locked snapshots. Preserve existing RPCs,
+      public defaults and authorized Classic writes; no media-reference changes.
+- [x] Gate framing only before 0046. Unknown reads fail closed; unknown writes
+      never retry through the legacy save path. HOME uses its own configuration
+      column and returns normalized canonical content with the final version.
+- [x] Owner applies `supabase/migrations/0046_hero_media_framing.sql`, then
+      `supabase/checks/0046_hero_media_framing.sql` (all eight results true,
+      confirmed by owner screenshot).
+      Reload all open V2 editors. No earlier migration needs to be reapplied.
+- [ ] After rollout, verify a saved crop and reload on a disposable placement;
+      do not overwrite the owner's real Hero merely to test persistence.
+
+Verification: isolated PostgreSQL/PGlite covers strict numeric/shape
+limits on RPCs and both table constraints, roles, unchanged predecessor RPCs,
+legacy service writes, CAS/ABA/final version, HOME ownership, stale/trashed media,
+rollback after the first write and content-preserving rerun. All eight checks
+pass locally. Full regression passes: 2,388 tests across 136 files, TypeScript,
+ESLint and the production build. Only the pre-existing Edge Runtime warnings
+remain in the build. Both framed and pre-migration snapshot reads are bounded.
+
+Authenticated browser QA verified the migration-gated panel in all six editors
+and that normal Hero text fields stay editable. A temporary local fixture using
+the real controls/public renderer verified image Fit whole, pointer drag,
+zoom, separate desktop/mobile values, keyboard positioning, both-device reset,
+explicit video playback/pause and actual responsive CSS at 390px versus desktop.
+The fixture route was removed and browser viewport/tabs cleaned up. No content
+was saved. Small crop previews request suitably sized, non-priority images;
+existing MediaAssetPicker image-size warnings are outside this framing change.
+Live save/reload against the owner's database remains a disposable-fixture
+audit task. Migration 0046 is now confirmed; do not test writes on real content.
+
+This batch does not remove Classic, change Showreel scroll/play behavior,
+transcode existing media, run remote SQL or push a deployment. ImageKit 7A.2f,
+Gmail/email 7B and the remaining 13G production gate stay on the backlog.

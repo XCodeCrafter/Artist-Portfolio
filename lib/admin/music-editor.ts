@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { heroFramingSchema } from "@/lib/content/hero-framing";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import type { MusicPageViewData } from "@/lib/content/music";
 import type {
@@ -211,7 +212,7 @@ const musicHeroDraftSchema = z
     ctaHref: optionalHref,
     backgroundSrc: assetSource,
     posterSrc: optionalAssetSource,
-    mediaType: z.enum(["image", "video"]),
+    framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
   })
   .strict();
 
@@ -319,7 +320,7 @@ const snapshotHeroDraftSchema = z
     ctaHref: optionalHref,
     backgroundSrc: legacyMediaSource,
     posterSrc: optionalLegacyAssetSource,
-    mediaType: z.enum(["image", "video"]),
+    framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
   })
   .strict();
 const snapshotSpotifyDraftSchema = z
@@ -392,7 +393,7 @@ const previewDraftSchema = z
         ctaHref: previewHref,
         backgroundSrc: previewMediaSource,
         posterSrc: previewImageSource,
-        mediaType: z.enum(["image", "video"]),
+        framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
       })
       .strict(),
     spotify: z
@@ -603,6 +604,7 @@ export function parseMusicEditorSnapshot(value: unknown): MusicEditorSnapshot | 
         backgroundSrc: snapshot.hero.backgroundSrc,
         posterSrc: snapshot.hero.posterSrc,
         mediaType: snapshot.hero.mediaType,
+        ...(snapshot.hero.framing !== undefined ? { framing: snapshot.hero.framing } : {}),
       },
       spotify: {
         releasesHeading: snapshot.spotify.releasesHeading,

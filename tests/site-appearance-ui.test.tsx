@@ -96,10 +96,11 @@ describe("Appearance and navbar name V2 controls", () => {
     expect(nameSource).toContain("setSaved(confirmed.data.payload)");
     expect(nameSource).toContain("setVersions(confirmed.data.versions)");
     expect(nameSource).toContain("clearDirty(() => router.refresh())");
-    expect(appearanceSource).toContain("[result.section]: confirmed.data.payload");
+    expect(appearanceSource).toContain("[confirmed.data.section]: confirmed.data.payload");
     expect(appearanceSource).toContain("setSaved(nextSaved)");
-    expect(appearanceSource).toContain('result.status === "saved"');
-    expect(appearanceSource).toContain("setVersions(result.versions)");
+    expect(appearanceSource).toContain("runEditorSave(previous");
+    expect(appearanceSource).toContain("confirmed.data.section !== submittedSection");
+    expect(appearanceSource).toContain("setVersions(confirmed.data.versions)");
     expect(appearanceSource).toContain("JSON.stringify(nextSaved) === JSON.stringify(nextDraft)");
     appearance(); expect(mocks.guard).toHaveBeenCalledWith(undefined, true);
   });
@@ -118,10 +119,12 @@ describe("Appearance and navbar name V2 controls", () => {
     expect(html).not.toMatch(/<fieldset disabled=""/);
   });
   it("keeps draft state and blocks blind retry after an uncertain save response", () => {
-    expect(appearanceSource).toContain("setSaveUncertain(true)");
-    expect(appearanceSource).toContain("The save response was lost. Your draft was kept.");
-    expect(appearanceSource).toContain('state.status === "conflict" || saveUncertain');
-    expect(appearanceSource).toContain('!sectionDirty || saveUncertain || state.status === "conflict"');
+    mocks.state = { ...INITIAL_APPEARANCE_SAVE_STATE, status: "error", message: "The save outcome could not be confirmed." };
+    const html = appearance();
+    expect(html).toContain("Reload saved settings");
+    expect(html).toMatch(/<button type="submit" disabled=""/);
+    expect(appearanceSource).toContain("runEditorSave(previous");
+    expect(appearanceSource).toContain("needsEditorReload(state)");
   });
   it("confirms a section discard through the shared guard while preserving other section drafts", () => {
     expect(appearanceSource).toContain("confirmDiscard(() => change(section, saved[section]))");

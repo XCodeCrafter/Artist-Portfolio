@@ -33,6 +33,14 @@ const securityCenter = readFileSync(
   new URL("../components/admin/SecurityCenter.tsx", import.meta.url),
   "utf8"
 );
+const securityActions = readFileSync(
+  new URL("../lib/admin/security-actions.ts", import.meta.url),
+  "utf8"
+);
+const classicActions = readFileSync(
+  new URL("../app/admin/security/actions.ts", import.meta.url),
+  "utf8"
+);
 
 describe("Admin V2 Security routing", () => {
   it("accepts only the two fixed surfaces and defaults every forged value", () => {
@@ -70,6 +78,16 @@ describe("Admin V2 Security routing", () => {
 });
 
 describe("Admin V2 Security workspace contract", () => {
+  it("uses a neutral server-action boundary with no Classic route dependency", () => {
+    expect(securityCenter).toContain('from "@/lib/admin/security-actions"');
+    expect(securityCenter).not.toMatch(/from ["']@\/app\/admin\//);
+    expect(securityActions).not.toMatch(/from ["']@\/app\//);
+    expect(securityActions.startsWith('"use server";')).toBe(true);
+    expect(classicActions).toContain('from "@/lib/admin/security-actions"');
+    expect(classicActions).not.toContain("createAdminServiceClient");
+    expect(classicActions).not.toContain(".from(");
+  });
+
   it("keeps all mutations on their originating allowlisted surface", () => {
     expect(
       securityCenter.match(
