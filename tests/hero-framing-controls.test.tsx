@@ -43,7 +43,7 @@ function media() { return nodes(render()).find(node => node.type === HeroMedia)!
 function dimensions(width = 200, height = 400) { (media().props.onDimensions as (size: unknown) => void)({ width, height }); }
 function slider(label: string) { return nodes(render()).find(node => node.type === "input" && node.props["aria-label"] === label)!; }
 function change(label: string, value: string) { (slider(label).props.onChange as (event: unknown) => void)({ target: { value } }); }
-function stage() { return button(`Position ${props.device ?? (button("Mobile").props["aria-pressed"] ? "mobile" : "desktop")} Hero media`); }
+function stage() { return button(`Position ${props.device ?? (button("Mobile").props["aria-pressed"] ? "mobile" : "desktop")} ${props.subjectLabel ?? "Hero"} media`); }
 function pointer(handler: string, overrides: Record<string, unknown> = {}) {
   const event = { pointerId: 1, clientX: 20, clientY: 20, button: 0, isPrimary: true, currentTarget: target, preventDefault: vi.fn(), ...overrides };
   (stage().props[handler] as (event: unknown) => void)(event);
@@ -179,5 +179,90 @@ describe("Hero framing controls", () => {
     expect(text(render())).toContain("Video playback could not start");
     change("desktop Hero zoom", "1.6"); expect(lastValue()?.desktop.zoom).toBe(1.6);
     click("Play video preview"); expect(text(render())).not.toContain("Video playback could not start");
+  });
+});
+
+describe("Reusable photo framing controls", () => {
+  const photoDefault: HeroFraming = {
+    desktop: { fit: "cover", x: 50, y: 50, zoom: 1 },
+    mobile: { fit: "cover", x: 50, y: 50, zoom: 1 },
+  };
+
+  it("uses configurable accessible labels and honest save instructions", () => {
+    props.subjectLabel = "Photo";
+    props.saveDescription = "Frame this photo. Your crop is saved when you save the card.";
+    expect(button("Fill Photo").props["aria-pressed"]).toBe(true);
+    expect(stage().props["aria-label"]).toBe("Position desktop Photo media");
+    expect(slider("desktop Photo zoom").props.value).toBe(1);
+    expect(slider("desktop Photo horizontal position").props.value).toBe(50);
+    expect(slider("desktop Photo vertical position").props.value).toBe(50);
+    expect(text(render())).toContain(props.saveDescription);
+    expect(text(render())).toContain("Fill Photo covers the frame");
+    expect(text(render())).not.toContain("save Hero");
+    click("Fit whole media"); click("Fill Photo");
+    expect(lastValue()?.desktop.fit).toBe("cover");
+  });
+
+  it("shows each placement aspect ratio while retaining the real shared renderer", () => {
+    props.previewViewport = { desktop: { width: 800, height: 800 }, mobile: { width: 390, height: 260 } };
+    expect(stage().props.style).toMatchObject({ aspectRatio: "800 / 800" });
+    expect(media().props.deviceOverride).toBe("desktop");
+    click("Mobile");
+    expect(stage().props.style).toMatchObject({ aspectRatio: "390 / 260", maxWidth: 230 });
+    expect(media().props.deviceOverride).toBe("mobile");
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -10, Number.NaN, Number.POSITIVE_INFINITY])("falls back safely for invalid placement dimensions %s", width => {
+    props.previewViewport = { desktop: { width, height: 300 }, mobile: { width: 390, height: 390 } };
+    expect(stage().props.style).toMatchObject({ aspectRatio: "1440 / 900" });
+    click("Mobile");
+    expect(stage().props.style).toMatchObject({ aspectRatio: "390 / 390" });
+  });
+
+  it("defaults ordinary photos to the supplied framing without creating an edit", () => {
+    props.defaultFraming = photoDefault;
+    expect(media().props.framing).toEqual(photoDefault);
+    click("Mobile"); expect(slider("mobile Hero vertical position").props.value).toBe(50);
+    expect(button("Reset both to original").props.disabled).toBe(true);
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it("resets each device and both devices to the supplied default without mutating it", () => {
+    props.defaultFraming = photoDefault;
+    change("desktop Hero zoom", "2.4"); click("Mobile"); change("mobile Hero vertical position", "13");
+    click("Reset mobile");
+    expect(lastValue()?.mobile).toEqual(photoDefault.mobile);
+    expect(lastValue()?.desktop.zoom).toBe(2.4);
+    click("Reset both to original");
+    expect(lastValue()).toBeNull();
+    expect(media().props.framing).toEqual(photoDefault);
+    expect(photoDefault.desktop.zoom).toBe(1);
+    expect(photoDefault.mobile.y).toBe(50);
+  });
+
+  it("does not trust malformed supplied default framing", () => {
+    props.defaultFraming = { ...photoDefault, mobile: { ...photoDefault.mobile, zoom: Number.NaN } };
+    expect(media().props.framing).toEqual(getDefaultHeroFraming("image"));
+    click("Mobile"); change("mobile Hero zoom", "2"); click("Reset mobile");
+    expect(lastValue()?.mobile).toEqual(getDefaultHeroFraming("image").mobile);
+  });
+
+  it("keeps source validation and disabled guards for configured photos", () => {
+    props.subjectLabel = "Photo"; props.defaultFraming = photoDefault;
+    props.src = "https://untrusted.example/photo.jpg";
+    expect(media()).toBeUndefined(); expect(stage().props.disabled).toBe(true);
+    click("Fill Photo"); change("desktop Photo zoom", "2");
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it("reuses natural pointer and keyboard positioning with generic photo labels", () => {
+    props.subjectLabel = "Photo"; props.defaultFraming = photoDefault;
+    dimensions(); pointer("onPointerDown"); pointer("onPointerMove", { clientY: 75 }); pointer("onPointerUp");
+    expect(lastValue()?.desktop.y).toBe(40);
+    const preventDefault = vi.fn();
+    (stage().props.onKeyDown as (event: unknown) => void)({ key: "ArrowUp", shiftKey: true, currentTarget: target, preventDefault });
+    expect(lastValue()?.desktop.y).toBe(43.64);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
   });
 });

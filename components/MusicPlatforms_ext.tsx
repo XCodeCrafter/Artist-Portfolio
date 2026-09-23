@@ -1,5 +1,5 @@
 // artist-portfolio/components/MusicPlatforms_ext.tsx
-import Image from "next/image";
+import FramedImage from "@/components/FramedImage";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
 import type { MusicPlatformLink } from "@/lib/content";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
@@ -34,7 +34,8 @@ export default function MusicPlatformsExt({
 
               <div className="relative aspect-[4/3]">
                 {c.imageSrc ? (
-                  <Image
+                  <FramedImage
+                    framing={c.framing}
                     src={c.imageSrc}
                     alt={c.title}
                     fill

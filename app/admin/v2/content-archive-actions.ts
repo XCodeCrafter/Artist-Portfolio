@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { reloadPhotoArchiveSection } from "@/lib/admin/photo-framing";
 import { requireAdmin } from "@/lib/admin/auth";
 import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { createAdminServiceClient } from "@/lib/admin/service";
@@ -64,10 +65,12 @@ export async function mutateVisualContentArchive(input: unknown): Promise<Visual
     revalidatePath(collection === "gallery" ? "/gallery" : "/video");
     revalidatePath(`/admin/v2/pages/${collection}`);
     revalidatePath("/admin/v2/media");
+    const canonicalSection = await reloadPhotoArchiveSection(client, collection === "gallery" ? "gallery" : "video", section, snapshot.versions, snapshot.payload);
+    if (canonicalSection === null) return unconfirmed();
     const message = operation === "archive"
       ? "Item archived and removed from the public page. Its slot is free; no media file was deleted."
       : "Item restored as hidden. Review it and save it as visible when you are ready.";
-    return { ok: true, collection, section, canonicalSection: snapshot.payload, versions: snapshot.versions, archive,
+    return { ok: true, collection, section, canonicalSection, versions: snapshot.versions, archive,
       message: `${message}${audit && !audit.ok ? " The audit log could not be recorded." : ""}` };
   } catch {
     return unconfirmed();

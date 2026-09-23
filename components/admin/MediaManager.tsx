@@ -63,7 +63,7 @@ import type {
   EditableVideoItem,
 } from "@/lib/admin/content";
 import type { MediaAsset } from "@/lib/admin/media";
-import { VIDEO_TYPES, type PortfolioType } from "@/lib/content";
+import { VIDEO_TYPES, type PortfolioType } from "@/lib/content/types";
 import { createClient } from "@/lib/supabase/client";
 
 type MediaManagerProps = {

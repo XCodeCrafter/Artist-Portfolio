@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import FramedImage, { FramedVideoPoster } from "@/components/FramedImage";
+import { normalizeHeroFraming, type HeroFraming } from "@/lib/content/hero-framing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AnimatePresence,
@@ -26,6 +28,7 @@ import type { GalleryImage, GalleryPresentation } from "@/lib/content";
 type GalleryShowcaseProps = {
   images: GalleryImage[];
   interludePosterSrc?: string;
+  interludePosterFraming?: HeroFraming | null;
   interludeVideoSrc?: string;
   presentation: GalleryPresentation;
   mode?: "gallery" | "narrative";
@@ -259,7 +262,8 @@ function FrameButton({
           y: mediaY,
         }}
       >
-        <Image
+        <FramedImage
+          framing={image.framing}
           alt={image.alt || image.title}
           className="gallery-mask-media object-cover transition duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.04]"
           fill
@@ -377,7 +381,8 @@ function StoryImage({
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       type="button"
     >
-      <Image
+      <FramedImage
+        framing={image.framing}
         alt={image.alt || image.title}
         className="object-cover"
         fill
@@ -466,7 +471,8 @@ function StaticStoryFrame({
       onClick={() => onOpen(image)}
       type="button"
     >
-      <Image
+      <FramedImage
+        framing={image.framing}
         alt={image.alt || image.title}
         className="object-cover transition duration-700 ease-out group-hover:scale-[1.025]"
         fill
@@ -616,6 +622,7 @@ function GalleryInterlude({
   ctaHref,
   ctaLabel,
   posterSrc,
+  posterFraming,
   title,
   videoSrc,
   flushTop = false,
@@ -628,6 +635,7 @@ function GalleryInterlude({
   ctaHref?: string;
   ctaLabel?: string;
   posterSrc: string;
+  posterFraming?: HeroFraming | null;
   title: string;
   videoSrc: string;
   flushTop?: boolean;
@@ -691,8 +699,8 @@ function GalleryInterlude({
         style={{ scale: mediaScale, y: mediaY }}
       >
         {staticPreview || !videoSrc ? (
-          posterSrc ? <Image alt="" className="object-cover" fill sizes="100vw" src={posterSrc} /> : null
-        ) : <video
+          posterSrc ? <FramedImage alt="" className="object-cover" fill framing={posterFraming} sizes="100vw" src={posterSrc} /> : null
+        ) : <><video
           autoPlay={!reduceMotion}
           className="h-full w-full object-cover"
           loop
@@ -704,7 +712,10 @@ function GalleryInterlude({
           preload="metadata"
           ref={videoRef}
           src={videoSrc}
-        />}
+        />{posterSrc && normalizeHeroFraming(posterFraming) ? <FramedVideoPoster
+          alt="" className="object-cover" fill framing={posterFraming} sizes="100vw" src={posterSrc}
+          videoRef={videoRef} videoSrc={videoSrc}
+        /> : null}</>}
       </motion.div>
 
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.5)_0%,rgba(0,0,0,0.08)_40%,rgba(0,0,0,0.78)_100%)]" />
@@ -757,6 +768,7 @@ export default function GalleryShowcase({
   interludeCtaLabel,
   interludeBody,
   interludePosterSrc = "/images/video-hero.jpg",
+  interludePosterFraming,
   interludeTitle,
   interludeVideoSrc = "/media/hero-loop.mp4",
   mode = "gallery",
@@ -963,6 +975,7 @@ export default function GalleryShowcase({
               ctaLabel={interludeCtaLabel}
               flushTop
               posterSrc={interludePosterSrc}
+              posterFraming={interludePosterFraming}
               title={interludeTitle ?? presentation.interludeTitle}
               videoSrc={interludeVideoSrc}
               staticPreview={staticPreview}

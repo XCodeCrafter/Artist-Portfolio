@@ -1,5 +1,5 @@
 import "server-only";
-import { loadHeroEditorSnapshot } from "@/lib/admin/hero-framing";
+import { loadPhotoEditorSnapshot } from "@/lib/admin/photo-framing";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -262,7 +262,7 @@ export async function getAdminMusicEditorData(): Promise<AdminMusicEditorData> {
     };
   }
 
-  const { data, error } = await loadHeroEditorSnapshot(supabase, "music", "get_music_page_v2_snapshot");
+  const { data, error } = await loadPhotoEditorSnapshot(supabase, "music", "get_music_page_v2_snapshot");
 
   if (error && isMissingMusicEditorSchemaError(error)) {
     const legacy = await loadLegacyMusicSnapshot(supabase);

@@ -65,7 +65,7 @@ export async function mutateMediaAssetV2(input: unknown): Promise<MediaLibraryRe
     missing: "This file no longer exists in the library.",
     in_use: "This file is used on the portfolio. Choose a replacement to remove it safely.",
     invalid_replacement: "The replacement is unavailable or incompatible. Choose another active file of the same type.",
-    pipeline_busy: "This file has protected optimization or provider records. Its variants need a provider-aware cleanup workflow before removal; no files were changed.",
+    pipeline_busy: "This file has active processing or provider variants that cannot yet be safely changed. Removal and restore are paused; no files were changed.",
   };
   if (typeof outcome !== "string" || !["trashed", "replaced_and_trashed", "restored"].includes(outcome)) {
     return { ok: false, conflict: outcome === "conflict" || outcome === "in_use" || outcome === "missing", message: messages[String(outcome)] || "The action could not be confirmed. Reload the library to verify its state." };

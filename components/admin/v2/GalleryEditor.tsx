@@ -1,5 +1,6 @@
 "use client";
 import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
+import PhotoFramingControls from "@/components/admin/v2/PhotoFramingControls";
 
 import Image from "next/image";
 import {
@@ -220,6 +221,8 @@ function InspectorHeader({
 
 type InspectorProps = {
   framingControls: ReactNode;
+  device: GalleryPreviewDevice;
+  onDeviceChange: (device: GalleryPreviewDevice) => void;
   activeSection: GalleryEditorSection;
   assets: MediaAsset[];
   draft: GalleryEditorDraft;
@@ -512,6 +515,8 @@ function FrameCard({
           required
           value={item.src}
         />
+        <PhotoFramingControls value={item.framing} src={item.src} onChange={framing => props.onFrameChange(index, { framing })} saveSection="Frames"
+          device={props.device} onDeviceChange={props.onDeviceChange} variableAspect />
         <Field error={fieldMessage(props.errors, `items.${index}.title`)} label="Title" required>
           <input
             className={inputClass}
@@ -870,6 +875,7 @@ export default function GalleryEditor({
       category: "",
       isMosaic: true,
       isPublished: true,
+      ...(snapshot.photoFramingAvailable ? { framing: null } : {}),
     };
     commitDraft({
       ...draftRef.current,
@@ -935,6 +941,8 @@ export default function GalleryEditor({
   }
 
   const inspectorProps: Omit<InspectorProps, "activeSection" | "instance"> = {
+    device,
+    onDeviceChange: setDevice,
     framingControls: <HeroFramingControls
       value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
       mediaType={draft.hero.mediaType} onChange={(framing) => updateHero({ framing })}

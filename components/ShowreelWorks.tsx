@@ -1,6 +1,7 @@
 "use client";
 
-import Image from "next/image";
+import FramedImage, { FramedVideoPoster } from "@/components/FramedImage";
+import { normalizeHeroFraming } from "@/lib/content/hero-framing";
 import {
   useEffect,
   useMemo,
@@ -108,7 +109,8 @@ function WorkPreview({
   // the preview representative without autoplay, tracking, or surprise audio.
   if (!interactive) {
     return item.thumbnailSrc ? (
-      <Image
+      <FramedImage
+        framing={item.framing}
         alt={item.title}
         className="object-cover"
         fill
@@ -124,7 +126,7 @@ function WorkPreview({
 
   if (direct) {
     return (
-      <video
+      <><video
         data-analytics-preview="true"
         className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.025]"
         loop
@@ -134,7 +136,17 @@ function WorkPreview({
         preload="metadata"
         ref={videoRef}
         src={item.embedUrl}
-      />
+      />{item.thumbnailSrc && normalizeHeroFraming(item.framing) ? <FramedVideoPoster
+        active={active}
+        alt={item.title}
+        className="object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.025]"
+        fill
+        framing={item.framing}
+        sizes="(max-width: 1023px) 100vw, 50vw"
+        src={item.thumbnailSrc}
+        videoRef={videoRef}
+        videoSrc={item.embedUrl}
+      /> : null}</>
     );
   }
 
@@ -151,7 +163,8 @@ function WorkPreview({
   }
 
   return item.thumbnailSrc ? (
-    <Image
+    <FramedImage
+      framing={item.framing}
       alt={item.title}
       className="object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.025]"
       fill

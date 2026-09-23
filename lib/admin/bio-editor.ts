@@ -23,6 +23,7 @@ export type BioEditorSection = (typeof BIO_EDITOR_SECTIONS)[number];
 export type BioHeroDraft = HeroContent;
 
 export type BioGalleryEditorItem = {
+  framing?: import("@/lib/content/hero-framing").HeroFraming | null;
   id: string;
   src: string;
   alt: string;
@@ -90,6 +91,7 @@ export type BioEditorFooter = {
 };
 
 export type BioEditorSnapshot = {
+  photoFramingAvailable?: true;
   draft: BioEditorDraft;
   versions: BioEditorVersions;
   footer: BioEditorFooter;
@@ -207,6 +209,7 @@ const bioHeroDraftSchema = z
 
 const bioGalleryItemSchema = z
   .object({
+    framing: heroFramingSchema.nullable().optional(),
     id: recordId,
     src: assetSource,
     alt: text(220),
@@ -370,6 +373,7 @@ const editorFooterSchema = z
   .strict();
 const snapshotSchema = z
   .object({
+    photoFramingAvailable: z.literal(true).optional(),
     hero: snapshotHeroSchema,
     biography: snapshotBiographySchema,
     resume: snapshotResumeSchema,
@@ -566,6 +570,7 @@ export function parseBioEditorSnapshot(value: unknown): BioEditorSnapshot | null
 
   const snapshot = parsed.data;
   return {
+    ...(snapshot.photoFramingAvailable ? { photoFramingAvailable: true as const } : {}),
     draft: {
       hero: {
         title: snapshot.hero.title,
@@ -584,6 +589,7 @@ export function parseBioEditorSnapshot(value: unknown): BioEditorSnapshot | null
         galleryImages: snapshot.biography.galleryImages.map((item) => ({
           id: item.id,
           src: item.src,
+          ...(item.framing !== undefined ? { framing: item.framing } : {}),
           alt: item.alt,
           isPublished: item.isPublished,
         })),
@@ -805,6 +811,7 @@ const previewDraftSchema = z
             .object({
               id: recordId,
               src: previewMediaSource,
+              framing: heroFramingSchema.nullable().optional(),
               alt: text(220),
               isPublished: z.boolean(),
             })
@@ -887,7 +894,7 @@ export function createBioPageViewDataFromEditor(
       caption: draft.biography.caption,
       galleryImages: draft.biography.galleryImages
         .filter((item) => item.isPublished)
-        .map(({ id, src, alt }) => ({ id, src, alt })),
+        .map(({ id, src, alt, framing }) => ({ id, src, alt, ...(framing !== undefined ? { framing } : {}) })),
       paragraphs: draft.biography.paragraphs
         .filter((item) => item.isPublished)
         .map(({ id, body, revealDelay }) => ({ id, body, revealDelay })),

@@ -110,6 +110,12 @@ or deployment was performed.
 
 ## Open gates — do not silently mark these passed
 
+Schema-evidence follow-up, 2026-09-22: owner screenshots confirm all five 0039
+checks and all four 0040 checks are true. Together with prior screenshots,
+checks 0039–0046 are confirmed and the missing schema-evidence gate is closed.
+No migration needs to be replayed. This does not reconcile CLI migration history
+or substitute for the live write/auth acceptance below.
+
 1. **Disposable write acceptance:** upload a tiny owned test image; edit/save/
    reload it; place it in a hidden test item; use a second session to verify stale
    save rejection; replace the test-used asset, Trash/restore, and archive/restore
@@ -123,11 +129,7 @@ or deployment was performed.
 3. **Auth acceptance:** fresh password + authenticator, recovery and any second
    account/session-revocation test require an approved test account or owner
    participation. The existing owner was not logged out or reconfigured.
-4. **Schema evidence:** owner reports 0039/0040 applied; their live read-only
-   check results remain to be explicitly recorded. Screenshots confirm checks
-   0041–0046. Local passing checks do not replace live evidence. Run only the
-   matching read-only checks; do not rerun old migrations over newer functions.
-5. **Classic retirement:** after acceptance, request owner approval, implement
+4. **Classic retirement:** after acceptance, request owner approval, implement
    the client-side fragment bridge in 13H and test real legacy bookmarks before
    removing routes. The mapping is still preparation, not active redirects.
 
@@ -151,6 +153,49 @@ or deployment was performed.
 
 Next: finish the explicit acceptance gates above, then owner decision on 13H.
 No new migration was produced by Batch 13G.
+
+### Acceptance preparation follow-up — 2026-09-22
+
+The owner approved proceeding. A guarded temporary local workspace generator,
+fictional seed/media and loopback-only launcher are implemented; see
+`docs/local-acceptance.md`. All 46 migration bodies plus the local bootstrap/seed
+passed isolated PGlite checks (72 checks 0037–0046 and six Hero snapshots), with
+minimal Auth/Storage stubs and only PGlite's unsupported pgcrypto extension
+statement omitted. Full regression is now 2,703 tests / 144 files; TypeScript
+and ESLint pass. Production SQL and application behavior were not changed.
+
+Docker's Linux engine remained unavailable after a hidden Desktop launch and
+the CLI is not on PATH. No real local Auth user, MFA factor, Storage upload or
+browser save was exercised. The HTTP harness deliberately cannot certify HTTPS
+Storage placement or production Secure-cookie flows; those need agreed isolated
+TLS or a separate owner-approved hosted test environment. All live gates above
+remain open. No production settings/data/account changes, push or new migration.
+
+Runtime continuation: owner subsequently started Docker. Real local Postgres now
+passes all 72 checks after the complete migration/fixture sequence. A Docker
+Desktop publishing discrepancy was caught before account creation: the network
+option did not constrain actual ports. Four exposed test services were stopped
+and safely rebound with explicit 127.0.0.1 bindings, retaining stopped originals,
+writable-layer snapshots and the DB volume. Provision/start now fail closed on
+actual port checks. Only the isolated confirmed owner/profile/media bucket were
+created. Live browser verified the fictional login page and unauthenticated V2
+redirect; first owner-driven MFA setup and the real editor/lifecycle matrix are
+still pending. See `docs/local-acceptance.md` for current handoff and safe restart
+instructions. No production change, cleanup/delete or Git push occurred.
+Login follow-up: the local Auth API identified `email_provider_disabled`, not
+an incorrect owner password. Corrected only the fixture email-provider flag,
+retaining global signup/anonymous restrictions and the stopped original Auth
+container. Preflight now enforces all three settings. The unchanged password
+authenticates (200), its diagnostic session logout passes (204), and signup is
+still rejected. Browser MFA and editor acceptance remain pending. ImageKit
+7A.2f is the next implementation priority and does not wait for fixture MFA.
+Owner subsequently confirmed login success. Read-only browser verification
+observed the fictional Admin V2 control room behind its unchanged AAL2 gate.
+No authenticator secret was read/changed; save/reload/recovery and media
+lifecycle acceptance remain open. ImageKit 7A.2f.1's dormant object verifier
+is now implemented separately; see `docs/imagekit-lifecycle.md`.
+Runtime-helper regression: 2,843 tests / 147 files, TypeScript, full ESLint and
+diff whitespace checks pass.
 
 ## Release follow-up
 

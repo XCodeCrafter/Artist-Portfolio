@@ -1,4 +1,5 @@
 "use server";
+import { getPhotoSaveCall, isMissingPhotoFramingSchemaError, PHOTO_FRAMING_MIGRATION_MESSAGE } from "@/lib/admin/photo-framing";
 import { getHeroSaveCall, isMissingHeroFramingSchemaError, HERO_FRAMING_MIGRATION_MESSAGE } from "@/lib/admin/hero-framing";
 
 import { randomUUID } from "node:crypto";
@@ -137,10 +138,11 @@ export async function saveGallerySectionV2(
     );
   }
 
-  const saveCall = getHeroSaveCall("gallery", section, rpcName(section), rpcArguments(section, payload, versions));
+  const saveCall = getPhotoSaveCall("gallery", section, payload, versions, getHeroSaveCall("gallery", section, rpcName(section), rpcArguments(section, payload, versions)));
   const { data, error } = await supabase.rpc(saveCall.name, saveCall.args);
 
   if (error) {
+    if (isMissingPhotoFramingSchemaError(error)) return result("migration-required", PHOTO_FRAMING_MIGRATION_MESSAGE, { section });
     if (isMissingHeroFramingSchemaError(error)) {
       return result("migration-required", HERO_FRAMING_MIGRATION_MESSAGE, { section });
     }

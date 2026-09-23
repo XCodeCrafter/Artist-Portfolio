@@ -33,6 +33,7 @@ export type ShowreelIntroductionDraft = {
 };
 
 export type ShowreelWorkEditorItem = {
+  framing?: import("@/lib/content/hero-framing").HeroFraming | null;
   id: string;
   title: string;
   description: string;
@@ -70,6 +71,7 @@ export type ShowreelEditorFooter = {
 };
 
 export type ShowreelEditorSnapshot = {
+  photoFramingAvailable?: true;
   draft: ShowreelEditorDraft;
   versions: ShowreelEditorVersions;
   footer: ShowreelEditorFooter;
@@ -263,6 +265,7 @@ const videoTypes = [
 
 const showreelWorkFieldsSchema = z
   .object({
+    framing: heroFramingSchema.nullable().optional(),
     id: legacyVideoId,
     title: requiredText(220),
     description: text(1_000),
@@ -374,6 +377,7 @@ const snapshotIntroductionSchema = z
   .strict();
 const snapshotWorkSchema = z
   .object({
+    framing: heroFramingSchema.nullable().optional(),
     id: legacyVideoId,
     title: requiredText(220),
     description: text(1_000),
@@ -407,6 +411,7 @@ const footerSchema = z
   .strict();
 const snapshotSchema = z
   .object({
+    photoFramingAvailable: z.literal(true).optional(),
     hero: snapshotHeroSchema,
     introduction: snapshotIntroductionSchema,
     works: z.object({ items: z.array(snapshotWorkSchema) }).strict(),
@@ -558,6 +563,7 @@ export function parseShowreelEditorSnapshot(
   if (!parsed.success) return null;
   const snapshot = parsed.data;
   return {
+    ...(snapshot.photoFramingAvailable ? { photoFramingAvailable: true as const } : {}),
     draft: {
       hero: {
         title: snapshot.hero.title,
@@ -583,6 +589,7 @@ export function parseShowreelEditorSnapshot(
           embedUrl: item.embedUrl,
           platform: item.platform,
           thumbnailSrc: item.thumbnailSrc,
+          ...(item.framing !== undefined ? { framing: item.framing } : {}),
           videoType: item.videoType,
           isFeatured: item.isFeatured,
           isPublished: item.isPublished,
@@ -734,6 +741,7 @@ const previewDraftSchema = z
               embedUrl: previewVideoSource,
               platform: text(80),
               thumbnailSrc: previewAssetSource,
+              framing: heroFramingSchema.nullable().optional(),
               videoType: z.enum(videoTypes),
               isFeatured: z.boolean(),
               isPublished: z.boolean(),
@@ -813,6 +821,7 @@ export function createShowreelPageViewDataFromEditor(
         thumbnailSrc: isSafeShowreelAssetSource(item.thumbnailSrc)
           ? item.thumbnailSrc
           : "",
+        ...(item.framing !== undefined ? { framing: item.framing } : {}),
         videoType: item.videoType,
         isFeatured: item.isFeatured,
       })),

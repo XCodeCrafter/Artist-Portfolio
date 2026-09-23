@@ -18,17 +18,18 @@ export type HomeEditorDraft = {
   about: AboutHomeContent;
   cnc: { eyebrow: string; title: string; body: string };
   feature: {
+    posterFraming?: import("@/lib/content/hero-framing").HeroFraming | null;
     title: string; body: string; ctaLabel: string; ctaHref: string;
     videoSrc: string; posterSrc: string; label: string; meta: string; eyebrow: string;
   };
   stories: {
     title: string; body: string; ctaLabel: string; ctaHref: string;
     label: string; scrollLabel: string;
-    images: Array<{ src: string; title: string; body: string; alt: string }>;
+    images: Array<{ src: string; title: string; body: string; alt: string; framing?: import("@/lib/content/hero-framing").HeroFraming | null }>;
   };
 };
 export type HomeEditorVersions = { updatedAt: string };
-export type HomeEditorSnapshot = { draft: HomeEditorDraft; versions: HomeEditorVersions };
+export type HomeEditorSnapshot = { draft: HomeEditorDraft; versions: HomeEditorVersions; photoFramingAvailable?: true };
 export type HomeSaveState = {
   status: "idle" | "saved" | "invalid" | "conflict" | "security-error" | "missing-service" | "migration-required" | "error";
   message: string;
@@ -79,17 +80,17 @@ const schemas = {
   }).strict().superRefine(requireCtaDestination),
   about: z.object({
     heading: text(500), body: text(10_000), ctaLabel: text(220), ctaHref: href,
-    imageSrc: media, imageAlt: text(1_000),
+    imageSrc: media, imageAlt: text(1_000), framing: heroFramingSchema.nullable().optional(),
   }).strict().superRefine(requireCtaDestination),
   cnc: z.object({ eyebrow: text(500), title: text(500), body: text(10_000) }).strict(),
   feature: z.object({
     title: text(500), body: text(10_000), ctaLabel: text(220), ctaHref: href,
-    videoSrc: media, posterSrc: media, label: text(500), meta: text(500), eyebrow: text(500),
+    videoSrc: media, posterSrc: media, posterFraming: heroFramingSchema.nullable().optional(), label: text(500), meta: text(500), eyebrow: text(500),
   }).strict().superRefine(requireCtaDestination),
   stories: z.object({
     title: text(500), body: text(10_000), ctaLabel: text(220), ctaHref: href,
     label: text(500), scrollLabel: text(1_000),
-    images: z.array(z.object({ src: media, title: text(500), body: text(10_000), alt: text(1_000) }).strict()).length(4),
+    images: z.array(z.object({ src: media, title: text(500), body: text(10_000), alt: text(1_000), framing: heroFramingSchema.nullable().optional() }).strict()).length(4),
   }).strict().superRefine(requireCtaDestination),
 };
 
@@ -99,10 +100,10 @@ const legacyText = z.string().max(50_000);
 const legacyDraftSchema = z.object({
   layout: layoutSchema,
   hero: z.object({ title: legacyText, subtitle: legacyText, ctaLabel: legacyText, ctaHref: legacyText, backgroundSrc: legacyText, posterSrc: legacyText, framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]) }).strict(),
-  about: z.object({ heading: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, imageSrc: legacyText, imageAlt: legacyText }).strict(),
+  about: z.object({ heading: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, imageSrc: legacyText, imageAlt: legacyText, framing: heroFramingSchema.nullable().optional() }).strict(),
   cnc: z.object({ eyebrow: legacyText, title: legacyText, body: legacyText }).strict(),
-  feature: z.object({ title: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, videoSrc: legacyText, posterSrc: legacyText, label: legacyText, meta: legacyText, eyebrow: legacyText }).strict(),
-  stories: z.object({ title: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, label: legacyText, scrollLabel: legacyText, images: z.array(z.object({ src: legacyText, title: legacyText, body: legacyText, alt: legacyText }).strict()).length(4) }).strict(),
+  feature: z.object({ title: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, videoSrc: legacyText, posterSrc: legacyText, posterFraming: heroFramingSchema.nullable().optional(), label: legacyText, meta: legacyText, eyebrow: legacyText }).strict(),
+  stories: z.object({ title: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, label: legacyText, scrollLabel: legacyText, images: z.array(z.object({ src: legacyText, title: legacyText, body: legacyText, alt: legacyText, framing: heroFramingSchema.nullable().optional() }).strict()).length(4) }).strict(),
 }).strict();
 
 function issueMap(error: z.ZodError, prefix = "") {
@@ -131,7 +132,7 @@ export function parseHomeEditorDraft(value: unknown): HomeEditorDraft | null {
   return parsed.success ? parsed.data : null;
 }
 export function parseHomeEditorSnapshot(value: unknown): HomeEditorSnapshot | null {
-  const parsed = z.object({ draft: legacyDraftSchema, versions: versionsSchema }).strict().safeParse(value);
+  const parsed = z.object({ draft: legacyDraftSchema, versions: versionsSchema, photoFramingAvailable: z.literal(true).optional() }).strict().safeParse(value);
   return parsed.success ? parsed.data : null;
 }
 export function createHomeDraftFromContent(content: PortfolioContent): HomeEditorDraft {

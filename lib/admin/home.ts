@@ -1,5 +1,5 @@
 import "server-only";
-import { loadHeroEditorSnapshot } from "@/lib/admin/hero-framing";
+import { loadPhotoEditorSnapshot } from "@/lib/admin/photo-framing";
 import { requireAdmin } from "@/lib/admin/auth";
 import { createAdminServiceClient, hasAdminServiceEnv } from "@/lib/admin/service";
 import { createFallbackHomeEditorSnapshot, createHomeDraftFromContent, parseHomeEditorSnapshot, type HomeEditorSnapshot } from "@/lib/admin/home-editor";
@@ -22,7 +22,7 @@ export async function getAdminHomeEditorData(): Promise<AdminHomeEditorData> {
   if (!hasAdminServiceEnv()) return { snapshot: fallback, isConfigured: false, migrationRequired: false };
   const supabase = createAdminServiceClient();
   if (!supabase) return { snapshot: fallback, isConfigured: false, migrationRequired: false };
-  const { data, error } = await loadHeroEditorSnapshot(supabase, "home", "get_home_page_v2_snapshot");
+  const { data, error } = await loadPhotoEditorSnapshot(supabase, "home", "get_home_page_v2_snapshot");
   if (error && isMissingHomeEditorSchemaError(error)) {
     try {
       const content = await getPortfolioContent();

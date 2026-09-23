@@ -88,6 +88,7 @@ export type HomeUpdate = {
 };
 
 export type AboutHomeContent = {
+  framing?: import("./hero-framing").HeroFraming | null;
   heading: string;
   body: string;
   ctaLabel: string;
@@ -105,6 +106,7 @@ export type SocialLink = {
 };
 
 export type MusicPlatformLink = {
+  framing?: import("./hero-framing").HeroFraming | null;
   id: string;
   title: string;
   label: string;
@@ -125,12 +127,14 @@ export type MusicPresentation = {
 };
 
 export type BioGalleryImage = {
+  framing?: import("./hero-framing").HeroFraming | null;
   id: string;
   src: string;
   alt: string;
 };
 
 export type GalleryImage = {
+  framing?: import("./hero-framing").HeroFraming | null;
   id: string;
   title: string;
   src: string;
@@ -157,6 +161,7 @@ export type BioContent = {
 };
 
 export type VideoItem = {
+  framing?: import("./hero-framing").HeroFraming | null;
   id: string;
   title: string;
   description: string;
@@ -249,6 +254,7 @@ export type HomePresentation = {
 };
 
 export type PortfolioContent = {
+  photoFramings?: import("./photo-framing").PublicPhotoFramings;
   settings: SiteSettings;
   navigation: NavigationConfig;
   heroes: Record<PageSlug, HeroContent>;

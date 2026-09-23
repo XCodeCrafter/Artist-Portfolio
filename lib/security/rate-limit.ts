@@ -17,6 +17,8 @@ type DatabaseRateLimitInput = {
   identifierHash: string;
   limit: number;
   windowSeconds: number;
+  /** Sensitive provider operations must remain closed even in development. */
+  failClosed?: boolean;
 };
 
 type RateLimitRow = {
@@ -28,9 +30,9 @@ type RateLimitRow = {
 
 const READINESS_IDENTIFIER_HASH = "0".repeat(64);
 
-function unavailableResult(limit: number, configured: boolean) {
+function unavailableResult(limit: number, configured: boolean, failClosed = false) {
   return {
-    allowed: process.env.NODE_ENV !== "production",
+    allowed: !failClosed && process.env.NODE_ENV !== "production",
     configured,
     firstDenied: false,
     limit,
@@ -60,15 +62,14 @@ export async function consumeDatabaseRateLimit(
   input: DatabaseRateLimitInput
 ): Promise<DatabaseRateLimitResult> {
   if (!isValidInput(input)) {
-    return unavailableResult(input.limit, false);
-  }
-
-  const supabase = createAdminServiceClient();
-  if (!supabase) {
-    return unavailableResult(input.limit, false);
+    return unavailableResult(input.limit, false, input.failClosed);
   }
 
   try {
+    const supabase = createAdminServiceClient();
+    if (!supabase) {
+      return unavailableResult(input.limit, false, input.failClosed);
+    }
     const { data, error } = await supabase.rpc("consume_security_rate_limit", {
       p_bucket: input.bucket,
       p_identifier_hash: input.identifierHash,
@@ -80,17 +81,26 @@ export async function consumeDatabaseRateLimit(
       const missingSchema = ["PGRST202", "42883", "42P01"].includes(
         error.code || ""
       );
-      return unavailableResult(input.limit, !missingSchema);
+      return unavailableResult(input.limit, !missingSchema, input.failClosed);
     }
 
+    if (input.failClosed && Array.isArray(data) && data.length !== 1) {
+      return unavailableResult(input.limit, true, true);
+    }
     const row = (Array.isArray(data) ? data[0] : data) as RateLimitRow | null;
     if (
       !row ||
       typeof row.allowed !== "boolean" ||
       typeof row.remaining !== "number" ||
-      typeof row.retry_after_seconds !== "number"
+      typeof row.retry_after_seconds !== "number" ||
+      (input.failClosed && (
+        typeof row.first_denied !== "boolean" ||
+        !Number.isInteger(row.remaining) || row.remaining < 0 || row.remaining > input.limit ||
+        !Number.isInteger(row.retry_after_seconds) || row.retry_after_seconds < 1 ||
+        row.retry_after_seconds > input.windowSeconds
+      ))
     ) {
-      return unavailableResult(input.limit, true);
+      return unavailableResult(input.limit, true, input.failClosed);
     }
 
     return {
@@ -102,7 +112,7 @@ export async function consumeDatabaseRateLimit(
       retryAfterSeconds: Math.max(1, Math.trunc(row.retry_after_seconds)),
     };
   } catch {
-    return unavailableResult(input.limit, true);
+    return unavailableResult(input.limit, true, input.failClosed);
   }
 }
 

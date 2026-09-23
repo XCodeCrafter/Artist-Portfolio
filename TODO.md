@@ -1,6 +1,18 @@
 # Artist Portfolio V2 Roadmap
 
-Updated: 2026-09-21
+Updated: 2026-09-23
+
+## Current checkpoint — photo framing detour (14B)
+
+Owner requested independent positioning/zoom for every photo placement before
+returning to ImageKit. Batch 14B below implements it; hosted migration **0051**
+is owner-confirmed by screenshot (all nine checks true). Disposable end-to-end
+save/reload acceptance is still pending. Do not replay owner-confirmed 0047–0051.
+After 14B, resume **7A.2f.3c.2** at explicit account
+admission and authenticated/quota-limited invocation; ImageKit keys remain
+owner-deferred, the provider/pilot stay disabled, and deletion/version resolution
+stays closed. Gmail/Resend 7B, remaining 13G acceptance and explicit 13H approval
+are not forgotten or implicitly completed.
 
 ## Product direction
 
@@ -476,8 +488,14 @@ Acceptance:
 
 ## Batch 7A - Provider-neutral media delivery and Media Optimizer V2
 
-Status: Batch 7A.2e isolated ImageKit V2 authority core complete; authenticated
-issuance, the lifecycle migration, and atomic finalization pending
+Status: Batch 7A.2e authority core, 7A.2f.1 read-only object verifier, 7A.2f.2
+database lifecycle/Trash, 7A.2f.3a authenticated reservation adapters and dormant
+7A.2f.3b issuance/finalization core implemented;
+hosted 0047/0048/0049 rollout is owner-confirmed (all 9 + 8 + 3 checks true in screenshots).
+Production admission/account verification, reconciliation
+and pilot UI remain pending. Current uploads remain Supabase.
+The no-keys 7A.2f.3c.1 observation worker core is implemented but dormant:
+it retains uncertain/absent work and never deletes provider objects.
 
 ### Batch 7A.1 - Immediate traffic and persistence foundation
 
@@ -565,6 +583,217 @@ Small, reviewable rollout steps:
       retry must first resolve the old intent and allocate a new intent/object
       key; the same authority must never be reissued. A failed finalization
       creates no public reference or silent provider orphan.
+  - [x] **7A.2f.1 — isolated provider evidence (2026-09-22):** add a dormant,
+        server-only verifier of authenticated file/version details, configured
+        account and canonical MIME-specific path; stream original version bytes
+        with bounded size/time, check MIME signatures and SHA-256, then recheck
+        the current version. No signing endpoint, DB/provider write, live API
+        call, credentials change or provider activation. Mock HTTP tests are
+        not a live pilot. Details and integration blockers:
+        `docs/imagekit-lifecycle.md`. Verification: 85 new verifier tests;
+        138 tests / 4 files passed with controlled concurrency, plus TypeScript
+        and scoped ESLint. Full regression interrupted due host timeouts;
+        the affected Bio/Classic-boundary suites passed in that controlled rerun.
+  - [x] **7A.2f.2 — database lifecycle (2026-09-22):** migrations 0047/0048 add
+        canonical MIME-specific reservations without mutating 0036 identities,
+        private provider/version bindings, durable one-shot issuance claims,
+        atomic insert-only finalization and bounded reconciliation leases.
+        Source-only verified ImageKit assets support recoverable Trash/restore
+        and reference-safe replacement, including archived content. Ready bytes
+        remain stored in Trash; no provider deletion is performed. Cleanup can
+        record absent/retry/unsafe observations but cannot declare completion
+        before f.3 implements verified provider-side reconciliation. Tested on
+        isolated PostgreSQL with runtime rollback, retry, role, binding, expiry
+        and Trash cases; all 75 checks for 0039–0048 pass. Single-session tests
+        do not establish concurrent race behavior; lock contracts were reviewed.
+        Full regression: 2,938 tests / 149 files, TypeScript, full ESLint and
+        tracked diff whitespace checks pass with controlled test concurrency.
+        No hosted SQL, credentials, provider call, activation or Git push.
+  - [x] **7A.2f.2 rollout:** owner confirmed applying 0047 and 0048 with screenshots
+        of their read-only checks (9 + 8 rows, all true). This is owner-supplied
+        rollout evidence, not an independent agent database probe. Leave Supabase
+        uploader/pilot flags as-is.
+        Exact files and test instructions: `docs/imagekit-lifecycle.md`.
+  - [ ] **7A.2f.3 — authenticated wiring:** AAL2/origin/rate-limit and same-account
+        key-pair preflight, action adapters, retry resolution, audited cleanup
+        with post-upload quiescence and client progress/cancel states. Never
+        reissue the same one-shot JWT or expose the verifier as a public action.
+        Before pilot activation, test competing issuance/finalize/Trash/cleanup
+        through multiple real PostgreSQL connections, beyond the f.2 PGlite
+        single-session behavioral and reviewed lock-order contracts.
+    - [x] **7A.2f.3a — authenticated reservation boundary (2026-09-22):** add
+          dormant prepare/resolve/cancel server actions using current AAL2/session
+          auth, active admin profile, explicit canonical Origin plus configured
+          allowlist, and fixed per-actor DB limits. Add an opt-in fail-closed
+          rate-limit policy even for local development, preserving existing
+          callers' defaults. Strict requests and exact 0047 response parsing
+          enforce server-derived IDs/account/path, size/MIME and lifecycle
+          invariants. Return only a six-field public status; never private
+          bindings, evidence, credentials or upload authority. Ambiguous RPC
+          results require resolution, never implicit replay/cancellation.
+          Existing upload UI/actions are untouched. No new migration, hosted
+          SQL, provider request, credential edit, activation or Git push.
+          Verification: 319 new tests; full regression 3,257 tests / 152 files,
+          TypeScript, full ESLint and tracked diff whitespace checks pass.
+    - [x] **7A.2f.3b — dormant issuance and finalization core:** add server-only
+          orchestration of schema readiness, actor-scoped resolution, one-shot
+          claim/signing and fresh verification/atomic finalization. JWT timing
+          exactly matches persisted issuance/expiry; immutable facts are checked
+          across responses. Ambiguous/already-issued claims never recreate a
+          token; consumed retries never overwrite edits or revive Trash. A
+          post-verification readback rejects changed/closed/expired intents.
+          Cache failure does not disguise a committed publication as failure.
+          No public endpoint/UI integration or default admission adapter exists;
+          Supabase uploads and feature flags are unchanged.
+          Verification: 51 new claim/finalizer parser cases, 140 coordinator
+          tests, plus isolated SQL with 38 readiness-drift cases and all 78
+          deployment checks for 0039–0049 passing. Full regression: 3,448 tests /
+          153 files, TypeScript, full ESLint and diff whitespace checks pass.
+          At that checkpoint real concurrent connections, live provider/account
+          admission and deployment were separate gates; the SQL concurrency
+          follow-up below now covers the implemented lifecycle.
+    - [x] **7A.2f.3b.1 — real PostgreSQL concurrency, without provider keys:**
+          add `npm run test:imagekit:concurrency` with three independent backends
+          and service-role RPC callers. Twelve deterministic cases cover prepare
+          retry/collision, one-shot issuance, issue/cancel and finalize/cancel in
+          both orders, finalization retries, provider-file collision commit and
+          rollback, non-blocking cleanup leases, and Trash versus late finalize.
+          Observe actual `pg_blocking_pids` before releasing the competing
+          transaction; assert durable rows and audit counts afterwards.
+          All 12 pass on fresh PostgreSQL 17 with migrations through 0049.
+          The runner uses only a cached image, no network/ports/host mounts,
+          read-only rootfs and temporary RAM-backed data; it verifies its own
+          container before removing it. Existing local/hosted Supabase is unused.
+          No production SQL change or additional migration was needed. This
+          proves the listed SQL races, not provider delivery or end-to-end UI.
+          Verification: 12 real-session cases pass repeatedly, including after
+          cleanup hardening; graceful SIGTERM removes only its owned container.
+          66 new isolation/ownership guard tests pass; full regression is 3,514
+          tests / 154 files, plus TypeScript, full ESLint and diff checks.
+          The owner deferred ImageKit credentials/account setup; do not request
+          secrets or activate the adapter until they return to that step.
+    - [x] **0049 rollout:** owner confirmed all three read-only checks true in
+          the supplied screenshot (service-only, read-only boundary, exact
+          version 1 / ready true contract). 0047/0048 are also confirmed; do not
+          request these migrations again. The agent did not execute hosted SQL.
+          Provider/account verification and activation remain separate gates.
+    - [ ] **Production admission/account preflight:** resolve and implement
+          explicit account approval and bounded pilot verification (no documented
+          read-only public/private pair proof was found). Do not substitute
+          string-format validation for account verification or use an always-open
+          admission callback. Require AAL2/live session, strict Origin and operation
+          rate limits plus ready reconciliation before exposing the coordinator.
+    - [ ] **7A.2f.3c — reconciliation and pilot controls:** implement bounded
+          provider ownership/version-safe reconciliation and upload quiescence,
+          then progress/retry/cancel UI and acceptance for the new reconciliation
+          paths (existing SQL lifecycle races are covered above). Do not
+          declare absence to be cleanup completion or delete by browser file ID.
+      - [x] **7A.2f.3c.1 — dormant observation worker, no provider keys needed:**
+            implement strict cleanup lease/result parsers, a bounded read-only
+            ImageKit exact-reservation-folder observation, and a server-only
+            one-candidate coordinator with mandatory trusted admission. Use
+            existing 0047/0049 RPCs; no new migration or route/action/cron.
+            An authenticated empty listing means only not observed now and
+            retains pending work; any found/ambiguous content requires attention.
+            Auth failures, 404, network errors and deadlines are never absence.
+            Protect account/namespace, lease lifetime and immutable snapshots;
+            never replay lost RPCs, accept browser targets, or delete objects.
+            Provider metadata is capped at 64 KiB/15 seconds; the entire worker
+            wait is bounded at 30 seconds. Recheck schema readiness and lease
+            before committing the observation; SQL fences stale workers.
+            Activation remains blocked on approved credentials and authenticated,
+            quota-limited invocation; the current claim RPC is single-account.
+            Verification: 154 contract, 88 mocked-provider and 83 workflow tests
+            pass (325 new cases); full regression is 3,839 tests / 157 files,
+            TypeScript, full ESLint and diff checks. The real PostgreSQL suite
+            now passes 14 cases, adding duplicate finish and expired-lease
+            reclaim races with exact audit/state assertions. Its own temporary
+            container is removed afterwards; no live provider call, hosted SQL,
+            application activation, credential edit or Git push occurred.
+      - [ ] **7A.2f.3c.2 — remaining reconciliation/activation:** design and verify
+            ownership/version-safe orphan resolution and upload quiescence,
+            explicit account approval and authenticated worker invocation with
+            operational status/alerts; observation-only is NOT cleanup readiness.
+            Then connect progress/retry/cancel controls and perform the live pilot.
+            Do not activate a timer/cron, provider deletion or uploads silently.
+        - [x] **7A.2f.3c.2a — read-only Media V2 operational overview:** add a
+              compact disclosure above the media library with upload-window,
+              waiting, due, checking and needs-review counts. Urgent cases open
+              automatically; the bounded list prioritizes review/due items and
+              explicitly says when more items are omitted. Keep existing upload,
+              edit and Trash controls independent; no refresh can discard drafts.
+              Add a service-only, active-admin-checked STABLE RPC in 0050. It
+              returns one consistent snapshot and no provider URLs/paths, keys,
+              worker/lease IDs, hashes or bindings. Viewing never expires a
+              reservation, claims a lease, changes an audit record or calls
+              ImageKit. Require the existing AAL2/live-session boundary in the
+              loader; bound reads, validate counts/rows, distinguish migration,
+              readiness and unavailable errors from a verified empty result.
+              The worker/provider adapter remains dormant; this panel is not
+              automatic cleanup or a statement that provider storage is empty.
+              Verification: 110 new unit/render cases; full regression 3,949
+              tests / 159 files, TypeScript, ESLint and production build pass
+              (existing Edge Runtime warnings only). Real PostgreSQL
+              passes 8 overview scenarios, 14 existing concurrency scenarios,
+              all four deployment checks and content-preserving migration rerun.
+              Repeated reads leave every public/auth table unchanged. Empty-state
+              browser smoke after hosted 0050 rollout passed below; no live
+              provider call, account edit, worker activation or push occurred.
+        - [x] **0050 rollout:** owner confirmed all four checks true in the
+              supplied screenshot on 2026-09-23: service-only access, read-only
+              boundary, parent guards ready and private source tables retained.
+              The agent did not execute hosted SQL. No ImageKit keys or provider
+              activation were required. 0047/0048/0049 remain confirmed as well;
+              do not request these migrations again. Browser acceptance is
+              recorded separately below, not proved by these schema checks.
+        - [x] **7A.2f.3c.2a browser smoke (2026-09-23):** current checkout at
+              localhost:3102, existing authenticated session, connected hosted
+              database. Verify the empty overview at 1440×900 and 390×844,
+              click/Enter/Space disclosure, keyboard focus, five/two-column counts,
+              no horizontal overflow, library search/filter/selection preservation,
+              mobile file inspector and existing Supabase upload form. Console
+              reported no warnings/errors. No fields saved, uploads, media/Trash
+              mutations, auth changes or provider activation. Raise both small
+              timestamp labels from white/40 to white/50 for readable contrast;
+              111 targeted tests, TypeScript and targeted ESLint pass. Restore the
+              browser viewport and filters after testing; port 3000 stays free.
+        - [x] **Populated/error component browser fixtures (2026-09-23):** reuse
+              the real component/global CSS with 11 deterministic synthetic cases
+              on a separate loopback-only static server; no app routes, backend
+              loaders, credentials, SQL or ImageKit calls. All cases pass at
+              1440×1000 and 390×844; mixed 20-of-23 queue also fits 320×740.
+              Verify priority auto-open, keyboard focus/Arrow/End list scrolling,
+              220-character wrapping, literal HTML text, truncation and UTC copy,
+              all four unavailable states without false zero counts, and an
+              explicitly QA-only adjacent draft input. Console is clean. This is
+              component acceptance, not authenticated failure-injection or provider
+              lifecycle acceptance. Add reusable `npm run test:imagekit:overview-browser`
+              and 45 fixture/server tests; 156 targeted tests, TypeScript and
+              targeted ESLint pass. Stop the fixture server, close only its tab
+              and restore viewport.
+              No production component change or new migration was needed.
+        - [x] **7A.2f.3c.2b — dormant orphan candidate inspection (2026-09-23):**
+              validate a terminal, issued, unbound server lease and exact account;
+              list only its canonical folder with a bounded, fixed-origin GET.
+              Empty means not observed now; multiple/malformed/foreign entries
+              require attention. For one exact candidate, pin list metadata to
+              current details and verify version, MIME, size, signature and SHA-256
+              of original bytes, then recheck current details and lease time.
+              Evidence is server-only and is NOT deletion/publication authority.
+              Add external abort and absolute timer/monotonic deadlines to both
+              adapters; late/stalled responses cannot trigger another request.
+              The inspector has its own 60s budget and lease margin; leave it
+              disconnected from the existing 30s observation worker. No SQL writes,
+              new migration, route, cron, provider calls or activation. Clarify
+              that the existing settling delay does not establish quiescence.
+              Verification: 359 focused cases; full regression 4,269 tests /
+              163 files with two workers, TypeScript and full ESLint pass.
+              Initial parallel-only timeout and limits are recorded in
+              `docs/imagekit-lifecycle.md`; no provider/browser acceptance claimed.
+        - [ ] **Remaining before activation:** provider ownership/version-safe
+              resolution, account approval, authenticated quota-limited invocation,
+              operational handling/alerts and the disposable image/video pilot.
+              Read-only visibility does not satisfy these remaining gates.
 - [ ] **7A.2g — live pilot:** upload one disposable image and one disposable
       video through Admin V2, verify progress, provider metadata, delivery,
       deletion/cache behavior, and quota reporting, then remove the pilot
@@ -1141,9 +1370,10 @@ acceptance / migration-history reconciliation.
       stale references, both CAS checks, rollback and provider-variant protection.
 - [x] Owner reports applying 0039 and 0040 in Supabase (2026-09-20).
       Appearance and Media usage load successfully in authenticated V2.
-- [ ] Confirm all rows in the matching 0039 and 0040 read-only check scripts
-      have `passed = true`; successful UI reads do not verify every grant,
-      constraint, or trigger. Never blind `supabase db push`.
+- [x] Owner screenshots confirm all matching read-only checks on 2026-09-22:
+      0039 has 5/5 and 0040 has 4/4 results with `passed = true`. This closes
+      the missing check-evidence gate, not CLI history reconciliation.
+      Never blind `supabase db push`.
 - [ ] Owner acceptance: upload disposable fixture, replace a used fixture,
       verify public result, move to Trash and restore. No live files used as tests.
 - [ ] Separate follow-up: provider-aware permanent cleanup / freed storage bytes.
@@ -1221,8 +1451,9 @@ Implementation notes: `docs/privacy-and-audit-repairs-2026-09-21.md` and
       verify scheduled cleanup and procedures for deletion requests.
 - [ ] Production acceptance on disposable fixtures: saves/conflicts/uploads/
       replace/Trash/restore, consented event ingestion and Contact delivery.
-- [ ] Still return to ImageKit **7A.2f**, Gmail/Resend **7B**, migration verification
-      checks **0039/0040**, and safe CLI migration-history reconciliation.
+- [ ] Still return to ImageKit **7A.2f**, Gmail/Resend **7B**, and safe CLI
+      migration-history reconciliation. Checks **0039/0040** were confirmed
+      separately by owner screenshots on 2026-09-22.
 
 ## Batch 13 — Classic parity and safe retirement (2026-09-21)
 
@@ -1657,9 +1888,11 @@ is no new SQL migration. This is not authorization to remove Classic.
       on owner-used media or actual singleton Hero placements.
 - [ ] Fresh password/MFA/recovery acceptance with an approved test account or
       owner; do not change or revoke actual owner access merely for testing.
-- [ ] Explicitly record live 0039/0040 read-only check results (owner reported
-      applying them; live UI and local SQL success are not every live grant).
-      0041–0046 checks are confirmed by screenshots. Do not rerun old migrations.
+- [x] Live 0039/0040 read-only checks confirmed by owner screenshots on
+      2026-09-22: 5/5 and 4/4 true respectively. Combined with the earlier
+      screenshots, checks 0039–0046 are now confirmed. No new migration is
+      pending; do not rerun old migrations. Live write/auth acceptance above
+      and CLI migration-history reconciliation remain separate open tasks.
 
 Morning reminders: disable public signup in Supabase Auth (live readiness
 reports it enabled); verify canonical HTTPS URL on deployment; return to
@@ -1678,6 +1911,94 @@ the already-confirmed 0046 migration are included; do not apply SQL as part of
 Git publishing. Manual/live acceptance gates above remain open and Classic is
 retained. ImageKit, email and production Auth configuration are not silently
 marked complete by a successful push.
+
+### 13G follow-up — Isolated acceptance preparation (2026-09-22)
+
+Owner approved proceeding with acceptance preparation. Runbook:
+`docs/local-acceptance.md`. This is not completed live acceptance or Classic
+retirement, and it creates no new production migration.
+
+- [x] Add `acceptance:prepare`, `acceptance:doctor`, `acceptance:start`: a fresh
+      temp shadow app without production env/public owner media, dedicated
+      127.0.0.1:3101 app and 554xx local stack, fictional image fixtures, and a
+      copied migration sequence with a bootstrap before the singleton guard.
+      Production SQL files/history are untouched; no reset/link/db-push command.
+- [x] Check workspace/source hashes and links; reject hosted keys/targets,
+      inherited provider secrets, `.env` files and linked project references.
+      Before app launch, read-check the service-only per-workspace DB marker and
+      explicitly closed Auth signup/anonymous settings using direct loopback
+      HTTP without proxy inheritance or redirects. No MFA bypass/account creation.
+- [x] Execute all 46 migration bodies + bootstrap + final fictional seed in
+      isolated PGlite with minimal Auth/Storage stubs (pgcrypto extension omitted
+      only there); all 72 checks 0037–0046 and six Hero snapshots pass. This is
+      not real GoTrue, Storage, browser or MFA evidence.
+- [x] Generate and verify the Windows shadow workspace; full regression now
+      2,703 tests / 144 files, TypeScript and ESLint pass. No application runtime
+      or production behavior changed; no hosted data/account/settings writes.
+- [x] Owner prerequisite: Docker engine running, confirmed in the runtime
+      follow-up below. CLI 2.117.0 is now cached via npx (not globally on PATH).
+- [x] Start the loopback-bound dedicated stack, verify real schema/bucket setup,
+      and create a disposable confirmed Auth owner. Genuine TOTP and the
+      save/reload/conflict/archive/Trash matrix remain open below.
+- [ ] Agree on trusted isolated HTTPS for integrated Storage placements and
+      production Secure-cookie/recovery tests. Current HTTP local URLs cannot
+      pass HTTPS media guards; do not weaken app/SQL/CSP rules. Add a generated
+      video before claiming Showreel/video acceptance; current six Heroes use PNGs.
+
+Runtime follow-up (2026-09-22, owner confirmed Docker readiness):
+
+- [x] Confirm Linux Docker Engine 28.3.2 / Desktop 4.43.2 outside the restrictive
+      sandbox; fix doctor to distinguish permission denial from stopped engine.
+      Cache official Supabase CLI 2.117.0 via npx; no project dependency change.
+- [x] Run all 46 migrations + acceptance bootstrap/seed on real local Postgres;
+      all 72 read-only checks 0037–0046 pass (not only PGlite now).
+- [x] Catch actual ports unexpectedly published on all interfaces despite the
+      loopback driver option. Stop four affected fixture services before any
+      account creation; preserve original containers/volumes and replace with
+      explicit 127.0.0.1 bindings. Verify all actual ports; add fail-closed runtime
+      checks before provisioning and app launch. Never restart unbound backups.
+- [x] Provision and read-verify only the local confirmed owner, active profile,
+      and media bucket. Private random password/keys stay in generated workspace:
+      `%TEMP%/portfolio-acceptance-995ddf824f63/0a8361f7-0fd5-4e5a-b50a-088e5000c68c`.
+- [x] Start shadow Next on 127.0.0.1:3101; browser verifies fictional login page
+      and unauthenticated V2 redirect. Integrity check still passes after startup.
+- [x] Fix the local email provider disabled by `[auth.email].enable_signup=false`:
+      enable only that provider, retain globally closed signup/anonymous login,
+      and require these exact settings in provisioning/startup preflight. Preserve
+      the stopped original Auth container and unchanged owner credential. Real
+      password login returns 200, diagnostic-session logout 204, signup is rejected.
+- [x] Final runtime-helper regression: 2,843 tests / 147 files, TypeScript,
+      full ESLint and diff whitespace checks pass. No production app/schema edits.
+- [x] Owner completed test login; the browser renders protected Admin V2 at
+      127.0.0.1:3101 through the existing AAL2-required layout. No authenticator
+      secret was read or modified by the agent. Editor save/reload, recovery,
+      upload and replacement acceptance are still pending.
+
+Local login handoff completed. ImageKit 7A.2f.1, 7A.2f.2 and the reservation-only
+7A.2f.3a are implemented; owner confirmed 0047/0048 hosted rollout with all
+9 + 8 checks true in screenshots. No need to request those migrations again.
+The dormant 7A.2f.3b coordinator is implemented; 0049 readiness rollout is now
+owner-confirmed with all three checks true in the supplied screenshot.
+The no-keys 7A.2f.3b.1 follow-up originally passed 12 real PostgreSQL concurrency
+scenarios; 7A.2f.3c.1 expands the passing suite to 14;
+provider credentials/account setup are explicitly deferred by the owner.
+The dormant 7A.2f.3c.1 observation core is also implemented without provider keys.
+Next is 7A.2f.3c.2 remaining reconciliation/pilot controls and production account admission,
+independently of the remaining editor acceptance.
+Its 7A.2f.3c.2a read-only Media overview is implemented; owner confirmed additive
+0050 on 2026-09-23 with all four checks true. Authenticated desktop/mobile
+empty-state browser smoke passed on localhost:3102. All 11 populated/error
+component fixtures now pass separately on loopback 3103; actual provider
+resolution/account-admission and lifecycle acceptance remain pending.
+7A.2f.3c.2b now adds separately dormant read-only orphan discovery plus pinned
+byte inspection. It neither changes the queue nor deletes/resolves files; do not
+wire it into the 30s observation worker. Next design boundary is explicit account
+admission and authenticated/quota-limited invocation, with unresolved provider
+quiescence/version-safe resolution kept closed before any deletion or pilot.
+Provider keys/account setup remain deferred, with no activation.
+Separately confirm real-project public signup is disabled. Gmail/Resend 7B and
+explicit 13H approval remain pending. No push,
+production Auth change or hosted migration execution occurred in this checkpoint.
 
 ### 13H — Retire Classic only after audit and owner approval
 
@@ -1731,3 +2052,56 @@ audit task. Migration 0046 is now confirmed; do not test writes on real content.
 This batch does not remove Classic, change Showreel scroll/play behavior,
 transcode existing media, run remote SQL or push a deployment. ImageKit 7A.2f,
 Gmail/email 7B and the remaining 13G production gate stay on the backlog.
+
+## Batch 14B — Independent positioning for every photo placement
+
+Status: implementation and isolated verification complete; hosted 0051 rollout
+owner-confirmed. Disposable end-to-end acceptance remains pending.
+
+- [x] Confirm owner choice: independent crop for each placement, not a shared
+      crop on a Media Library asset. Originals remain unchanged.
+- [x] Add collapsible **Photo position & zoom** controls beside the media picker
+      for HOME About, four Stories and Interlude poster; BIO rotating portraits;
+      Gallery frames; Music platform covers; Showreel thumbnails/posters.
+- [x] Reuse Hero drag/keyboard/position controls, 100–300% zoom, Fill / Fit whole,
+      desktop/mobile values and reset. Keep the existing section Save/discard
+      and unsaved-change protections; controls load their preview only on open.
+- [x] Render the same crop in public components and 1:1 previews. Preserve
+      existing animations, video playback/hover and the full original gallery
+      lightbox. Video poster crops never transform the playing video.
+- [x] Add additive 0051 private source-bound sidecar, service-only snapshot/save
+      wrappers and public published-source-only projection. Retain all existing
+      CAS, media-reference and archive guards. Restore retains the crop; archive
+      responses are rehydrated only against identical section versions.
+- [x] Gate only the new controls when 0051 is missing. Unknown snapshot errors
+      fail closed; failed writes never retry through old RPCs.
+- [x] Preserve legacy Showreel IDs/catalog capacity. Forward-fix the existing
+      `pg_catalog.greatest` Showreel save error only for the exact known function
+      body; reject unknown owner-modified definitions rather than replacing them.
+- [x] Run isolated PostgreSQL/PGlite lifecycle, permissions, invalid shape,
+      source replacement, rollback, CAS, archive/restore and rerun tests. All nine
+      0051 checks and predecessor guard checks pass locally. Lock order reviewed;
+      separate multi-session PostgreSQL concurrency not executed for this batch.
+- [x] Browser: authenticated pre-migration HOME About, BIO portraits, Gallery
+      frame and Showreel thumbnail controls appear; other fields remain editable.
+      Music is currently empty and loads normally. No real content was saved.
+- [x] Browser: isolated actual-controls/public-renderer fixture verifies Fit whole,
+      keyboard and pointer drag, zoom, independent placement/device values,
+      reset and real responsive CSS at desktop/390px. No DB/provider connection.
+- [x] Owner ran `supabase/migrations/0051_photo_framing.sql`, then
+      `supabase/checks/0051_photo_framing.sql`: **all nine results true**, confirmed
+      by owner screenshot. This is supplied rollout evidence, not an independent
+      agent probe or proof of end-to-end save/reload acceptance.
+      Reload V2 after rollout. Do not replay older migrations.
+- [ ] On a disposable placement after rollout, save → reload → public render;
+      test archive/restore and discard/recovery without altering owner content.
+
+Details and repeatable local checks: `docs/photo-framing.md`. This batch does not
+activate ImageKit, apply hosted SQL, change stored photos, retire Classic or push
+GitHub. Resume the checkpoint at the top of this file after owner rollout.
+
+Final regression: **4,612 tests / 169 files**, TypeScript, full ESLint, production
+build and diff whitespace checks pass. The build retains only the existing Edge
+Runtime deprecation/static-generation warnings. Two client imports of the
+`VIDEO_TYPES` constant now use the pure types module, keeping the new server-only
+photo loader out of client bundles; AST regressions cover both imports.

@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import HeroMedia from "@/components/HeroMedia";
-import { getDefaultHeroFraming, type HeroFrame, type HeroFraming, type HeroFramingDevice } from "@/lib/content/hero-framing";
+import { getDefaultHeroFraming, normalizeHeroFraming, type HeroFrame, type HeroFraming, type HeroFramingDevice } from "@/lib/content/hero-framing";
 import { getHeroFramingPreviewViewport, moveHeroFrame, validHeroDimensions, type HeroMediaDimensions } from "@/lib/admin/hero-framing-geometry";
 import { isSafeManagedMediaSource } from "@/lib/media-source";
 
@@ -16,6 +16,10 @@ export type HeroFramingControlsProps = {
   unavailableReason?: string;
   device?: HeroFramingDevice;
   onDeviceChange?: (device: HeroFramingDevice) => void;
+  subjectLabel?: string;
+  saveDescription?: string;
+  previewViewport?: Record<HeroFramingDevice, HeroMediaDimensions>;
+  defaultFraming?: HeroFraming;
 };
 
 type Drag = {
@@ -31,7 +35,8 @@ type Drag = {
 
 const buttonClass = "min-h-10 rounded-xl border border-white/12 px-3 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-35";
 
-export default function HeroFramingControls({ value, onChange, src, posterSrc, mediaType, disabled = false, unavailableReason, device: selectedDevice, onDeviceChange }: HeroFramingControlsProps) {
+export default function HeroFramingControls({ value, onChange, src, posterSrc, mediaType, disabled = false, unavailableReason, device: selectedDevice, onDeviceChange,
+  subjectLabel = "Hero", saveDescription = "Drag the media to frame your subject. Desktop and mobile are saved separately, only when you save Hero.", previewViewport, defaultFraming }: HeroFramingControlsProps) {
   const id = useId();
   const [localDevice, setLocalDevice] = useState<HeroFramingDevice>("desktop");
   const [loaded, setLoaded] = useState<{ source: string; dimensions: HeroMediaDimensions } | null>(null);
@@ -40,12 +45,14 @@ export default function HeroFramingControls({ value, onChange, src, posterSrc, m
   const dragRef = useRef<Drag | null>(null);
   const device = selectedDevice ?? localDevice;
   const source = `${mediaType}:${src}`;
-  const framing = value ?? getDefaultHeroFraming(mediaType);
+  const originalFraming = normalizeHeroFraming(defaultFraming) ?? getDefaultHeroFraming(mediaType);
+  const framing = value ?? originalFraming;
   const frame = framing[device];
   const safeSource = isSafeManagedMediaSource(src);
   const locked = disabled || Boolean(unavailableReason) || !safeSource;
   const dimensions = loaded?.source === source && failedSource !== source ? loaded.dimensions : null;
-  const viewport = getHeroFramingPreviewViewport(device, mediaType);
+  const suppliedViewport = previewViewport?.[device];
+  const viewport = validHeroDimensions(suppliedViewport) ? suppliedViewport : getHeroFramingPreviewViewport(device, mediaType);
   const error = failedSource === source;
   const playing = playback?.source === source && playback.playing;
   const playbackFailed = playback?.source === source && playback.failed;
@@ -108,19 +115,19 @@ export default function HeroFramingControls({ value, onChange, src, posterSrc, m
   return <section aria-labelledby={`${id}-title`} className="grid gap-4 rounded-[20px] border border-white/10 bg-black/25 p-4">
     <div>
       <h3 className="text-sm font-semibold text-white/85" id={`${id}-title`}>Position &amp; zoom</h3>
-      <p className="mt-2 text-xs leading-5 text-white/50">Drag the media to frame your subject. Desktop and mobile are saved separately, only when you save Hero.</p>
+      <p className="mt-2 text-xs leading-5 text-white/50">{saveDescription}</p>
     </div>
     {unavailableReason ? <p role="status" className="rounded-xl border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-5 text-amber-100/80">{unavailableReason}</p> : null}
     <div aria-label="Framing device" className="grid grid-cols-2 gap-2" role="group">
       {(["desktop", "mobile"] as const).map(option => <button aria-pressed={device === option} className={`${buttonClass} ${device === option ? "border-white/40 bg-white/10 text-white" : ""}`} disabled={locked} key={option} onClick={() => changeDevice(option)} type="button">{option === "desktop" ? "Desktop" : "Mobile"}</button>)}
     </div>
     <div aria-label="Media fit" className="grid grid-cols-2 gap-2" role="group">
-      <button aria-pressed={frame.fit === "cover"} className={buttonClass} disabled={locked} onClick={() => changeFrame({ ...frame, fit: "cover" })} type="button">Fill Hero</button>
+      <button aria-pressed={frame.fit === "cover"} className={buttonClass} disabled={locked} onClick={() => changeFrame({ ...frame, fit: "cover" })} type="button">Fill {subjectLabel}</button>
       <button aria-pressed={frame.fit === "contain"} className={buttonClass} disabled={locked} onClick={() => changeFrame({ ...frame, fit: "contain", zoom: 1 })} type="button">Fit whole media</button>
     </div>
-    <p className="text-xs leading-5 text-white/45">{frame.fit === "contain" ? "Fit whole keeps the full image or video at 100%. Unused space stays black; zoom in for a closer crop." : "Fill Hero covers the frame and crops its edges. For a tall portrait, try Fit whole media to see more."}</p>
+    <p className="text-xs leading-5 text-white/45">{frame.fit === "contain" ? "Fit whole keeps the full image or video at 100%. Unused space stays black; zoom in for a closer crop." : `Fill ${subjectLabel} covers the frame and crops its edges. For a tall portrait, try Fit whole media to see more.`}</p>
     <div className="flex justify-center rounded-xl border border-white/10 bg-[#141416] p-2">
-      <button aria-describedby={`${id}-drag-help`} aria-label={`Position ${device} Hero media`} className="relative block w-full touch-none select-none overflow-hidden rounded-lg bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed" disabled={locked}
+      <button aria-describedby={`${id}-drag-help`} aria-label={`Position ${device} ${subjectLabel} media`} className="relative block w-full touch-none select-none overflow-hidden rounded-lg bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed" disabled={locked}
         onDragStart={event => event.preventDefault()} onKeyDown={moveWithKeyboard} onLostPointerCapture={endDrag} onPointerCancel={endDrag} onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag}
         style={{ aspectRatio: `${viewport.width} / ${viewport.height}`, maxWidth: device === "mobile" ? 230 : undefined, cursor: !locked && dimensions ? "grab" : undefined }} type="button">
         {safeSource ? <HeroMedia backgroundSrc={src} deviceOverride={device} framing={framing} key={source} mediaType={mediaType}
@@ -137,16 +144,16 @@ export default function HeroFramingControls({ value, onChange, src, posterSrc, m
     <p className="text-xs leading-5 text-white/45" id={`${id}-drag-help`}>{dimensions ? "Drag here, or focus the preview and use arrow keys (Shift for larger moves). The full page preview shows your text and overlays." : "Dragging becomes available when the media dimensions load. You can also use the position sliders."}{mediaType === "video" ? " Video starts paused. Play the preview to check the actual video: a separate poster may have a different crop." : ""}</p>
     <label className="grid gap-2 text-xs text-white/65" htmlFor={`${id}-zoom`}>
       <span className="flex justify-between"><span>Zoom</span><output>{Math.round(frame.zoom * 100)}%</output></span>
-      <input aria-label={`${device} Hero zoom`} className="w-full accent-white" disabled={locked} id={`${id}-zoom`} max={3} min={1} onChange={event => changeRange("zoom", event.target.value)} step={0.01} type="range" value={frame.zoom} />
+      <input aria-label={`${device} ${subjectLabel} zoom`} className="w-full accent-white" disabled={locked} id={`${id}-zoom`} max={3} min={1} onChange={event => changeRange("zoom", event.target.value)} step={0.01} type="range" value={frame.zoom} />
     </label>
     <div className="grid grid-cols-2 gap-3">
       {(["x", "y"] as const).map(axis => <label className="grid gap-2 text-xs text-white/65" htmlFor={`${id}-${axis}`} key={axis}>
         <span>{axis === "x" ? "Horizontal" : "Vertical"} <span className="text-white/35">{Math.round(frame[axis])}%</span></span>
-        <input aria-label={`${device} Hero ${axis === "x" ? "horizontal" : "vertical"} position`} className="w-full accent-white" disabled={locked} id={`${id}-${axis}`} max={100} min={0} onChange={event => changeRange(axis, event.target.value)} step={1} type="range" value={frame[axis]} />
+        <input aria-label={`${device} ${subjectLabel} ${axis === "x" ? "horizontal" : "vertical"} position`} className="w-full accent-white" disabled={locked} id={`${id}-${axis}`} max={100} min={0} onChange={event => changeRange(axis, event.target.value)} step={1} type="range" value={frame[axis]} />
       </label>)}
     </div>
     <div className="flex flex-wrap gap-2">
-      <button className={buttonClass} disabled={locked} onClick={() => changeFrame(getDefaultHeroFraming(mediaType)[device])} type="button">Reset {device}</button>
+      <button className={buttonClass} disabled={locked} onClick={() => changeFrame(originalFraming[device])} type="button">Reset {device}</button>
       <button className={buttonClass} disabled={locked || value == null} onClick={() => { if (!locked) onChange(null); }} type="button">Reset both to original</button>
     </div>
   </section>;

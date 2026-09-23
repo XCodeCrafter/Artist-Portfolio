@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { FALLBACK_CONTENT } from "./fallback";
 import { normalizeFooterContent } from "./footer";
 import { normalizeHeroFraming } from "./hero-framing";
+import { applyPublicPhotoFramings } from "./photo-framing";
+import { loadPublicPhotoFramings } from "./photo-framing.server";
 import { PAGE_SLUGS, normalizeHiddenNavPageSlugs } from "./modules";
 import {
   normalizeBodyFont,
@@ -536,6 +538,7 @@ async function readSupabaseContent(
     videos,
     actorResume,
     actorCredits,
+    photoFramings,
   ] = await Promise.all([
     supabase
       .from("site_settings")
@@ -659,6 +662,7 @@ async function readSupabaseContent(
       .eq("is_published", true)
       .order("sort_order", { ascending: true })
       .returns<ActorCreditRow[]>(),
+    loadPublicPhotoFramings(supabase),
   ]);
 
   const errors = [
@@ -704,7 +708,7 @@ async function readSupabaseContent(
   const bioProfileContent = mapBioProfile(bioProfile.data?.[0]);
   const mappedSettings = mapSettings(settingsRow);
 
-  return {
+  const content: PortfolioContent = {
     settings: mappedSettings,
     navigation: resolveNavigationConfig({
       version: mappedSettings.navigationConfigVersion,
@@ -745,6 +749,7 @@ async function readSupabaseContent(
     actorResume: mapActorResume(actorResume.data?.[0]),
     actorCredits: mapActorCredits(actorCredits.data ?? []),
   };
+  return photoFramings ? applyPublicPhotoFramings(content, photoFramings) : content;
 }
 
 function isLoopbackSiteUrl(value?: string) {

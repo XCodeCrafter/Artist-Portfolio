@@ -30,7 +30,9 @@ function rpcResponse(data: unknown, error: unknown = null) {
 
 function withRpcResult(data: unknown, error: unknown = null) {
   const response = rpcResponse(data, error);
-  const rpc = vi.fn().mockReturnValue(response);
+  // Existing archive fixtures represent a database before additive 0051.
+  const rpc = vi.fn().mockImplementation((name: string) => name === "get_photo_editor_with_framing_v2"
+    ? rpcResponse(null, { code: "PGRST202", message: "get_photo_editor_with_framing_v2 missing" }) : response);
   mocks.service.mockReturnValue({ rpc });
   return { rpc, response };
 }

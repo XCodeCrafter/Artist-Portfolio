@@ -118,6 +118,61 @@ Pilot sequence:
 7. Enable ImageKit only through the future fail-closed adapter and controlled
    cutover recorded in `TODO.md`.
 
+Batch 7A.2f.1 adds a dormant server-only object verifier (authenticated version
+identity and streamed original-byte SHA-256). Batch 7A.2f.2 adds migrations
+`0047_imagekit_upload_lifecycle.sql` and `0048_imagekit_source_trash.sql` for
+one-shot issuance, atomic publication and compatible recoverable Trash. Apply
+0047 then 0048 manually, followed by both matching read-only check files; all
+checks must pass. The owner confirmed hosted deployment with screenshots showing
+all nine 0047 checks and all eight 0048 checks true; the agent did not execute
+hosted SQL. No new provider was enabled and no live upload action is wired.
+Batch 7A.2f.3a adds dormant, AAL2/origin/rate-protected reservation preparation,
+resolution and cancellation with strict input/snapshot validation. It issues no
+upload token, calls no provider, and is not connected to the current uploader.
+No additional migration is introduced by f.3a. The f.3b server-only coordinator
+connects persisted one-shot issuance to the signer and fresh evidence to atomic
+finalization, but has no public endpoint or default production admission adapter.
+The owner also confirmed `0049_imagekit_upload_readiness.sql` with all three
+matching read-only checks true in a screenshot; no rerun is needed for this
+checkpoint. This schema RPC does not activate a provider. Remaining account
+approval, admission, reconciliation and UI work is tracked in
+[the lifecycle notes](docs/imagekit-lifecycle.md).
+
+Without provider keys, `npm run test:imagekit:concurrency` now verifies 14 real
+multi-session PostgreSQL races against a brand-new, network-less, temporary
+Docker container. It requires the locally cached image documented in the
+lifecycle notes and never reuses the acceptance or hosted database. This is
+SQL concurrency coverage, not a live ImageKit pilot; account setup is deferred.
+
+Batch 7A.2f.3c.1 adds a dormant read-only reconciliation observer and bounded
+one-candidate worker core, using the existing 0047/0049 RPCs. Empty provider
+listings remain pending observations, present/ambiguous objects require attention,
+and API errors never mean absence. No provider deletion, route, scheduler or
+activation is included. Account admission and actual orphan resolution remain
+separate pilot blockers; no new migration is required for this increment.
+
+Batch 7A.2f.3c.2a adds **ImageKit upload checks** to Admin V2 → Media. This is
+read-only visibility into issued, unfinished database records—not a provider
+storage scan or automatic cleanup. The owner confirmed migration
+`0050_imagekit_reconciliation_overview.sql` on 2026-09-23 with all four matching
+read-only checks true in a screenshot. ImageKit keys were not required. On fresh
+environments before deployment, the optional panel explains the missing migration
+while existing media tools remain usable. 0047–0050 are owner-confirmed; do not
+reapply them for this increment. Authenticated desktop/mobile empty-state browser
+smoke passed on 2026-09-23 using the current checkout on localhost:3102. All 11
+synthetic populated/error component fixtures also pass desktop/mobile browser QA.
+Reproduce them with `npm run test:imagekit:overview-browser` (loopback 3103,
+no credentials or database). Provider lifecycle and the live pilot remain separate
+gates; see [verification limits](docs/imagekit-lifecycle.md).
+
+Batch 7A.2f.3c.2b adds dormant **read-only orphan candidate inspection**. A
+validated server lease permits one bounded folder lookup and, for one exact
+candidate, version-pinned byte verification. Changed, ambiguous or unavailable
+evidence is never a cleanup success. The verifier now supports caller aborts,
+an absolute deadline and list-to-detail version checks. No route, worker hookup,
+provider deletion, migration or upload activation is included. Account approval,
+in-flight upload completion guarantees and safe resolution remain separate gates.
+
 Cloudflare R2 remains a dormant future alternative. If later traffic economics
 justify it, create the private bucket, scoped credentials, billing account, and
 custom media domain under client ownership. The existing R2 variables document
@@ -425,8 +480,8 @@ one retains its text and media. The shared Footer stays in site settings and
 CNC source programs retain their existing manager. Saves publish only the active
 section, reject concurrent stale snapshots, and protect even hidden media from
 accidental deletion. Classic HOME writes hand off to V2 once its snapshot is
-available. Migration `0038` is allocated to admin session hardening; assign
-ImageKit's still-planned lifecycle migration the next available number when implemented.
+available. Migration `0038` is allocated to admin session hardening; ImageKit's
+dormant lifecycle and source-only Trash use `0047` and `0048`, respectively.
 
 Migration `0038_admin_session_hardening.sql` adds service-only session-liveness
 and atomic recovery-challenge RPCs and strengthens existing admin RLS against
@@ -500,8 +555,8 @@ database migration.
 
 1. The owner has reported manual rollout through `0046_hero_media_framing.sql`
    on the currently linked project. Screenshots confirm matching read-only
-   checks for `0041`–`0046`; live check results for `0039`/`0040` still need to be
-   explicitly recorded (their rollout was reported). For another deployment, apply only missing forward
+   checks for `0039`–`0046`; the final `0039`/`0040` evidence was supplied on
+   2026-09-22 (5/5 and 4/4 true respectively). For another deployment, apply only missing forward
    migrations in order and run their corresponding `supabase/checks/` scripts;
    never replay older migrations over newer functions or registries. Take a full
    backup and reconcile the pre-existing empty CLI history before using `db push`.
@@ -511,6 +566,14 @@ database migration.
    On older deployments, only framing controls are disabled; ordinary Hero editing works.
    The migration adds optional per-placement settings without modifying media
    files or existing Hero content. Reload V2 after applying it.
+   Non-Hero photo positioning (HOME, BIO, Gallery, Music covers and Showreel
+   thumbnails) additionally requires **0051_photo_framing.sql**, followed by
+   all nine results true in `supabase/checks/0051_photo_framing.sql`. The owner
+   has confirmed all nine checks by screenshot; do not reapply it on that project.
+   Disposable end-to-end save/reload acceptance remains pending.
+   The same file can have different desktop/mobile
+   crops at each placement; original media and gallery lightboxes are unchanged.
+   See [photo framing](docs/photo-framing.md) for usage, safety and local checks.
    The [final Classic/V2 audit](docs/admin-v2-final-audit-2026-09-21.md) records
    repaired defects and the still-open disposable write/auth acceptance gates.
 2. In Supabase Auth, disable public signup and anonymous sign-ins, keep TOTP
@@ -540,6 +603,11 @@ database migration.
 
 ## Scripts
 
+For the pending 13G save/auth acceptance, use the guarded
+[isolated local acceptance runbook](docs/local-acceptance.md). Preparation does
+not change the hosted database, load production env files or close the live
+acceptance gate. Docker/CLI and trusted HTTPS requirements are explicit.
+
 ```bash
 npm run dev
 npm run typecheck
@@ -548,6 +616,8 @@ npm test
 npm run build
 npm run check
 npm run audit:prod
+npm run acceptance:doctor
+npm run acceptance:prepare
 npm run start
 npm run db:init
 npm run db:link -- --project-ref YOUR_PROJECT_REF

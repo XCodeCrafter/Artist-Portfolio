@@ -30,6 +30,7 @@ export type MusicSpotifyDraft = {
 };
 
 export type MusicPlatformEditorItem = {
+  framing?: import("@/lib/content/hero-framing").HeroFraming | null;
   id: string;
   title: string;
   label: string;
@@ -85,6 +86,7 @@ export type MusicEditorFooter = {
 };
 
 export type MusicEditorSnapshot = {
+  photoFramingAvailable?: true;
   draft: MusicEditorDraft;
   versions: MusicEditorVersions;
   footer: MusicEditorFooter;
@@ -232,6 +234,7 @@ const musicSpotifyDraftSchema = z
 
 const musicPlatformSaveItemSchema = z
   .object({
+    framing: heroFramingSchema.nullable().optional(),
     id: recordId,
     title: requiredText(220),
     label: text(220),
@@ -332,6 +335,7 @@ const snapshotSpotifyDraftSchema = z
   .strict();
 const snapshotPlatformEditorItemSchema = z
   .object({
+    framing: heroFramingSchema.nullable().optional(),
     id: recordId,
     title: requiredText(220),
     label: text(220),
@@ -413,6 +417,7 @@ const previewDraftSchema = z
               label: text(220),
               href: previewHref,
               imageSrc: previewImageSource,
+              framing: heroFramingSchema.nullable().optional(),
               iconKey: text(220),
               isPublished: z.boolean(),
             })
@@ -439,6 +444,7 @@ const previewDraftSchema = z
   .strict();
 const snapshotSchema = z
   .object({
+    photoFramingAvailable: z.literal(true).optional(),
     hero: snapshotHeroDraftSchema.extend({ updatedAt: timestamp }).strict(),
     spotify: snapshotSpotifyDraftSchema
       .extend({
@@ -595,6 +601,7 @@ export function parseMusicEditorSnapshot(value: unknown): MusicEditorSnapshot | 
 
   const snapshot = parsed.data;
   return {
+    ...(snapshot.photoFramingAvailable ? { photoFramingAvailable: true as const } : {}),
     draft: {
       hero: {
         title: snapshot.hero.title,
@@ -618,6 +625,7 @@ export function parseMusicEditorSnapshot(value: unknown): MusicEditorSnapshot | 
           label: item.label,
           href: item.href,
           imageSrc: item.imageSrc,
+          ...(item.framing !== undefined ? { framing: item.framing } : {}),
           iconKey: item.iconKey,
           isPublished: item.isPublished,
         })),
@@ -721,6 +729,7 @@ export function getMusicSectionPayload(
         label: item.label,
         href: item.href,
         imageSrc: item.imageSrc,
+        ...(item.framing !== undefined ? { framing: item.framing } : {}),
         iconKey: detectSocialPlatform(
           item.iconKey,
           item.href,
@@ -818,6 +827,7 @@ export function createMusicPageViewDataFromEditor(
         label: item.label,
         href: item.href,
         imageSrc: item.imageSrc,
+        ...(item.framing !== undefined ? { framing: item.framing } : {}),
         iconKey: detectSocialPlatform(
           item.iconKey,
           item.href,

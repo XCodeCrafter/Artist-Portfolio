@@ -1,5 +1,6 @@
 "use client";
 import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
+import PhotoFramingControls from "@/components/admin/v2/PhotoFramingControls";
 
 import {
   cloneElement,
@@ -369,6 +370,8 @@ function VisibilityToggle({
 
 type InspectorProps = {
   framingControls: ReactNode;
+  device: BioPreviewDevice;
+  onDeviceChange: (device: BioPreviewDevice) => void;
   archiveControl: (collection: BioArchiveCollection, id: string, label: string) => ReactNode;
   archivePanel: (collection: BioArchiveCollection) => ReactNode;
   assets: MediaAsset[];
@@ -657,6 +660,8 @@ function BiographyInspector(props: InspectorProps) {
                   required
                   value={item.src}
                 />
+                <PhotoFramingControls value={item.framing} src={item.src} onChange={framing => props.onPortraitChange(index, { framing })} saveSection="Biography"
+                  device={props.device} onDeviceChange={props.onDeviceChange} previewViewport={{ desktop: { width: 547, height: 720 }, mobile: { width: 350, height: 520 } }} />
                 <Field error={fieldMessage(props.errors, `galleryImages.${index}.alt`)} label="Alternative text">
                   <input
                     className={inputClass}
@@ -1386,7 +1391,7 @@ export default function BioEditor({
   function addPortrait() {
     updateBiographyItems("galleryImages", [
       ...draftRef.current.biography.galleryImages,
-      createEmptyPortrait(),
+      { ...createEmptyPortrait(), ...(snapshot.photoFramingAvailable ? { framing: null } : {}) },
     ]);
     setAnnouncement("New portrait draft added. Choose an image, then save Biography.");
   }
@@ -1504,6 +1509,8 @@ export default function BioEditor({
   }
 
   const inspectorProps: Omit<InspectorProps, "instance"> = {
+    device,
+    onDeviceChange: setDevice,
     framingControls: <HeroFramingControls
       value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
       mediaType={draft.hero.mediaType} onChange={(framing) => updateHero({ framing })}

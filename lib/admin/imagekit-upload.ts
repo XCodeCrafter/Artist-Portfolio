@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHmac } from "node:crypto";
 import type { ImageKitMediaUploadCredentials } from "@/lib/admin/media-upload-config";
+import { getImageKitMediaTarget, isImageKitTargetIdentity } from "@/lib/admin/imagekit-media-policy";
 
 export const IMAGEKIT_UPLOAD_ENDPOINT =
   "https://upload.imagekit.io/api/v2/files/upload";
@@ -9,42 +10,6 @@ export const IMAGEKIT_UPLOAD_AUTH_TTL_SECONDS = 5 * 60;
 
 const MINIMUM_USEFUL_TTL_SECONDS = 30;
 const EXPIRY_SAFETY_SECONDS = 2;
-const IMAGEKIT_PILOT_IMAGE_BYTES = 10 * 1024 * 1024;
-const IMAGEKIT_PILOT_VIDEO_BYTES = 95_000_000;
-const UUID_V4_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ASSET_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,99}$/;
-
-const MIME_TARGETS = {
-  "image/avif": {
-    extension: "avif",
-    maximumBytes: IMAGEKIT_PILOT_IMAGE_BYTES,
-  },
-  "image/gif": { extension: "gif", maximumBytes: IMAGEKIT_PILOT_IMAGE_BYTES },
-  "image/jpeg": {
-    extension: "jpg",
-    maximumBytes: IMAGEKIT_PILOT_IMAGE_BYTES,
-  },
-  "image/png": { extension: "png", maximumBytes: IMAGEKIT_PILOT_IMAGE_BYTES },
-  "image/webp": {
-    extension: "webp",
-    maximumBytes: IMAGEKIT_PILOT_IMAGE_BYTES,
-  },
-  "video/mp4": {
-    extension: "mp4",
-    maximumBytes: IMAGEKIT_PILOT_VIDEO_BYTES,
-  },
-  "video/quicktime": {
-    extension: "mov",
-    maximumBytes: IMAGEKIT_PILOT_VIDEO_BYTES,
-  },
-  "video/webm": {
-    extension: "webm",
-    maximumBytes: IMAGEKIT_PILOT_VIDEO_BYTES,
-  },
-} as const;
-
-type ImageKitPilotMimeType = keyof typeof MIME_TARGETS;
 
 export type ImageKitV2UploadParams = Readonly<{
   fileName: string;
@@ -92,12 +57,6 @@ function base64UrlJson(value: object) {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
 }
 
-function isImageKitPilotMimeType(
-  mimeType: string
-): mimeType is ImageKitPilotMimeType {
-  return Object.hasOwn(MIME_TARGETS, mimeType);
-}
-
 /**
  * Creates a short-lived ImageKit Upload V2 JWT for one database reservation.
  * Every multipart field returned in uploadParams is represented byte-for-byte
@@ -114,17 +73,16 @@ export function createImageKitUploadAuthority(
   const expiresAtSeconds = Math.floor(Date.parse(input.intentExpiresAt) / 1000);
 
   if (
-    !UUID_V4_PATTERN.test(input.intentId) ||
-    !ASSET_ID_PATTERN.test(input.assetId)
+    !isImageKitTargetIdentity(input.intentId, input.assetId)
   ) {
     return { ok: false, reason: "invalid-target" };
   }
 
-  if (!isImageKitPilotMimeType(input.mimeType)) {
+  const mediaTarget = getImageKitMediaTarget(input.mimeType);
+  if (!mediaTarget) {
     return { ok: false, reason: "invalid-media" };
   }
 
-  const mediaTarget = MIME_TARGETS[input.mimeType];
   if (
     !Number.isSafeInteger(input.expectedByteSize) ||
     input.expectedByteSize < 1 ||

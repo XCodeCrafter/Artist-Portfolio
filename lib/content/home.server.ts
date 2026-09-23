@@ -5,6 +5,7 @@ import { createHomeDraftFromContent, parseHomeEditorDraft, type HomeEditorDraft 
 import type { PortfolioContent } from "@/lib/content/types";
 import { createPublicContentClient } from "@/lib/content/supabase";
 import { normalizeHeroFraming } from "@/lib/content/hero-framing";
+import { applyHomePhotoFramings } from "@/lib/content/photo-framing";
 
 function isMissingHomeSchema(error: { code?: string; message?: string }) {
   return (error.code === "42P01" || error.code === "PGRST205") &&
@@ -37,5 +38,5 @@ export const getPublishedHomeDraft = cache(async (content: PortfolioContent): Pr
   if (result.data[0].hero_media_framing !== undefined) {
     draft.hero.framing = normalizeHeroFraming(result.data[0].hero_media_framing);
   }
-  return draft;
+  return content.photoFramings ? applyHomePhotoFramings(draft, content.photoFramings) : draft;
 });

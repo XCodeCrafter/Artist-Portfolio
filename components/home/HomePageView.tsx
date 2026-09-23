@@ -83,6 +83,7 @@ export default function HomePageView({
     .map((image, index) => ({
       id: `home-story-${index + 1}`,
       src: image.src,
+      framing: image.framing,
       title: image.title,
       caption: image.body,
       alt: image.alt,
@@ -130,6 +131,7 @@ export default function HomePageView({
             interludeCtaHref={data.feature.ctaHref}
             interludeCtaLabel={data.feature.ctaLabel}
             interludePosterSrc={data.feature.posterSrc}
+            interludePosterFraming={data.feature.posterFraming}
             interludeTitle={data.feature.title}
             interludeVideoSrc={data.feature.videoSrc}
             mode="narrative"

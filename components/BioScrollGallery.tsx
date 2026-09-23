@@ -1,7 +1,8 @@
 // artist-portfolio/components/BioScrollGallery.tsx
 "use client";
 
-import Image from "next/image";
+import FramedImage from "@/components/FramedImage";
+import type { HeroFraming } from "@/lib/content/hero-framing";
 import {
   AnimatePresence,
   motion,
@@ -11,7 +12,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type BioScrollGalleryProps = {
-  images: { src: string; alt: string }[];
+  images: { src: string; alt: string; framing?: HeroFraming | null }[];
   hasBody?: boolean;
 
   topLabel?: string; // "BIOGRAPHY"
@@ -123,7 +124,8 @@ export default function BioScrollGallery({
                         ease: [0.22, 1, 0.36, 1],
                       }}
                     >
-                      <Image
+                      <FramedImage
+                        framing={current.framing}
                         src={current.src}
                         alt={current.alt}
                         fill

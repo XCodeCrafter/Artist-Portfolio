@@ -27,6 +27,7 @@ export type GalleryIntroductionDraft = {
 };
 
 export type GalleryFrameEditorItem = {
+  framing?: import("@/lib/content/hero-framing").HeroFraming | null;
   id: string;
   title: string;
   src: string;
@@ -63,6 +64,7 @@ export type GalleryEditorFooter = {
 };
 
 export type GalleryEditorSnapshot = {
+  photoFramingAvailable?: true;
   draft: GalleryEditorDraft;
   versions: GalleryEditorVersions;
   footer: GalleryEditorFooter;
@@ -196,6 +198,7 @@ const galleryIntroductionDraftSchema = z
 
 const galleryFrameItemSchema = z
   .object({
+    framing: heroFramingSchema.nullable().optional(),
     id: recordId,
     title: requiredText(180),
     src: assetSource,
@@ -272,6 +275,7 @@ const galleryEditorFooterSchema = z
   .strict();
 const snapshotSchema = z
   .object({
+    photoFramingAvailable: z.literal(true).optional(),
     hero: snapshotHeroSchema,
     introduction: snapshotIntroductionSchema,
     frames: z.object({ items: z.array(snapshotFrameSchema) }).strict(),
@@ -409,6 +413,7 @@ export function parseGalleryEditorSnapshot(
 
   const snapshot = parsed.data;
   return {
+    ...(snapshot.photoFramingAvailable ? { photoFramingAvailable: true as const } : {}),
     draft: {
       hero: {
         title: snapshot.hero.title,
@@ -429,6 +434,7 @@ export function parseGalleryEditorSnapshot(
           id: item.id,
           title: item.title,
           src: item.src,
+          ...(item.framing !== undefined ? { framing: item.framing } : {}),
           alt: item.alt,
           caption: item.caption,
           category: item.category,
@@ -630,6 +636,7 @@ export function createGalleryPageViewDataFromEditor(
         id: item.id,
         title: item.title,
         src: item.src,
+        ...(item.framing !== undefined ? { framing: item.framing } : {}),
         alt: item.alt,
         caption: item.caption,
         category: item.category,

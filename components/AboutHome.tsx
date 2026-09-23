@@ -1,5 +1,5 @@
 // components/AboutHome.tsx
-import Image from "next/image";
+import FramedImage from "@/components/FramedImage";
 import type { AboutHomeContent } from "@/lib/content";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import HomeSectionCta, {
@@ -60,7 +60,8 @@ export default function AboutHome({
           <div className="w-full max-w-[620px] justify-self-end">
             <div className="relative overflow-hidden rounded-3xl bg-black/40 ring-1 ring-white/10 backdrop-blur-[2px]">
               <div className="relative aspect-[3/4] lg:aspect-[4/5]">
-                <Image
+                <FramedImage
+                  framing={content.framing}
                   src={content.imageSrc || "/images/about.jpg"}
                   alt={content.imageAlt}
                   fill

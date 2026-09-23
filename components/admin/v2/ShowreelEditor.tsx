@@ -1,5 +1,6 @@
 "use client";
 import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
+import PhotoFramingControls from "@/components/admin/v2/PhotoFramingControls";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -61,7 +62,7 @@ import {
 import type { MediaAsset } from "@/lib/admin/media";
 import { useVisualContentArchive } from "@/components/admin/v2/VisualContentArchivePanel";
 import type { VisualArchiveData } from "@/lib/admin/visual-content-archive-editor";
-import { VIDEO_TYPES } from "@/lib/content";
+import { VIDEO_TYPES } from "@/lib/content/types";
 
 type FieldErrors = Record<string, string[]>;
 
@@ -194,6 +195,8 @@ function Field({
 
 type InspectorProps = {
   framingControls: ReactNode;
+  device: ShowreelPreviewDevice;
+  onDeviceChange: (device: ShowreelPreviewDevice) => void;
   activeSection: ShowreelEditorSection;
   assets: MediaAsset[];
   draft: ShowreelEditorDraft;
@@ -710,6 +713,9 @@ function WorkCard({
           }
           value={item.thumbnailSrc}
         />
+        <PhotoFramingControls value={item.framing} src={item.thumbnailSrc} onChange={framing => props.onWorkChange(index, { framing })} saveSection="Videos"
+          device={props.device} onDeviceChange={props.onDeviceChange}
+          previewViewport={{ desktop: { width: 1600, height: visiblePosition === 0 ? 700 : 900 }, mobile: { width: 1600, height: 900 } }} />
       </div>
     </details>
   );
@@ -1051,6 +1057,7 @@ export default function ShowreelEditor({
       videoType: "showreel",
       isFeatured: false,
       isPublished: true,
+      ...(snapshot.photoFramingAvailable ? { framing: null } : {}),
     };
     commitDraft({
       ...draftRef.current,
@@ -1132,6 +1139,8 @@ export default function ShowreelEditor({
   }
 
   const inspectorProps: Omit<InspectorProps, "activeSection" | "instance"> = {
+    device,
+    onDeviceChange: setDevice,
     framingControls: <HeroFramingControls
       value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
       mediaType={draft.hero.mediaType} onChange={(framing) => updateHero({ framing })}

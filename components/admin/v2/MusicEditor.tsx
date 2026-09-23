@@ -1,5 +1,6 @@
 "use client";
 import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
+import PhotoFramingControls from "@/components/admin/v2/PhotoFramingControls";
 
 import {
   useActionState,
@@ -324,6 +325,8 @@ function VisibilityToggle({
 
 type InspectorFieldsProps = {
   framingControls: ReactNode;
+  device: MusicPreviewDevice;
+  onDeviceChange: (device: MusicPreviewDevice) => void;
   activeSection: MusicEditorSection;
   assets: MediaAsset[];
   draft: MusicEditorDraft;
@@ -552,6 +555,8 @@ export function SpotifyInspector({
 }
 
 function PlatformsInspector({
+  device,
+  onDeviceChange,
   assets,
   draft,
   errors,
@@ -566,6 +571,8 @@ function PlatformsInspector({
   archivePanel,
 }: Pick<
   InspectorFieldsProps,
+  | "device"
+  | "onDeviceChange"
   | "assets"
   | "draft"
   | "errors"
@@ -701,6 +708,8 @@ function PlatformsInspector({
                 required
                 value={item.imageSrc}
               />
+              <div className="mt-3"><PhotoFramingControls value={item.framing} src={item.imageSrc} onChange={framing => onPlatformChange(index, { framing })} saveSection="Platforms"
+                device={device} onDeviceChange={onDeviceChange} previewViewport={{ desktop: { width: 400, height: 300 }, mobile: { width: 400, height: 300 } }} /></div>
               {fieldMessage(errors, `items.${index}.imageSrc`) ? (
                 <p className="mt-2 text-xs text-red-200" role="alert">
                   {fieldMessage(errors, `items.${index}.imageSrc`)}
@@ -1270,7 +1279,7 @@ export default function MusicEditor({
   }
 
   function addPlatform() {
-    const items = [...draftRef.current.platforms.items, createEmptyPlatform()];
+    const items = [...draftRef.current.platforms.items, { ...createEmptyPlatform(), ...(snapshot.photoFramingAvailable ? { framing: null } : {}) }];
     commitDraft({ ...draftRef.current, platforms: { items } });
     setAnnouncement(
       "New platform draft added. Complete its details, then save Platforms."
@@ -1385,6 +1394,8 @@ export default function MusicEditor({
   }
 
   const inspectorProps: Omit<InspectorFieldsProps, "instance"> = {
+    device,
+    onDeviceChange: setDevice,
     framingControls: <HeroFramingControls
       value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
       mediaType={draft.hero.mediaType} onChange={(framing) => updateHero({ framing })}

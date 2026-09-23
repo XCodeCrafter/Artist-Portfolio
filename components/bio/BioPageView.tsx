@@ -433,6 +433,7 @@ export default function BioPageView({
                   .map((image) => ({
                     src: image.src,
                     alt: image.alt,
+                    framing: image.framing,
                   }))}
                 topLabel={data.bio.topLabel}
                 introText={data.bio.introText}

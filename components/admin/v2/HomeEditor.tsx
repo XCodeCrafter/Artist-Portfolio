@@ -1,5 +1,6 @@
 "use client";
 import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
+import PhotoFramingControls from "@/components/admin/v2/PhotoFramingControls";
 
 import Link from "next/link";
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
@@ -45,9 +46,10 @@ function TextField({ id, label, value, onChange, multiline = false, errors, path
   </label>;
 }
 
-function ContentInspector({ section, draft, assets, errors, instance, onChange }: {
+function ContentInspector({ section, draft, assets, errors, instance, onChange, device, onDeviceChange }: {
   section: Exclude<HomeEditorSection, "layout">; draft: HomeEditorDraft; assets: MediaAsset[];
   errors: FieldErrors; instance: string; onChange: (next: HomeEditorDraft) => void;
+  device: HomePreviewDevice; onDeviceChange: (device: HomePreviewDevice) => void;
 }) {
   const value = draft[section];
   const patch = (fields: Record<string, unknown>) => onChange({ ...draft, [section]: { ...value, ...fields } });
@@ -74,7 +76,10 @@ function ContentInspector({ section, draft, assets, errors, instance, onChange }
   </div>;
   if (section === "about") return <div className="grid gap-5">
     {field("heading", "Heading", false, 220)}{field("body", "Introduction", true, 5000)}
-    {media("imageSrc", "About image", "image")}{field("imageAlt", "Image description", false, 500)}{cta}
+    {media("imageSrc", "About image", "image")}
+    <PhotoFramingControls value={draft.about.framing} src={draft.about.imageSrc} onChange={framing => patch({ framing })} saveSection="About"
+      device={device} onDeviceChange={onDeviceChange} previewViewport={{ desktop: { width: 400, height: 500 }, mobile: { width: 300, height: 400 } }} />
+    {field("imageAlt", "Image description", false, 500)}{cta}
   </div>;
   if (section === "cnc") return <div className="grid gap-5">
     <p className="rounded-2xl bg-white/5 p-4 text-xs leading-5 text-white/55">This optional section shows your code programs. Turn it off in Page sections if it does not belong in this portfolio.</p>
@@ -84,6 +89,8 @@ function ContentInspector({ section, draft, assets, errors, instance, onChange }
   if (section === "feature") return <div className="grid gap-5">
     {field("title", "Heading", true, 220)}{field("body", "Description", true, 5000)}
     {media("videoSrc", "Feature video", "video")}{media("posterSrc", "Video poster", "image")}{cta}
+    <PhotoFramingControls value={draft.feature.posterFraming} src={draft.feature.posterSrc} onChange={posterFraming => patch({ posterFraming })} saveSection="Feature"
+      device={device} onDeviceChange={onDeviceChange} previewViewport={{ desktop: { width: 1440, height: 871 }, mobile: { width: 390, height: 754 } }} />
     <details className="rounded-2xl border border-white/10 p-4"><summary className="cursor-pointer text-xs text-white/60">Small labels</summary>
       <div className="mt-4 grid gap-4">{field("label", "Section label", false, 220)}{field("eyebrow", "Eyebrow", false, 220)}{field("meta", "Video caption", false, 220)}</div>
     </details>
@@ -96,6 +103,8 @@ function ContentInspector({ section, draft, assets, errors, instance, onChange }
         <h3 className="text-xs font-semibold text-white/75">Story {index + 1}</h3>
         <MediaAssetPicker assets={assets} kind="image" label="Story image" name={`${instance}-home-story-${index}`} value={image.src}
           error={errors[`images.${index}.src`]?.join(" ")} onValueChange={(src, asset) => changeImage({ src, ...(asset?.alt ? { alt: asset.alt } : {}) })} />
+        <PhotoFramingControls value={image.framing} src={image.src} onChange={framing => changeImage({ framing })} saveSection="Stories"
+          device={device} onDeviceChange={onDeviceChange} previewViewport={{ desktop: { width: 748, height: 756 }, mobile: { width: 400, height: 500 } }} />
         <p className="text-xs leading-5 text-white/40">Clear the image to leave this story out. Its text is kept.</p>
         {([['title', 'Story heading'], ['body', 'Story text'], ['alt', 'Image description']] as const).map(([key, label]) => <TextField
           key={key} id={`${instance}-home-story-${index}-${key}`} path={`images.${index}.${key}`} label={label}
@@ -212,7 +221,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
       <Link href="/admin/v2/settings" className={buttonClass}>Site settings <FaExternalLinkAlt /></Link>
     </> : <>
       {!draft.layout.find((row) => row.id === activeSection)?.enabled ? <p className="rounded-2xl bg-amber-300/5 p-3 text-xs leading-5 text-amber-100/70">This section is hidden. You can still edit its content. Enable it in Page sections when ready.</p> : null}
-      <ContentInspector section={activeSection} draft={draft} assets={assets} errors={errors} instance={instance} onChange={change} />
+      <ContentInspector section={activeSection} draft={draft} assets={assets} errors={errors} instance={instance} onChange={change} device={device} onDeviceChange={setDevice} />
       {activeSection === "hero" ? <HeroFramingControls
         value={draft.hero.framing} src={draft.hero.backgroundSrc} posterSrc={draft.hero.posterSrc}
         mediaType={draft.hero.mediaType} onChange={(framing) => change({ ...draft, hero: { ...draft.hero, framing } })}
