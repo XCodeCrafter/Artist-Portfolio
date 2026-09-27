@@ -13,6 +13,7 @@ import {
 } from "react";
 import {
   FaBars,
+  FaCalendarAlt,
   FaChartLine,
   FaChevronLeft,
   FaChevronRight,
@@ -79,6 +80,7 @@ function iconFor(key: AdminV2NavigationKey) {
     showreel: <FaVideo />,
     music: <FaMusic />,
     contact: <FaEnvelope />,
+    events: <FaCalendarAlt />,
     inbox: <FaInbox />,
     media: <FaImages />,
     insights: <FaChartLine />,

@@ -87,7 +87,9 @@ async function readMetadata(response: Response, signal: AbortSignal): Promise<un
  * or an in-flight upload can change later. Keep the DB record and recheck later.
  * No mutations, retries, CDN requests, byte downloads or credential discovery.
  */
-export async function observeImageKitUpload(value: unknown): Promise<ImageKitReconciliationObservation> {
+export async function observeImageKitUpload(
+  value: unknown, options: { signal?: AbortSignal } = {},
+): Promise<ImageKitReconciliationObservation> {
   const parsed = inputSchema.safeParse(value);
   if (!parsed.success) return { observation: "unsafe" };
   const { credentials, intent } = parsed.data;
@@ -99,6 +101,8 @@ export async function observeImageKitUpload(value: unknown): Promise<ImageKitRec
       intent.objectKey !== `media/source/${intent.assetId}/${intent.intentId}.${target.extension}`) {
     return { observation: "unsafe" };
   }
+  const externalSignal = options.signal;
+  if (externalSignal?.aborted) return { observation: "retry" };
 
   const url = new URL(API_URL);
   url.searchParams.set("path", `/media/source/${intent.assetId}/`);
@@ -107,6 +111,13 @@ export async function observeImageKitUpload(value: unknown): Promise<ImageKitRec
   url.searchParams.set("skip", "0");
   const requestUrl = url.toString();
   const controller = new AbortController();
+  let resolveAbort!: (value: ImageKitReconciliationObservation) => void;
+  const aborted = new Promise<ImageKitReconciliationObservation>(resolve => { resolveAbort = resolve; });
+  const abort = () => {
+    controller.abort();
+    resolveAbort({ observation: "retry" });
+  };
+  externalSignal?.addEventListener("abort", abort, { once: true });
   let timeout: ReturnType<typeof setTimeout>;
   const deadline = new Promise<ImageKitReconciliationObservation>((resolve) => {
     timeout = setTimeout(() => {
@@ -117,6 +128,7 @@ export async function observeImageKitUpload(value: unknown): Promise<ImageKitRec
 
   const observe = async (): Promise<ImageKitReconciliationObservation> => {
     try {
+      externalSignal?.throwIfAborted();
       const response = await fetch(requestUrl, {
         method: "GET", redirect: "error", credentials: "omit", cache: "no-store",
         signal: controller.signal,
@@ -153,8 +165,9 @@ export async function observeImageKitUpload(value: unknown): Promise<ImageKitRec
     }
   };
   try {
-    return await Promise.race([observe(), deadline]);
+    return await Promise.race([observe(), deadline, aborted]);
   } finally {
+    externalSignal?.removeEventListener("abort", abort);
     clearTimeout(timeout!);
     controller.abort();
   }

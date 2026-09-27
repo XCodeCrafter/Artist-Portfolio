@@ -39,6 +39,11 @@ const shell = readFileSync(
 );
 
 describe("Admin V2 destination finder", () => {
+  it("finds the Events editor from Czech and English calendar terms", () => {
+    expect(filterAdminV2Destinations("kalendář")[0]).toMatchObject({ id: "events", href: "/admin/v2/pages/events" });
+    expect(filterAdminV2Destinations("tickets")[0]?.id).toBe("events");
+    expect(getAdminV2ActiveItem("/admin/v2/pages/events").key).toBe("events");
+  });
   it("opens Home V2 from the finder and selects it in the sidebar", () => {
     expect(filterAdminV2Destinations("homepage")[0]).toMatchObject({
       id: "home",

@@ -150,6 +150,15 @@ export const ADMIN_V2_DESTINATIONS = [
     ],
   },
   {
+    id: "events",
+    label: "Events calendar",
+    description: "Public Bookings calendar, live dates, venues, tickets and event publication.",
+    href: "/admin/v2/pages/events",
+    group: "Portfolio pages",
+    badge: "1:1",
+    keywords: ["events", "calendar", "concert", "concerts", "tour", "tickets", "booking", "kalendar", "udalosti", "akce", "koncerty", "vstupenky"],
+  },
+  {
     id: "inbox",
     label: "Inbox",
     description: "New booking and collaboration messages, replies, and notes.",

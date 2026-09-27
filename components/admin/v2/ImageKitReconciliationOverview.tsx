@@ -62,7 +62,7 @@ function UploadItem({ item }: { item: Item }) {
   </li>;
 }
 
-export default function ImageKitReconciliationOverview({ data }: { data: ImageKitReconciliationOverviewData }) {
+export default function ImageKitReconciliationOverview({ data, initiallyExpanded }: { data: ImageKitReconciliationOverviewData; initiallyExpanded?: boolean }) {
   const overview = data.status === "available" ? data.overview : null;
   const unavailable = data.status === "unavailable" ? unavailableCopy[data.reason] : null;
   return <section aria-labelledby="imagekit-checks-heading" className="min-w-0 rounded-[26px] border border-white/10 bg-[#0d0d0f] p-5 sm:p-6">
@@ -71,7 +71,7 @@ export default function ImageKitReconciliationOverview({ data }: { data: ImageKi
       <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-white/45">Read-only</span>
     </div>
     <p className="mt-2 text-xs leading-6 text-white/55">Automatic checks are not enabled. Read-only status; no files are deleted.</p>
-    <details open={Boolean(overview && (overview.counts.attention > 0 || overview.counts.due > 0))} className="mt-3 min-w-0">
+    <details open={initiallyExpanded ?? Boolean(overview && (overview.counts.attention > 0 || overview.counts.due > 0))} className="mt-3 min-w-0">
       <summary className="cursor-pointer rounded-lg py-2 text-sm text-white/75 outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-4 focus-visible:ring-offset-[#0d0d0f]">
         {overview ? `View tracked uploads (${overview.total})` : unavailable?.title}
       </summary>

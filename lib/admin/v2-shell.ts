@@ -59,6 +59,13 @@ export const ADMIN_V2_NAVIGATION = [
     group: "Portfolio",
   },
   {
+    key: "events",
+    href: "/admin/v2/pages/events",
+    label: "Events",
+    description: "Public calendar and live dates",
+    group: "Portfolio",
+  },
+  {
     key: "media",
     href: "/admin/v2/media",
     label: "Media library",

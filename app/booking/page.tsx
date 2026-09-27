@@ -5,6 +5,7 @@ import ContactPageView, {
 } from "@/components/contact/ContactPageView";
 import { getPortfolioContent } from "@/lib/content";
 import { createPageMetadata } from "@/lib/seo";
+import { getPublicBookingCalendar } from "@/lib/booking-calendar-data";
 
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getPortfolioContent();
@@ -13,8 +14,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function BookingPage() {
-  const content = await getPortfolioContent();
+  const [content, calendar] = await Promise.all([
+    getPortfolioContent(),
+    getPublicBookingCalendar(),
+  ]);
   const data: ContactPageViewData = {
+    calendar,
+    calendarToday: new Date().toISOString().slice(0, 10),
     hero: content.heroes.booking,
     details: {
       contactBlurb: content.settings.contactBlurb,

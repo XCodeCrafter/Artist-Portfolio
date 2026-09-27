@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getImageKitMediaUploadCredentials,
   getImageKitPilotUploadCredentials,
+  getImageKitObservationCredentials,
   getMediaUploadConfigSummary,
   getR2MediaUploadCredentials,
 } from "@/lib/admin/media-upload-config";
@@ -17,6 +18,7 @@ const ENV_KEYS = [
   "IMAGEKIT_PRIVATE_KEY",
   "NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT",
   "IMAGEKIT_PILOT_UPLOAD_ENABLED",
+  "IMAGEKIT_OBSERVATION_ENABLED",
 ] as const;
 
 const originalEnvironment = Object.fromEntries(
@@ -55,6 +57,23 @@ afterEach(() => {
 });
 
 describe("media upload provider configuration", () => {
+  it.each([undefined, "", "false", "TRUE", " true", "1"])("keeps observation credentials closed for flag %j", flag => {
+    configureValidImageKitEnvironment();
+    if (flag !== undefined) process.env.IMAGEKIT_OBSERVATION_ENABLED = flag;
+    expect(getImageKitObservationCredentials()).toBeNull();
+  });
+
+  it("separates observation from upload activation and still validates credentials", () => {
+    configureValidImageKitEnvironment();
+    process.env.MEDIA_UPLOAD_PROVIDER = "supabase";
+    process.env.IMAGEKIT_OBSERVATION_ENABLED = "true";
+    expect(getImageKitObservationCredentials()).toMatchObject({ imageKitId: "artistportfolio" });
+    expect(getMediaUploadConfigSummary().provider).toBe("supabase");
+    expect(getImageKitPilotUploadCredentials().isAvailable).toBe(false);
+    process.env.IMAGEKIT_PRIVATE_KEY = "bad";
+    expect(getImageKitObservationCredentials()).toBeNull();
+  });
+
   it("defaults to the existing Supabase provider", () => {
     expect(getMediaUploadConfigSummary()).toMatchObject({
       status: "available",

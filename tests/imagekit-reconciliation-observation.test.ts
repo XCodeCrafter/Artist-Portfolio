@@ -242,6 +242,54 @@ describe("read-only ImageKit reconciliation observation", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("does not fetch with an already aborted worker signal", async () => {
+    const controller = new AbortController(); controller.abort();
+    expect(await observeImageKitUpload({ credentials, intent }, { signal: controller.signal })).toEqual({ observation: "retry" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("external abort stops even a fetch ignoring cancellation, then cancels its late response", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    let resolveFetch!: (response: Response) => void;
+    vi.mocked(fetch).mockReturnValueOnce(new Promise(resolve => { resolveFetch = resolve; }));
+    const pending = observeImageKitUpload({ credentials, intent }, { signal: controller.signal });
+    controller.abort();
+    expect(await pending).toEqual({ observation: "retry" });
+    expect(vi.mocked(fetch).mock.calls[0][1]?.signal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    const cancel = vi.fn();
+    resolveFetch(identify(new Response(new ReadableStream({ cancel }))));
+    await Promise.resolve(); await Promise.resolve();
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("external abort cancels an in-flight metadata body and removes its listener", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const remove = vi.spyOn(controller.signal, "removeEventListener");
+    const cancel = vi.fn(() => new Promise<void>(() => undefined));
+    vi.mocked(fetch).mockResolvedValueOnce(identify(new Response(new ReadableStream({ cancel }), {
+      headers: { "content-type": "application/json" },
+    })));
+    const pending = observeImageKitUpload({ credentials, intent }, { signal: controller.signal });
+    await Promise.resolve(); await Promise.resolve();
+    controller.abort();
+    expect(await pending).toEqual({ observation: "retry" });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("detaches the external listener after success", async () => {
+    const controller = new AbortController();
+    const remove = vi.spyOn(controller.signal, "removeEventListener");
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse([]));
+    expect(await observeImageKitUpload({ credentials, intent }, { signal: controller.signal })).toEqual({ observation: "absent" });
+    expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+  });
+
   it("does not wait on a hanging cancellation or leave a timer after success", async () => {
     vi.useFakeTimers();
     const cancel = vi.fn(() => new Promise<void>(() => undefined));

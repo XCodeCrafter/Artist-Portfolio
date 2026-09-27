@@ -173,6 +173,38 @@ an absolute deadline and list-to-detail version checks. No route, worker hookup,
 provider deletion, migration or upload activation is included. Account approval,
 in-flight upload completion guarantees and safe resolution remain separate gates.
 
+Batch 7A.2f.3c.2c adds a **dormant account-scoped observation entry** with fresh
+AAL2/session/profile checks, exact Origin, shared actor/account quotas and
+explicit expiring owner approval. Additive `0052_imagekit_observation_admission.sql`
+replaces the worker's global claim path with scoped claim/finish and creates an
+initially empty private approval registry. The owner confirmed hosted 0052 on
+2026-09-24 with all nine matching checks true in screenshots; no rerun is needed.
+The agent did not execute hosted SQL. Applying it does not approve an account,
+start a job or enable uploads. Keep `IMAGEKIT_OBSERVATION_ENABLED=false` until
+account setup and explicit approval are complete.
+Actual account/key-pair verification, provider-safe resolution and the disposable
+pilot remain open. See [admission boundaries](docs/imagekit-observation-admission.md).
+
+Batch 7A.2f.3c.2d adds an **ImageKit operations** panel in Media V2: setup status,
+local status refresh and an explicit check of at most one eligible upload.
+This is the manual caller for the admission boundary above, not an upload switch,
+account-approval flow or cleanup tool. Missing configuration/approval keeps it
+blocked. Refresh preserves editor drafts and uses its own rate limit; it never
+starts a check. Outcomes distinguish absent, inconclusive, review-required and
+unknown results, with no automatic retry. No new migration, provider activation,
+background job or media deletion is included. The isolated browser fixture uses
+synthetic responses only; real-account/provider acceptance is still pending.
+
+Batch 7A.2f.3c.2e is the final no-keys upload hardening step: the dormant issue
+and finalize coordinator bounds admission, RPCs and verification to 15/60 seconds,
+forwards cancellation, snapshots account data and stops late continuations. A
+confirmed publication remains successful if cache refresh fails or times out.
+No upload endpoint is connected, no flags change and no migration is needed.
+The next ImageKit step requires server-side credentials and owner account
+verification; mock tests cannot prove real key pairing or provider behavior.
+Observation approval does not authorize uploading. Keep current Supabase uploads
+and both ImageKit feature flags unchanged until the remaining gates are reviewed.
+
 Cloudflare R2 remains a dormant future alternative. If later traffic economics
 justify it, create the private bucket, scoped credentials, billing account, and
 custom media domain under client ownership. The existing R2 variables document

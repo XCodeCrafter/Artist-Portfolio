@@ -46,6 +46,13 @@ describe("Read-only ImageKit upload overview", () => {
     expect(detailsTag(render(data))).toContain('open=""');
   });
 
+  it("allows a host panel to preserve native user expansion across data refreshes", () => {
+    const data = available([item({ stage: "attention" })]);
+    data.overview.counts.attention = 1;
+    expect(detailsTag(renderToStaticMarkup(<ImageKitReconciliationOverview data={data} initiallyExpanded={false} />))).not.toContain("open");
+    expect(detailsTag(renderToStaticMarkup(<ImageKitReconciliationOverview data={available()} initiallyExpanded />))).toContain('open=""');
+  });
+
   it.each(["uploading", "waiting", "checking"] as const)("keeps the %s-only overview collapsed", (stage) => {
     const data = available([item({ stage })]);
     data.overview.counts[stage] = 1;

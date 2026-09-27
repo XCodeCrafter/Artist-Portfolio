@@ -3,7 +3,7 @@ import { getAdminV2OverviewData } from "@/lib/admin/v2-overview";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(), navigation: vi.fn(), home: vi.fn(), bio: vi.fn(), gallery: vi.fn(), showreel: vi.fn(),
-  music: vi.fn(), contact: vi.fn(), inbox: vi.fn(), appearance: vi.fn(), media: vi.fn(), readiness: vi.fn(),
+  music: vi.fn(), contact: vi.fn(), events: vi.fn(), inbox: vi.fn(), appearance: vi.fn(), media: vi.fn(), readiness: vi.fn(),
 }));
 vi.mock("@/lib/admin/auth", () => ({ requireAdmin: mocks.auth }));
 vi.mock("@/lib/admin/navigation", () => ({ getAdminNavigationData: mocks.navigation }));
@@ -13,6 +13,7 @@ vi.mock("@/lib/admin/gallery", () => ({ getAdminGalleryEditorData: mocks.gallery
 vi.mock("@/lib/admin/showreel", () => ({ getAdminShowreelEditorData: mocks.showreel }));
 vi.mock("@/lib/admin/music", () => ({ getAdminMusicEditorData: mocks.music }));
 vi.mock("@/lib/admin/contact", () => ({ getAdminContactEditorData: mocks.contact }));
+vi.mock("@/lib/admin/booking-calendar", () => ({ getAdminBookingCalendarData: mocks.events }));
 vi.mock("@/lib/admin/inquiries", () => ({ getAdminNewInquiryCount: mocks.inbox }));
 vi.mock("@/lib/admin/site-appearance", () => ({ getAdminAppearanceData: mocks.appearance }));
 vi.mock("@/lib/admin/media-library", () => ({ getMediaLibraryV2Data: mocks.media }));
@@ -27,7 +28,7 @@ const ready = { isConfigured: true, migrationRequired: false };
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.auth.mockResolvedValue({ id: "admin" });
-  for (const loader of [mocks.home, mocks.bio, mocks.gallery, mocks.showreel, mocks.music]) loader.mockResolvedValue(ready);
+  for (const loader of [mocks.home, mocks.bio, mocks.gallery, mocks.showreel, mocks.music, mocks.events]) loader.mockResolvedValue(ready);
   mocks.navigation.mockResolvedValue({ ...ready, configVersion: 1, navigation: [], availability: {} });
   mocks.contact.mockResolvedValue({ ...ready, delivery: { emailConfigured: true, webhookConfigured: true } });
   mocks.inbox.mockResolvedValue({ isConfigured: true, count: 0 });
@@ -43,7 +44,7 @@ describe("Overview workspace readiness", () => {
     expect(mocks.media).toHaveBeenCalledOnce();
     expect(mocks.readiness).toHaveBeenCalledExactlyOnceWith({ includeSchema: false });
     expect(result.issues).toEqual([]);
-    expect(result.pages).toHaveLength(6);
+    expect(result.pages).toHaveLength(7);
     expect(JSON.stringify(result)).not.toContain("not-for-client");
     expect(JSON.stringify(result)).not.toContain("private-path");
   });
@@ -52,6 +53,13 @@ describe("Overview workspace readiness", () => {
     const result = await getAdminV2OverviewData();
     expect(result.pages.every(page => page.editorState === "ready")).toBe(true);
     expect(result.issues).toContainEqual(expect.objectContaining({ id: "footer-migration", href: "/admin/v2/settings/appearance", detail: expect.stringContaining("0039") }));
+  });
+  it("reports the separate Events migration without exposing draft event data", async () => {
+    mocks.events.mockResolvedValue({ ...ready, migrationRequired: true, snapshot: { draft: { events: [{ title: "Private draft event" }] } } });
+    const result = await getAdminV2OverviewData();
+    expect(result.issues).toContainEqual(expect.objectContaining({ id: "events-migration", href: "/admin/v2/pages/events", detail: expect.stringContaining("0053") }));
+    expect(result.pages.find(page => page.key === "events")?.editorState).toBe("setup-required");
+    expect(JSON.stringify(result)).not.toContain("Private draft event");
   });
   it("reports unavailable Media usage/removal without claiming uploads are broken", async () => {
     mocks.media.mockResolvedValue({ isConfigured: true, usageError: "Media usage and safe removal need migration 0040. Upload and file details remain available." });

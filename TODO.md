@@ -1,18 +1,72 @@
 # Artist Portfolio V2 Roadmap
 
-Updated: 2026-09-23
+Updated: 2026-09-27
 
-## Current checkpoint — photo framing detour (14B)
+## Current focus — Bookings public-events calendar + V2 Events editor
+
+Owner requested an interactive calendar of planned public events in Bookings,
+**preview first** (2026-09-27), then explicitly approved implementation in the
+project and Admin V2. The approved calendar/detail layout places public dates above the existing inquiry form,
+with month navigation, selectable events, event details and a mobile-friendly
+upcoming list. Preview events are fictional, not actual artist announcements.
+Empty dates must not imply availability for private bookings. Existing inquiry
+submission and email-delivery plans remain separate and unchanged.
+
+- [x] Prepare an isolated interactive preview: calendar/detail and tour-list
+      alternatives, without modifying public pages, admin editors or database.
+- [x] Owner approved the calendar + detail presentation and requested a V2
+      section for adding and editing events.
+- [x] Implement and verify the public component and matching V2 event inspector:
+      dates/times/timezone, venue, description, optional ticket link and
+      sold-out/cancelled states. The approved decorative poster is typographic,
+      not a new uploaded image placement. No fictional events are seeded.
+      Final local verification (2026-09-27): 5,305 tests / 187 files passed
+      (`npm test -- --maxWorkers=2`), typecheck, lint and production build passed.
+      Disposable PostgreSQL/PGlite migration checks and actual-component desktop /
+      mobile browser QA passed, including private drafts, publication, conflict
+      recovery and selected-event state after save. Hosted save/reload remains
+      pending the owner migration below; local UI QA uses only in-memory data.
+- [ ] Owner applies additive migration `0053_booking_calendar.sql`, then its
+      read-only checks. Enable calendar and publish real events in V2 afterwards.
+      Existing Contact form and ImageKit migrations are unchanged.
+- [ ] Resume ImageKit at the exact parked checkpoint below: real server keys,
+      endpoint and owner account verification are now needed. No new mock batch,
+      repeated migrations or implicit approval/activation.
+
+## Parked ImageKit checkpoint — pre-activation hardening (7A.2f.3c.2e)
 
 Owner requested independent positioning/zoom for every photo placement before
 returning to ImageKit. Batch 14B below implements it; hosted migration **0051**
 is owner-confirmed by screenshot (all nine checks true). Disposable end-to-end
-save/reload acceptance is still pending. Do not replay owner-confirmed 0047–0051.
-After 14B, resume **7A.2f.3c.2** at explicit account
-admission and authenticated/quota-limited invocation; ImageKit keys remain
-owner-deferred, the provider/pilot stay disabled, and deletion/version resolution
-stays closed. Gmail/Resend 7B, remaining 13G acceptance and explicit 13H approval
-are not forgotten or implicitly completed.
+save/reload acceptance is still pending. Do not replay owner-confirmed 0047–0052.
+The owner requested returning to the stored plan. **7A.2f.3c.2c** added
+authenticated/quota-limited observation admission and additive **0052**
+for explicit expiring owner approvals plus account-scoped claim/finish. Hosted
+0052 is owner-confirmed on 2026-09-24 by screenshots showing the registry
+assertion result and all nine matching checks true. The agent did not execute
+hosted SQL. Applying it approves no account and starts no job.
+**7A.2f.3c.2d** now connects an explicit one-item check action and local status
+refresh to Media V2, with understandable setup/outcome states. It adds no
+migration, automatic invocation, approval flow or provider deletion. Real
+ImageKit keys and owner approval remain deferred; provider/pilot/observation
+flags stay disabled and deletion/version resolution stays closed.
+**7A.2f.3c.2e** hardens the dormant upload coordinator with bounded admission/RPC/
+verification waits, abort propagation and immutable per-run account snapshots.
+It neither exposes nor activates upload issuance/finalization. No new migration.
+**Next ImageKit step requires the owner:** supply the exact endpoint and key pair
+through server configuration, then verify account ownership and provider evidence
+before approval or activation. Notify the owner now; do not silently turn on
+flags, approve an account or keep adding substitute mock dashboards. Observation
+approval is not upload permission, and real-account setup does not itself resolve
+provider-safe cleanup, alerts or the disposable pilot. The independent 14B
+save/reload acceptance, Gmail/Resend 7B, remaining 13G acceptance and explicit 13H
+approval are not forgotten or implicitly completed.
+During calendar regression testing, an existing ImageKit boundary test
+(`tests/imagekit-upload-workflow.test.ts`, future authority at issuedAt minus
+5,001 ms) intermittently failed under load because injected wall time is mixed
+with real monotonic elapsed time. The final complete run passed. When resuming
+ImageKit tests, inject a deterministic monotonic clock in that test; do not relax
+the production expiry guard. No ImageKit code was changed for the calendar.
 
 ## Product direction
 
@@ -790,10 +844,78 @@ Small, reviewable rollout steps:
               163 files with two workers, TypeScript and full ESLint pass.
               Initial parallel-only timeout and limits are recorded in
               `docs/imagekit-lifecycle.md`; no provider/browser acceptance claimed.
+        - [x] **7A.2f.3c.2c — dormant account-scoped observation admission:**
+              add a private, initially empty approval registry in additive 0052.
+              Owner-only approval binds exact account/endpoint and a server HMAC
+              of both keys, with a fresh revision, 24h maximum lifetime and CAS
+              revocation. It is an operator attestation, not provider key-pair
+              proof. Scope claim BEFORE any expiry/lease/attention mutation;
+              fence finish to the same account and approved revision. Preserve
+              predecessor RPCs and all existing media/content.
+              The unexposed entry requires uncached AAL2/live-session/profile,
+              exact Origin, separate disabled observation flag, fail-closed
+              per-actor/account quotas, and repeated approval/config validation.
+              Propagate a 30s lazy abort budget through auth and provider reads;
+              do not continue or retry ambiguous calls after timeout. Missing
+              session-boundary RPC fails closed here, without changing cached
+              page-auth compatibility. No automatic approvals, app route/action,
+              cron, real provider calls, hosted SQL, credential edit or activation.
+              See `docs/imagekit-observation-admission.md` for limits/verification.
+              Verification: 4,811 tests / 172 files, full ESLint, TypeScript and
+              production build pass; isolated SQL including drift/rerun cases,
+              eight real PostgreSQL concurrency scenarios and all nine 0052
+              checks pass. Temporary test containers were removed. No live
+              provider or UI acceptance is claimed for this backend-only batch.
+              Hosted **0052 is owner-confirmed on 2026-09-24** by screenshots:
+              registry assertion returned normally and all nine checks are true.
+              No agent-executed hosted SQL or account approval. Do not replay
+              confirmed 0047–0052.
+        - [x] **7A.2f.3c.2d — manual operations in Media V2:** add understandable
+              setup states, local snapshot refresh and one explicit observation
+              action. Every run uses the existing fresh AAL2/Origin/approval/
+              quota boundary; the browser cannot select an account or approve it.
+              Status refresh is read-only apart from its separate abuse-control
+              quota, never consumes observation quota and never reloads the page.
+              Preserve media drafts, disclosure state and the previous snapshot
+              on failures; require a successful refresh after every check before
+              another click. Bound waiting, block double clicks, reject malformed
+              responses and never automatically retry unknown outcomes. No new
+              migration, live ImageKit request, approval, flag change, upload,
+              deletion or Git push. See the admission notes for verification and
+              the isolated browser fixture; live-provider acceptance remains open.
+              Verification: 5,065 tests / 177 files, TypeScript, full ESLint and
+              production build pass. Desktop/mobile synthetic browser QA covers
+              all setup/outcome states, double clicks, refresh failures and draft/
+              disclosure preservation. The real-account pilot remains untested.
+        - [x] **7A.2f.3c.2e — final no-key upload hardening:** give the dormant
+              issue/finalize coordinator a shared lazy deadline (15s/60s), with
+              wall/monotonic checks, abort propagation and no late continuation.
+              Bound admission, RPCs, verification and cache refresh; pass the
+              same budget into future trusted admission. Freeze a parsed copy of
+              account credentials and capture actor/dependency/RPC identities.
+              Do not replay an ambiguous claim/finalizer, reconstruct lost JWTs
+              or misreport confirmed publication when cache refresh stalls.
+              Retain observation's separate 30s maximum and existing contracts.
+              No UI/action hookup, new migration, provider request, flags,
+              approval or push. Verification is recorded in lifecycle notes.
+              Verification: 5,162 tests / 179 files (97 new cases), standalone
+              TypeScript, full ESLint, diff checks and production build pass.
+              Independent review's raw admission-error leak is fixed; only real
+              live Next redirects propagate. No live provider acceptance claimed.
+        - [ ] **Owner handoff — keys and account verification are now needed:**
+              configure IMAGEKIT_PUBLIC_KEY, IMAGEKIT_PRIVATE_KEY and the exact
+              NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT on the server, without sharing
+              private keys in chat or Git. Review the real client-owned account
+              and key pairing before explicit approval. Keep Supabase selected,
+              pilot/observation disabled, and webhook secret optional. Only then
+              review actual provider behavior and remaining lifecycle/admission
+              gates before a controlled image/video pilot; setup is not launch.
         - [ ] **Remaining before activation:** provider ownership/version-safe
-              resolution, account approval, authenticated quota-limited invocation,
-              operational handling/alerts and the disposable image/video pilot.
-              Read-only visibility does not satisfy these remaining gates.
+              resolution, verified real-account setup and explicit approval,
+              remaining operational alerts and the disposable image/video pilot.
+              Authenticated quota-limited manual invocation/status now exists;
+              no scheduler or automatic retries are installed. The UI does not
+              satisfy the remaining provider/cleanup gates.
 - [ ] **7A.2g — live pilot:** upload one disposable image and one disposable
       video through Admin V2, verify progress, provider metadata, delivery,
       deletion/cache behavior, and quota reporting, then remove the pilot
@@ -1992,9 +2114,16 @@ component fixtures now pass separately on loopback 3103; actual provider
 resolution/account-admission and lifecycle acceptance remain pending.
 7A.2f.3c.2b now adds separately dormant read-only orphan discovery plus pinned
 byte inspection. It neither changes the queue nor deletes/resolves files; do not
-wire it into the 30s observation worker. Next design boundary is explicit account
-admission and authenticated/quota-limited invocation, with unresolved provider
-quiescence/version-safe resolution kept closed before any deletion or pilot.
+wire it into the 30s observation worker. 7A.2f.3c.2c now supplies a dormant
+authenticated/quota-limited observation entry and account approval foundation
+with additive 0052 (hosted rollout owner-confirmed on 2026-09-24, all nine checks
+true in screenshots). 7A.2f.3c.2d connects the gated manual one-item action and
+local status refresh to Media V2, with no new migration or automatic invocation.
+No real account is approved. 7A.2f.3c.2e adds bounded dormant upload orchestration
+without changing that boundary. The next ImageKit step now needs owner-supplied
+server credentials and verified account/provider setup. Remaining operational
+alerts and unresolved quiescence/version-safe resolution remain
+closed before any deletion or pilot.
 Provider keys/account setup remain deferred, with no activation.
 Separately confirm real-project public signup is disabled. Gmail/Resend 7B and
 explicit 13H approval remain pending. No push,

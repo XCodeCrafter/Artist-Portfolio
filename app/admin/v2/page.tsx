@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   FaArrowRight,
   FaChartLine,
+  FaCalendarAlt,
   FaCheckCircle,
   FaEnvelope,
   FaExclamationTriangle,
@@ -42,6 +43,8 @@ function pageIcon(key: AdminV2PageSummary["key"]) {
       return <FaMusic />;
     case "contact":
       return <FaEnvelope />;
+    case "events":
+      return <FaCalendarAlt />;
   }
 }
 
@@ -85,7 +88,7 @@ function AttentionRow({ issue }: { issue: AdminV2OverviewIssue }) {
 
 function PageRow({ page }: { page: AdminV2PageSummary }) {
   const navbarLabel =
-    page.navbarState === "shown"
+    page.key === "events" ? "Inside Bookings" : page.navbarState === "shown"
       ? "In navbar"
       : page.navbarState === "hidden"
         ? "Hidden from navbar"

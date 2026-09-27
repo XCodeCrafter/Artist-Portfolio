@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminContactEditorData } from "@/lib/admin/contact";
 import { getMediaAssets } from "@/lib/admin/media";
 import { getContactCopyCapability } from "@/lib/admin/contact-copy";
+import Link from "next/link";
 
 export const metadata = { title: "Contact page · Admin V2" };
 export const dynamic = "force-dynamic";
@@ -35,6 +36,9 @@ export default async function AdminV2ContactPage() {
           submitted inquiry is configured to go. The preview form is safely
           disabled; it cannot create test messages while you edit.
         </p>
+        <Link className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-white/15 px-4 text-sm text-white hover:bg-white/10" href="/admin/v2/pages/events">
+          Manage Bookings events calendar →
+        </Link>
       </header>
 
       <ContactEditor

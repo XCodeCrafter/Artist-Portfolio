@@ -24,17 +24,20 @@ export function isMissingAdminHardeningRpc(
  * 0038 RPC retains the previous JWT behavior while the migration is pending;
  * database failures and unexpected responses deny access.
  */
-export async function isAdminSessionActive(userId: string, sessionId: string) {
+export async function isAdminSessionActive(userId: string, sessionId: string, options: { requireBoundary?: boolean; checkpoint?: () => void } = {}) {
+  options.checkpoint?.();
   if (!isAdminIdentityUuid(userId) || !isAdminIdentityUuid(sessionId)) return false;
   const supabase = createAdminServiceClient();
-  if (!supabase) return process.env.NODE_ENV !== "production";
+  if (!supabase) return !options.requireBoundary && process.env.NODE_ENV !== "production";
 
   try {
+    options.checkpoint?.();
     const { data, error } = await supabase.rpc("is_admin_session_active", {
       p_user_id: userId,
       p_session_id: sessionId,
     });
-    if (isMissingAdminHardeningRpc(error, "is_admin_session_active")) return true;
+    options.checkpoint?.();
+    if (isMissingAdminHardeningRpc(error, "is_admin_session_active")) return !options.requireBoundary;
     return !error && data === true;
   } catch {
     return false;

@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import AdaptiveHero from "@/components/AdaptiveHero";
 import BookingForm from "@/components/BookingForm";
+import BookingCalendar from "@/components/booking/BookingCalendar";
+import type { BookingCalendarDraft } from "@/lib/booking-calendar";
 import type { HeroContent } from "@/lib/content/types";
 
 export const CONTACT_PREVIEW_SECTIONS = ["hero", "details"] as const;
@@ -19,6 +21,8 @@ export type ContactPreviewSelectionMessage = {
 };
 
 export type ContactPageViewData = {
+  calendar?: BookingCalendarDraft | null;
+  calendarToday?: string;
   hero: HeroContent;
   details: {
     contactBlurb: string;
@@ -125,6 +129,10 @@ export default function ContactPageView({
       >
         <AdaptiveHero {...data.hero} staticPreview={mode === "preview"} />
       </PreviewSection>
+
+      {data.calendar?.settings.enabled ? (
+        <BookingCalendar data={data.calendar} preview={mode === "preview"} today={data.calendarToday} />
+      ) : null}
 
       <PreviewSection
         label="Contact & form"

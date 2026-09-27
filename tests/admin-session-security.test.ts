@@ -37,6 +37,7 @@ describe("server-side admin session liveness", () => {
       code, message: "function public.is_admin_session_active(uuid, uuid) does not exist",
     } });
     await expect(isAdminSessionActive(USER, SESSION)).resolves.toBe(true);
+    await expect(isAdminSessionActive(USER, SESSION, { requireBoundary: true })).resolves.toBe(false);
     await expect(probeAdminSessionBoundary()).resolves.toBe(false);
   });
 
@@ -60,6 +61,13 @@ describe("server-side admin session liveness", () => {
   it("denies missing server credentials in production", async () => {
     mocks.createAdminServiceClient.mockReturnValue(null);
     await expect(isAdminSessionActive(USER, SESSION)).resolves.toBe(false);
+  });
+
+  it("requires the live session boundary for privileged operations even in development", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    mocks.createAdminServiceClient.mockReturnValue(null);
+    await expect(isAdminSessionActive(USER, SESSION)).resolves.toBe(true);
+    await expect(isAdminSessionActive(USER, SESSION, { requireBoundary: true })).resolves.toBe(false);
   });
 
   it("rejects malformed identities without sending them to the database", async () => {

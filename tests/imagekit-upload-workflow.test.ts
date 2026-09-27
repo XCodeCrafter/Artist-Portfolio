@@ -84,7 +84,7 @@ afterEach(() => {
 
 describe("ImageKit dormant workflow admission", () => {
   it.each(["issue", "finalize"] as const)("%s preserves auth redirects before any other work", async operation => {
-    const redirect = new Error("NEXT_REDIRECT:/admin/mfa");
+    const redirect = Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/admin/mfa;307;" });
     admit.mockRejectedValue(redirect);
     await expect(run(operation, null)).rejects.toBe(redirect);
     expect(rpc).not.toHaveBeenCalled(); expect(sign).not.toHaveBeenCalled(); expect(verify).not.toHaveBeenCalled();
@@ -92,7 +92,7 @@ describe("ImageKit dormant workflow admission", () => {
   it.each(["issue", "finalize"] as const)("%s denies unavailable admission", async operation => {
     admit.mockResolvedValue({ ok: false });
     expect(await run(operation)).toEqual({ ok: false, code: "not-admitted" });
-    expect(rpc).not.toHaveBeenCalled(); expect(admit).toHaveBeenCalledExactlyOnceWith(operation);
+    expect(rpc).not.toHaveBeenCalled(); expect(admit).toHaveBeenCalledExactlyOnceWith(operation, expect.objectContaining({ signal: expect.any(AbortSignal), checkpoint: expect.any(Function), within: expect.any(Function) }));
   });
   it.each([
     { actorId: "not-an-actor" }, { credentials: { ...credentials, privateKey: "bad" } },
@@ -170,7 +170,13 @@ describe("ImageKit one-shot authority issuance", () => {
     queue(readyReply, initial);
     expect(await run("issue")).toEqual({ ok: false, code: "unconfirmed" }); expect(sign).not.toHaveBeenCalled();
   });
-  it.each([NaN, Infinity, 0, -1, 0.5, Date.parse(base.expiresAt)])("does not claim with invalid/expired wall clock %s", async clock => {
+  it.each([NaN, Infinity, 0, -1, 0.5])("does not start any work with invalid wall clock %s", async clock => {
+    time = clock; issueQueue();
+    expect(await run("issue")).toEqual({ ok: false, code: "unconfirmed" });
+    expect(admit).not.toHaveBeenCalled(); expect(sign).not.toHaveBeenCalled(); expect(rpc).not.toHaveBeenCalled();
+  });
+  it("does not claim an already expired reservation", async () => {
+    const clock = Date.parse(base.expiresAt);
     time = clock; issueQueue();
     expect(await run("issue")).toEqual({ ok: false, code: "expired" }); expect(sign).not.toHaveBeenCalled(); expect(rpc).toHaveBeenCalledTimes(2);
   });
@@ -221,9 +227,9 @@ describe("ImageKit one-shot authority issuance", () => {
     issueQueue(base, { ...issued, outcome: "issued" }, current);
     expect(await run("issue")).toEqual({ ok: false, code }); expect(sign).toHaveBeenCalledTimes(1);
   });
-  it("withholds a token that became too short while signing", async () => {
+  it("withholds a token and does not start resolve after the signing deadline", async () => {
     issueQueue(); sign.mockImplementation(input => { time += 270_000; return createImageKitUploadAuthority(input); });
-    expect(await run("issue")).toEqual({ ok: false, code: "expired" }); expect(rpc).toHaveBeenCalledTimes(4);
+    expect(await run("issue")).toEqual({ ok: false, code: "unconfirmed" }); expect(rpc).toHaveBeenCalledTimes(3);
   });
   it("withholds signed authority after a final actor-scoped resolve error", async () => {
     queue(readyReply, base, { ...issued, outcome: "issued" });
@@ -244,7 +250,7 @@ describe("ImageKit verified atomic completion", () => {
     expect(verify).toHaveBeenCalledExactlyOnceWith({ credentials, fileId: proof.fileId, intent: {
       intentId, assetId, storageContainer: base.storageContainer, objectKey: base.objectKey, mimeType: base.mimeType,
       expectedByteSize: base.expectedByteSize, expectedChecksumSha256: base.expectedChecksumSha256,
-    } });
+    } }, { signal: expect.any(AbortSignal) });
     expect(calls()).toEqual(["get_imagekit_upload_readiness_v1", "resolve_imagekit_upload_v1", "resolve_imagekit_upload_v1", "finalize_imagekit_upload_v1"]);
     expect(rpc).toHaveBeenLastCalledWith("finalize_imagekit_upload_v1", { p_intent_id: intentId, p_actor_id: actorId, p_evidence: proof });
     expect(sign).not.toHaveBeenCalled(); expect(revalidate).toHaveBeenCalledOnce();
@@ -282,14 +288,14 @@ describe("ImageKit verified atomic completion", () => {
     finalizeQueue(); verify.mockResolvedValue({ ok: true, object: { ...proof, ...patch } } as Awaited<ReturnType<typeof verifyImageKitObject>>);
     expect(await run("finalize")).toEqual({ ok: false, code: "verification-failed" }); expect(rpc).toHaveBeenCalledTimes(2);
   });
-  it("does not finalize if intent expires during provider verification", async () => {
+  it("does not finalize if the operation deadline passes during provider verification", async () => {
     finalizeQueue(); verify.mockImplementation(async () => { time = Date.parse(base.expiresAt); return { ok: true, object: proof }; });
-    expect(await run("finalize")).toEqual({ ok: false, code: "expired" }); expect(rpc).toHaveBeenCalledTimes(2);
+    expect(await run("finalize")).toEqual({ ok: false, code: "unconfirmed" }); expect(rpc).toHaveBeenCalledTimes(2);
   });
-  it("also rechecks expiry after a slow actor-scoped resolve", async () => {
+  it("does not finalize after an actor-scoped resolve outlives the deadline", async () => {
     queue(readyReply, issued);
     rpc.mockImplementationOnce(async () => { time = Date.parse(base.expiresAt); return ok(issued); });
-    expect(await run("finalize")).toEqual({ ok: false, code: "expired" }); expect(rpc).toHaveBeenCalledTimes(3);
+    expect(await run("finalize")).toEqual({ ok: false, code: "unconfirmed" }); expect(rpc).toHaveBeenCalledTimes(3);
   });
   it.each([[closed(), "intent-closed"], [null, "unconfirmed"],
     [{ ...issued, expectedChecksumSha256: "b".repeat(64) }, "unconfirmed"],

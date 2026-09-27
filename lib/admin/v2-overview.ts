@@ -3,6 +3,7 @@ import "server-only";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminBioEditorData } from "@/lib/admin/bio";
 import { getAdminContactEditorData } from "@/lib/admin/contact";
+import { getAdminBookingCalendarData } from "@/lib/admin/booking-calendar";
 import { getAdminGalleryEditorData } from "@/lib/admin/gallery";
 import { getAdminHomeEditorData } from "@/lib/admin/home";
 import { getAdminNewInquiryCount } from "@/lib/admin/inquiries";
@@ -26,7 +27,7 @@ export type AdminV2PageEditorState =
 export type AdminV2NavbarState = "shown" | "hidden" | "unknown";
 
 export type AdminV2PageSummary = {
-  key: "home" | "bio" | "gallery" | "showreel" | "music" | "contact";
+  key: "home" | "bio" | "gallery" | "showreel" | "music" | "contact" | "events";
   label: string;
   description: string;
   editorHref: string;
@@ -119,7 +120,7 @@ function sortIssues(issues: AdminV2OverviewIssue[]) {
 export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
   await requireAdmin();
 
-  const [navigation, home, bio, gallery, showreel, music, contact, inbox, appearance, media, readiness] =
+  const [navigation, home, bio, gallery, showreel, music, contact, events, inbox, appearance, media, readiness] =
     await Promise.all([
       getAdminNavigationData(),
       getAdminHomeEditorData(),
@@ -128,6 +129,7 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
       getAdminShowreelEditorData(),
       getAdminMusicEditorData(),
       getAdminContactEditorData(),
+      getAdminBookingCalendarData(),
       getAdminNewInquiryCount(),
       getAdminAppearanceData(),
       getMediaLibraryV2Data(),
@@ -221,6 +223,16 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
       publicHref: "/booking",
       migrationLabel: "The Contact V2 database migration",
       readiness: contact,
+      navigationKey: "contact",
+    },
+    {
+      key: "events",
+      label: "Events",
+      description: "Public Bookings calendar, live dates, venues and tickets.",
+      editorHref: "/admin/v2/pages/events",
+      publicHref: "/booking#events",
+      migrationLabel: "The Events calendar database migration (0053)",
+      readiness: events,
       navigationKey: "contact",
     },
   ];

@@ -52,10 +52,12 @@ function requiresAdminProfile() {
   return process.env.NODE_ENV === "production";
 }
 
-async function getActiveAdminProfile(user: User): Promise<AdminProfileRow | null> {
+async function getActiveAdminProfile(user: User, checkpoint: () => void = () => undefined): Promise<AdminProfileRow | null> {
+  checkpoint();
   const supabase = createAdminServiceClient();
   if (!supabase) return null;
 
+  checkpoint();
   const { data, error } = await supabase
     .from("admin_profiles")
     .select("user_id, email, role, is_active")
@@ -64,6 +66,7 @@ async function getActiveAdminProfile(user: User): Promise<AdminProfileRow | null
     .limit(1)
     .maybeSingle<AdminProfileRow>();
 
+  checkpoint();
   if (error || !data) return null;
 
   const userEmail = user.email?.toLowerCase();
@@ -124,39 +127,45 @@ export const getCurrentAdminCandidate = cache(async (): Promise<AdminUser | null
   return (await getCurrentAdminContext())?.admin || null;
 });
 
-const getCurrentAdminContext = cache(async (): Promise<{
+async function resolveCurrentAdminContext(requireSessionBoundary = false, checkpoint: () => void = () => undefined): Promise<{
   admin: AdminUser;
   aal: string;
-} | null> => {
+} | null> {
+  checkpoint();
   if (!hasSupabaseBrowserEnv()) {
     return null;
   }
 
   const supabase = await createClient();
+  checkpoint();
   const {
     data: { user },
     error,
   } = await supabase.auth.getUser();
 
+  checkpoint();
   if (error || !user) {
     return null;
   }
 
   const claimsResult = await supabase.auth.getClaims();
+  checkpoint();
   const claims = claimsResult.data?.claims;
   if (
     claimsResult.error ||
     claims?.sub !== user.id ||
     typeof claims.session_id !== "string" ||
-    !(await isAdminSessionActive(user.id, claims.session_id))
+    !(await isAdminSessionActive(user.id, claims.session_id, { requireBoundary: requireSessionBoundary, checkpoint }))
   ) {
     return null;
   }
 
+  checkpoint();
   const profile = hasAdminServiceEnv()
-    ? await getActiveAdminProfile(user)
+    ? await getActiveAdminProfile(user, checkpoint)
     : null;
 
+  checkpoint();
   if (
     hasAdminServiceEnv()
       ? !profile
@@ -174,7 +183,16 @@ const getCurrentAdminContext = cache(async (): Promise<{
     },
     aal: typeof claims.aal === "string" ? claims.aal : "aal1",
   };
-});
+}
+
+const getCurrentAdminContext = cache(() => resolveCurrentAdminContext());
+
+/** Recheck live session, AAL2 and profile between privileged worker operations.
+ * Unlike the page-level helper, this intentionally does not use React cache. */
+export async function getFreshCurrentAdmin(checkpoint?: () => void): Promise<AdminUser | null> {
+  const context = await resolveCurrentAdminContext(true, checkpoint);
+  return context?.aal === "aal2" ? context.admin : null;
+}
 
 export const requireAdmin = cache(async () => {
   const admin = await getCurrentAdmin();

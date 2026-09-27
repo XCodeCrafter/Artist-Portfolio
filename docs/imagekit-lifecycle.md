@@ -241,6 +241,77 @@ such, not silently substituted for verification. Keep the current gate closed.
   checkpoint. Hosted schema rollout is owner-confirmed by screenshots; real
   credential/account compatibility and the live upload path remain unverified.
 
+## Final no-keys upload hardening (7A.2f.3c.2e)
+
+The dormant `createImageKitUploadWorkflow` now uses one shared lazy operation
+budget from before admission through the last response: **15 seconds for issue,
+60 seconds for finalize**. The latter leaves room for the verifier's own bounded
+45-second read. It is not an upload-duration limit: no browser upload transport
+is wired here. The helper checks elapsed monotonic time and nondecreasing wall
+time, handles external abort, and prevents late responses from starting another
+RPC, signer, verifier or cache operation. RPC builders receive an abort signal
+when supported; adapters ignoring abort still cannot extend caller waiting.
+
+Trusted future admission receives this same budget and must use its checkpoints
+inside its own authentication/authorization work. Genuine login/MFA redirects
+still propagate while the budget is live; stalled or late admission fails closed.
+The coordinator captures its dependencies at creation and snapshots parsed,
+frozen credentials, actor ID and the bound RPC method before database awaits.
+This prevents mutable caller objects from redirecting a run; it is **not** proof
+of account ownership, live approval, provider pairing or upload permission.
+
+Timeouts/ambiguous claims or finalizers return `unconfirmed`, never replay, cancel,
+roll back or reconstruct a lost one-shot token. A sent database operation may
+still commit after abort. Conversely, once a valid committed snapshot has been
+confirmed, cache refresh failure or expiry preserves `completed`/`already-completed`
+instead of inviting another upload. Waiting for cache refresh is bounded too.
+The observer reuses the helper but retains its existing **30-second maximum**,
+error contract, approval rules and manual-only application caller.
+
+This remains a server-only, unconnected upload coordinator. No new migration,
+hosted SQL, configuration change, account approval, provider call, deletion,
+application upload route or Git push is included. Existing Supabase uploads and
+public/editor UI are unchanged. No new browser acceptance is needed for this
+backend-only increment; its tests do not establish a live provider pilot.
+
+Verification (2026-09-24): **5,162 tests / 179 files**, standalone TypeScript,
+full ESLint, tracked whitespace checks and the production build pass. The build
+retains only the existing Edge Runtime warnings. The 97 new tests comprise 54
+shared-budget/compatibility cases and 43 independent upload-deadline cases.
+They cover stalled/late admission and every RPC stage, verifier cancellation,
+frozen/regressing clocks, expiry before the operation deadline, immutable
+identity/dependencies, RPC receiver binding and confirmed cache-timeout success.
+Independent review caught broad admission error propagation: only real Next
+redirects are now preserved, with a fresh deadline check even on rejected auth
+responses. Generic errors (including credential-bearing fixtures) are sanitized.
+No new SQL concurrency or browser/provider acceptance is claimed in this batch.
+
+### Owner handoff: stop before real account setup
+
+The next useful ImageKit step needs the owner to provide these through **server
+configuration**, never a chat message, source file or browser form in our admin:
+
+- `IMAGEKIT_PUBLIC_KEY`
+- `IMAGEKIT_PRIVATE_KEY` (server secret)
+- `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` (the exact account endpoint)
+
+Review the client-owned account and its key pairing together before approving
+anything. Do not treat a correct format, matching fingerprint or a successful
+private-key read as proof that both keys belong to that endpoint. Keep
+`MEDIA_UPLOAD_PROVIDER=supabase`, `IMAGEKIT_PILOT_UPLOAD_ENABLED=false` and
+`IMAGEKIT_OBSERVATION_ENABLED=false` during setup. Webhooks are not implemented
+and `IMAGEKIT_WEBHOOK_SECRET` is not required for this handoff.
+
+Only after verified setup can real account/provider acceptance proceed, followed
+by the remaining safe-resolution/admission and progress/retry/cancel work and a
+controlled disposable image/video pilot. The 0052 approval is for observation,
+**not upload authorization**. No automatic cleanup or production cutover is
+justified by configuring keys. Owner-confirmed 0047–0052 need no replay.
+
+Independent 14B save/reload acceptance, Gmail/Resend 7B, 13G acceptance and owner
+approval for 13H remain open. They are separate work, not substitute proof that
+ImageKit is ready.
+
 ## No-keys follow-up: real PostgreSQL concurrency (7A.2f.3b.1)
 
 The owner explicitly deferred ImageKit API credentials/account setup. This
@@ -313,8 +384,12 @@ those gates are satisfied. Gmail/Resend 7B remains a separate pending batch.
 
 ## Dormant observation worker (7A.2f.3c.1)
 
-This no-keys increment uses the already owner-confirmed 0047/0049 RPCs; **there
-is no new migration**. It is deliberately only observation, not automatic orphan
+The original no-keys increment used the owner-confirmed 0047/0049 RPCs without
+a new migration. **Follow-up 7A.2f.3c.2c now requires additive 0052 for scoped
+observation admission**, described in [the admission notes](imagekit-observation-admission.md).
+7A.2f.3c.2d connects a gated manual one-item action and local status refresh in
+Media V2; actual credentials, approval and activation remain deferred.
+It remains deliberately only observation, not automatic orphan
 resolution, provider deletion or successful cleanup. Current uploads, the pilot
 flag, credentials, hosted data and the existing local acceptance stack are unchanged.
 
@@ -335,7 +410,8 @@ Three server-only modules form the boundary:
   means `unsafe`; HTTP errors (including 404/401/403/429), network failures and
   timeouts mean `retry`. No raw provider data or credentials are returned.
 - `imagekit-reconciliation-workflow.ts` requires an explicit trusted server/job
-  admission callback; there is no default production adapter. It checks schema
+  admission callback. The later manual-admin entry supplies authenticated
+  admission to the explicit Media V2 action; page loads never invoke it. It checks schema
   readiness, claims at most one candidate, validates the lease, observes the
   whitelisted target, then rechecks readiness/time and records the observation
   through the exact worker/lease RPC. Overall waiting is bounded at 30 seconds.
@@ -357,12 +433,13 @@ state frees storage, revokes a URL, changes portfolio content, or claims that an
 orphan was removed. An empty claim reply only means this bounded poll returned
 no lease, not that every item has been processed.
 
-Activation is still blocked: authenticate and rate-limit the invoker, explicitly
-approve the real account/keys, design operational invocation/status, and verify
-ownership/version-safe resolution plus upload quiescence. Input format checks
-are not key-pair/account proof. The current SQL claim is globally scoped and is
-only suitable for this **single approved account**; a multi-account deployment
-needs an account-scoped claim RPC first. No route, action, UI, timer or cron imports
+Activation is still blocked: explicitly verify/approve the real account/keys,
+complete real-account operational acceptance, and verify ownership/version-safe
+resolution plus upload quiescence. Follow-up 7A.2f.3c.2c implements dormant
+authenticated/quota-limited admission and switches the worker to new 0052
+account-scoped claim/finish RPCs; the legacy global claim is never a fallback.
+Input format checks and approval attestations are not key-pair/account proof.
+Only the explicit 2d action calls the entry; no page load, timer or cron starts
 this core. No cleanup code calls DELETE or trusts a browser-provided file ID.
 
 Verification for 7A.2f.3c.1: **325 new tests** pass (154 contract, 88 mocked HTTP,
@@ -403,7 +480,8 @@ credentials or contact ImageKit. The safe projection omits object paths, provide
 URLs/accounts/file IDs, bindings, hashes, worker/lease identities and actor IDs.
 Only issued, unfinished tracked reservations appear; empty means no such database
 records, not empty provider storage. Dates are explicitly UTC and labelled as a
-non-live snapshot. Checks are still dormant, and nothing is physically deleted.
+non-live snapshot. The later 2d wrapper can refresh this snapshot locally and run
+one separately admitted manual check; automatic checks and deletion remain off.
 
 ### 0050 rollout — owner-confirmed 2026-09-23
 

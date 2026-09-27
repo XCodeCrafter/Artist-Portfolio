@@ -398,6 +398,7 @@ describe("Admin V2 shell helpers", () => {
       "showreel",
       "music",
       "contact",
+      "events",
       "media",
       "inbox",
       "insights",

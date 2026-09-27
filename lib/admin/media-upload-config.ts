@@ -511,3 +511,20 @@ export function getImageKitPilotUploadCredentials(): ImageKitPilotUploadCredenti
     },
   };
 }
+
+/** Independent, read-only observation gate. Enabling this does NOT approve an
+ * account or enable uploads: the admission registry and live admin checks are
+ * still mandatory. Only an explicit manual action can start observation; there
+ * is no automatic provider call, upload activation or background job. */
+export function getImageKitObservationCredentials(): ImageKitMediaUploadCredentials | null {
+  if (process.env.IMAGEKIT_OBSERVATION_ENABLED !== "true") return null;
+  const environment = readImageKitEnvironment();
+  const endpoint = parseImageKitUrlEndpoint(environment.urlEndpoint);
+  if (!endpoint || getImageKitIssues(getImageKitReadiness(environment)).length > 0) return null;
+  return {
+    publicKey: environment.publicKey,
+    privateKey: environment.privateKey,
+    urlEndpoint: endpoint.urlEndpoint,
+    imageKitId: endpoint.imageKitId,
+  };
+}

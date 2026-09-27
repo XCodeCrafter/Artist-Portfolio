@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { BookingCalendarDraft } from "@/lib/booking-calendar";
 import ContactPageView, {
   CONTACT_PREVIEW_SELECTION_MESSAGE,
 } from "@/components/contact/ContactPageView";
@@ -15,8 +16,12 @@ export const CONTACT_PREVIEW_READY_MESSAGE = "contact-preview-ready" as const;
 
 export default function ContactPreviewRuntime({
   initialSnapshot,
+  calendar,
+  calendarToday,
 }: {
   initialSnapshot: ContactEditorSnapshot;
+  calendar?: BookingCalendarDraft | null;
+  calendarToday?: string;
 }) {
   const [draft, setDraft] = useState(initialSnapshot.draft);
   const [selectedSection, setSelectedSection] =
@@ -83,7 +88,7 @@ export default function ContactPreviewRuntime({
   return (
     <div className="min-h-screen bg-black text-white">
       <ContactPageView
-        data={viewData}
+        data={{ ...viewData, calendar, calendarToday }}
         mode="preview"
         onSelectSection={selectSection}
         selectedSection={selectedSection}
