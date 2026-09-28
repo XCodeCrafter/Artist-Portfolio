@@ -1,8 +1,34 @@
 # Artist Portfolio V2 Roadmap
 
-Updated: 2026-09-27
+Updated: 2026-09-28
 
-## Current focus — Bookings public-events calendar + V2 Events editor
+## Current focus — Live & Contact + V2 Events editor
+
+Owner clarified on 2026-09-28 that the public destination is currently labelled
+Contact, not a separate Bookings page. Keep the calendar above the form on that
+same page, now named **Live & Contact**. The technical `/booking` URL, database
+keys, API endpoint and analytics identifiers remain stable for compatibility.
+Navbar/legacy fallback navigation, SEO, Insights page labels, admin page titles,
+finder, previews and editor cross-links now share the new page name. Quick links
+let visitors jump to live dates or the contact form when the calendar is enabled.
+
+- [x] Verify the rename locally: 5,318 tests / 189 files, typecheck, lint and
+      production build passed on 2026-09-28. Actual-component browser QA passed
+      at 390 px and 1440 px, including both section shortcuts. Isolated SQL tests
+      cover custom-copy preservation, CAS invalidation and safe reruns of 0054.
+      Build logged a photo-framing read failure while compiling; subsequent
+      read-only public Supabase probes for photo framing and the calendar both
+      returned HTTP 200. This is not hosted write/save acceptance.
+- [x] Owner applied **0054_live_contact_page_copy.sql** and confirmed all five
+      matching read-only checks true by screenshot on 2026-09-28.
+      This data-only follow-up changes only known stock CONTACT /
+      BOOKING(S) hero titles to LIVE & CONTACT; custom/blank titles, media,
+      framing, CTA, events and publication flags are preserved. Do not replay
+      owner-confirmed 0053 or 0054. The agent did not execute hosted SQL.
+- [ ] Verify deployment of the Live & Contact code rename after the
+      owner-requested GitHub delivery (2026-09-28). The database copy migration
+      alone does not deploy navbar, admin labels or section shortcuts, and a
+      successful Git push is not confirmation of a successful Vercel deployment.
 
 Owner requested an interactive calendar of planned public events in Bookings,
 **preview first** (2026-09-27), then explicitly approved implementation in the
@@ -24,11 +50,15 @@ submission and email-delivery plans remain separate and unchanged.
       (`npm test -- --maxWorkers=2`), typecheck, lint and production build passed.
       Disposable PostgreSQL/PGlite migration checks and actual-component desktop /
       mobile browser QA passed, including private drafts, publication, conflict
-      recovery and selected-event state after save. Hosted save/reload remains
-      pending the owner migration below; local UI QA uses only in-memory data.
-- [ ] Owner applies additive migration `0053_booking_calendar.sql`, then its
-      read-only checks. Enable calendar and publish real events in V2 afterwards.
-      Existing Contact form and ImageKit migrations are unchanged.
+      recovery and selected-event state after save. Local UI QA uses only
+      in-memory data; hosted save/reload remains a separate pending check.
+- [x] Owner applied additive migration `0053_booking_calendar.sql` and confirmed
+      all eight matching read-only checks true by screenshot on 2026-09-27.
+      The agent did not execute hosted SQL. Do not replay 0053.
+- [ ] After deployment, verify Events save/reload, enable the public calendar
+      and publish an owner-selected real event; confirm its Live & Contact display.
+      Migration checks alone do not prove this end-to-end workflow. Existing
+      Contact form and ImageKit migrations are unchanged.
 - [ ] Resume ImageKit at the exact parked checkpoint below: real server keys,
       endpoint and owner account verification are now needed. No new mock batch,
       repeated migrations or implicit approval/activation.

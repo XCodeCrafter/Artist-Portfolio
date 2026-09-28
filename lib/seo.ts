@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { PageSlug, PortfolioContent } from "@/lib/content";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import {
   getSiteUrl,
   isNonProductionVercelDeployment,
@@ -97,7 +98,7 @@ function pageLabel(page: PublicSeoPage) {
     case "video":
       return "Showreel & Videos";
     case "booking":
-      return "Contact";
+      return LIVE_CONTACT_PAGE_LABEL;
     case "privacy":
       return "Privacy";
     case "terms":
@@ -121,7 +122,7 @@ function pageDescription(content: PortfolioContent, page: PublicSeoPage) {
     case "video":
       return `Showreel, selected scenes, self-tapes, music videos, and screen work featuring ${personName}.`;
     case "booking":
-      return `Contact ${personName} for acting, casting, music bookings, releases, productions, and creative collaborations.`;
+      return `Discover live events and contact ${personName} for music bookings, acting, casting, productions, and creative collaborations.`;
     case "privacy":
       return `Privacy information for the official ${brandName} portfolio.`;
     case "terms":

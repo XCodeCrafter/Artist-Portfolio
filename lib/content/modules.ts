@@ -1,4 +1,5 @@
 import type { PageSlug, PortfolioType } from "./types";
+import { LIVE_CONTACT_NAV_LABEL } from "./live-contact";
 
 export type PublicModuleKey =
   | "home"
@@ -92,21 +93,21 @@ export const MODULE_REGISTRY: PortfolioModule[] = [
   },
   {
     key: "contact",
-    label: "CONTACT",
+    label: LIVE_CONTACT_NAV_LABEL,
     href: "/booking",
     pageSlug: "booking",
     profiles: ["actor"],
     publicNav: true,
-    description: "Casting and representation contact.",
+    description: "Live events, casting, representation, and collaboration inquiries.",
   },
   {
     key: "contact",
-    label: "BOOKING",
+    label: LIVE_CONTACT_NAV_LABEL,
     href: "/booking",
     pageSlug: "booking",
     profiles: ["musician"],
     publicNav: true,
-    description: "Booking and general inquiries.",
+    description: "Live event calendar, music bookings, and general inquiries.",
   },
   {
     key: "content",

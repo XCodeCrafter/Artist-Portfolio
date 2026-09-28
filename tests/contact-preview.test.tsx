@@ -156,7 +156,7 @@ describe("Admin V2 Contact preview", () => {
       mobile: { width: 390, height: 844 },
     });
     expect(markup).toContain('src="/admin/v2-preview/contact"');
-    expect(markup).toContain("Contact page mobile preview");
+    expect(markup).toContain("Live &amp; Contact page mobile preview");
     expect(markup).toContain("390px");
     expect(markup).toContain("844px");
     expect(markup).toContain("Review-only preview");

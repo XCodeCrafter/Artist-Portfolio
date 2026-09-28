@@ -4,7 +4,7 @@ import {
   ADMIN_V2_DESTINATIONS,
   filterAdminV2Destinations,
 } from "@/lib/admin/v2-destinations";
-import { getAdminV2ActiveItem } from "@/lib/admin/v2-shell";
+import { ADMIN_V2_NAVIGATION, getAdminV2ActiveItem } from "@/lib/admin/v2-shell";
 
 const overviewPage = readFileSync(
   new URL("../app/admin/v2/page.tsx", import.meta.url),
@@ -39,6 +39,28 @@ const shell = readFileSync(
 );
 
 describe("Admin V2 destination finder", () => {
+  it("names the public page consistently and keeps Events as its calendar editor", () => {
+    expect(ADMIN_V2_NAVIGATION.find(item => item.key === "contact")).toMatchObject({
+      label: "Live & Contact", href: "/admin/v2/pages/contact",
+    });
+    expect(ADMIN_V2_NAVIGATION.find(item => item.key === "events")?.description).toContain("inside Live & Contact");
+    expect(filterAdminV2Destinations("Live & Contact")[0]).toMatchObject({
+      id: "contact", label: "Live & Contact", href: "/admin/v2/pages/contact",
+    });
+    expect(filterAdminV2Destinations("contact")[0]?.id).toBe("contact");
+    expect(ADMIN_V2_DESTINATIONS.find(item => item.id === "events")?.description).toContain("inside Live & Contact");
+  });
+
+  it("links the public page editor and calendar inspector both ways without changing routes", () => {
+    const pageEditor = readFileSync(new URL("../app/admin/v2/pages/contact/page.tsx", import.meta.url), "utf8");
+    const calendarEditor = readFileSync(new URL("../app/admin/v2/pages/events/page.tsx", import.meta.url), "utf8");
+    expect(pageEditor).toContain('href="/admin/v2/pages/events"');
+    expect(pageEditor).toContain("manage the calendar in Events");
+    expect(calendarEditor).toContain('href="/admin/v2/pages/contact"');
+    expect(calendarEditor).toContain("not a separate public page");
+    expect(overviewPage).not.toContain("Inside Bookings");
+  });
+
   it("finds the Events editor from Czech and English calendar terms", () => {
     expect(filterAdminV2Destinations("kalendář")[0]).toMatchObject({ id: "events", href: "/admin/v2/pages/events" });
     expect(filterAdminV2Destinations("tickets")[0]?.id).toBe("events");

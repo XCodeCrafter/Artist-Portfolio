@@ -81,14 +81,31 @@ describe("navigation destination registry", () => {
 });
 
 describe("legacy navigation compatibility", () => {
-  it("matches the musician menu and its legacy labels", () => {
+  it("keeps musician destinations and uses the unified live/contact label", () => {
     expect(visibleItems(createLegacyNavigationConfig("musician"))).toEqual([
       { key: "home", label: "HOME", href: "/" },
       { key: "bio", label: "BIO", href: "/bio" },
       { key: "music", label: "MUSIC", href: "/music" },
       { key: "works", label: "VIDEO", href: "/video" },
-      { key: "contact", label: "BOOKING", href: "/booking" },
+      { key: "contact", label: "LIVE & CONTACT", href: "/booking" },
     ]);
+  });
+
+  it.each(["actor", "musician"] as const)("renames %s labels without changing stored destinations", (portfolioType) => {
+    const legacy = createLegacyNavigationConfig(portfolioType);
+    const active = resolveNavigationConfig({
+      version: 1,
+      portfolioType,
+      rows: [{ destination_key: "contact", is_visible: true, sort_order: 130 }],
+    });
+    for (const config of [legacy, active]) {
+      expect(config.items.find((item) => item.key === "contact")).toMatchObject({
+        defaultLabel: "LIVE & CONTACT",
+        href: "/booking",
+        pageSlug: "booking",
+        isVisible: true,
+      });
+    }
   });
 
   it("matches the actor menu and respects hidden legacy page slugs", () => {

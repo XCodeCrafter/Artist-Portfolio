@@ -26,6 +26,7 @@ describe("public top navigation", () => {
     expect(html).toContain('href="/music"');
     expect(html).toContain('href="/video"');
     expect(html).toContain('href="/booking"');
+    expect(html).toContain("LIVE &amp; CONTACT");
     expect(html).not.toContain("/#home-about");
     expect(html).not.toContain("/#cnc-code");
     expect(html).not.toContain("/bio#resume");

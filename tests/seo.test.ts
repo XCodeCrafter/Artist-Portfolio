@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import {
   createBioJsonLd,
+  createPageMetadata,
   getPageSeo,
   getSeoIdentity,
 } from "@/lib/seo";
@@ -21,6 +22,20 @@ function contentFor(
 }
 
 describe("mixed public SEO", () => {
+  it("names the calendar/contact page consistently while preserving its canonical URL", () => {
+    const content = contentFor("musician");
+    const seo = getPageSeo(content, "booking");
+    const metadata = createPageMetadata(content, "booking");
+
+    expect(seo.label).toBe("Live & Contact");
+    expect(seo.title).toContain("Live & Contact");
+    expect(seo.description).toMatch(/live events and contact/i);
+    expect(seo.path).toBe("/booking");
+    expect(metadata.alternates).toEqual({ canonical: "/booking" });
+    expect(metadata.openGraph).toMatchObject({ title: seo.title, url: "/booking" });
+    expect(metadata.twitter).toMatchObject({ title: seo.title });
+  });
+
   it("does not change public labels or descriptions with the legacy profile", () => {
     const actor = contentFor("actor");
     const musician = contentFor("musician");

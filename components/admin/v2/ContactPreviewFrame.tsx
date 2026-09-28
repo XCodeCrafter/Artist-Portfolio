@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import { CONTACT_PREVIEW_READY_MESSAGE } from "@/components/admin/v2/ContactPreviewRuntime";
 import {
   CONTACT_PREVIEW_SECTIONS,
@@ -149,13 +150,13 @@ export default function ContactPreviewFrame({
           style={{ width: viewport.width, height: viewport.height }}
         >
           <iframe
-            aria-label={`Contact page ${device} preview`}
+            aria-label={`${LIVE_CONTACT_PAGE_LABEL} page ${device} preview`}
             className="absolute left-0 top-0 block origin-top-left border-0 bg-black"
             onLoad={sendDraft}
             ref={frameRef}
             src="/admin/v2-preview/contact"
             style={{ width: viewport.width, height: viewport.height }}
-            title={`Contact page preview at ${viewport.width} pixels`}
+            title={`${LIVE_CONTACT_PAGE_LABEL} page preview at ${viewport.width} pixels`}
           />
         </div>
       </div>

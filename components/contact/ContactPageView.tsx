@@ -6,6 +6,7 @@ import BookingForm from "@/components/BookingForm";
 import BookingCalendar from "@/components/booking/BookingCalendar";
 import type { BookingCalendarDraft } from "@/lib/booking-calendar";
 import type { HeroContent } from "@/lib/content/types";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 
 export const CONTACT_PREVIEW_SECTIONS = ["hero", "details"] as const;
 
@@ -129,6 +130,26 @@ export default function ContactPageView({
       >
         <AdaptiveHero {...data.hero} staticPreview={mode === "preview"} />
       </PreviewSection>
+
+      {data.calendar?.settings.enabled ? (
+        <nav
+          aria-label={`${LIVE_CONTACT_PAGE_LABEL} sections`}
+          className="mx-auto flex max-w-[1400px] flex-wrap justify-center gap-3 px-5 py-6 sm:px-8"
+        >
+          <a
+            href="#events"
+            className="font-ui inline-flex min-h-11 items-center justify-center rounded-full border border-[#ff674f]/40 bg-[#ff674f]/10 px-5 text-sm text-white transition hover:bg-[#ff674f]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff674f]"
+          >
+            Live dates
+          </a>
+          <a
+            href="#form"
+            className="font-ui inline-flex min-h-11 items-center justify-center rounded-full border border-white/20 px-5 text-sm text-white/80 transition hover:border-white/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff674f]"
+          >
+            Get in touch
+          </a>
+        </nav>
+      ) : null}
 
       {data.calendar?.settings.enabled ? (
         <BookingCalendar data={data.calendar} preview={mode === "preview"} today={data.calendarToday} />

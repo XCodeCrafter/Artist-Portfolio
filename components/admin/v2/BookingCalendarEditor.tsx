@@ -5,6 +5,7 @@ import { FaCalendarAlt, FaCheck, FaPlus, FaSlidersH, FaSpinner, FaTrash } from "
 import { saveBookingCalendarV2 } from "@/app/admin/v2/pages/events/actions";
 import BookingCalendar from "@/components/booking/BookingCalendar";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import { needsEditorReload, runEditorSave } from "@/lib/admin/editor-save-recovery";
 import {
   BOOKING_CALENDAR_MAX_EVENTS,
@@ -206,15 +207,15 @@ export default function BookingCalendarEditor({ snapshot, disabled, migrationReq
 
     <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,390px)] xl:items-start">
       <section className={`${panelClass} overflow-hidden`} aria-label="Live calendar preview">
-        <header className="border-b border-white/10 px-4 py-3"><p className="flex items-center gap-2 text-xs font-semibold text-white/75"><FaCalendarAlt aria-hidden="true" /> Bookings · public calendar preview</p><p className="mt-1 text-xs text-white/45">Preview only. Ticket links are disabled and edits are not yet public.</p></header>
+        <header className="border-b border-white/10 px-4 py-3"><p className="flex items-center gap-2 text-xs font-semibold text-white/75"><FaCalendarAlt aria-hidden="true" /> {LIVE_CONTACT_PAGE_LABEL} · public calendar preview</p><p className="mt-1 text-xs text-white/45">Preview only. Ticket links are disabled and edits are not yet public.</p></header>
         <BookingCalendar data={draft} preview onSelectEvent={select} selectedEventId={selectedId || undefined} />
       </section>
       <section ref={inspectorRef} className={`${panelClass} scroll-mt-4 p-4 sm:p-5`} aria-labelledby="booking-calendar-inspector-title">
-        <div className="mb-5"><p className="text-[10px] font-semibold uppercase tracking-widest text-[#ff806c]">{selected ? "Event inspector" : "Calendar section"}</p><h2 id="booking-calendar-inspector-title" className="heading-ui mt-2 break-words text-xl font-semibold text-white">{selected ? selected.title || "New event" : "Calendar settings"}</h2><p className="mt-2 text-xs leading-5 text-white/45">{selected ? "Changes appear in the preview immediately. Save when ready." : "This section appears above the existing Bookings inquiry form."}</p></div>
+        <div className="mb-5"><p className="text-[10px] font-semibold uppercase tracking-widest text-[#ff806c]">{selected ? "Event inspector" : "Calendar section"}</p><h2 id="booking-calendar-inspector-title" className="heading-ui mt-2 break-words text-xl font-semibold text-white">{selected ? selected.title || "New event" : "Calendar settings"}</h2><p className="mt-2 text-xs leading-5 text-white/45">{selected ? "Changes appear in the preview immediately. Save when ready." : `This section appears above the contact form on ${LIVE_CONTACT_PAGE_LABEL}.`}</p></div>
         <fieldset disabled={blocked} className="grid min-w-0 gap-5">
           <legend className="sr-only">{selected ? "Selected event fields" : "Calendar display settings"}</legend>
           {!selected ? <>
-            <label htmlFor="booking-calendar-enabled" className="flex min-h-12 items-start gap-3 rounded-xl border border-white/10 p-3 text-sm text-white/80"><input id="booking-calendar-enabled" type="checkbox" className="mt-1 accent-[#ff674f]" checked={draft.settings.enabled} onChange={event => change({ ...draft, settings: { ...draft.settings, enabled: event.target.checked } })} /><span>Show calendar on Bookings<span className="mt-1 block text-xs leading-5 text-white/45">Switching this off hides the entire public calendar without deleting events. Save to apply.</span></span></label>
+            <label htmlFor="booking-calendar-enabled" className="flex min-h-12 items-start gap-3 rounded-xl border border-white/10 p-3 text-sm text-white/80"><input id="booking-calendar-enabled" type="checkbox" className="mt-1 accent-[#ff674f]" checked={draft.settings.enabled} onChange={event => change({ ...draft, settings: { ...draft.settings, enabled: event.target.checked } })} /><span>Show calendar on {LIVE_CONTACT_PAGE_LABEL}<span className="mt-1 block text-xs leading-5 text-white/45">Switching this off hides the entire public calendar without deleting events. Save to apply.</span></span></label>
             <Field id="booking-calendar-title" label="Section title" required error={errorFor("settings.title")}>
               <input id="booking-calendar-title" className={inputClass} required maxLength={160} value={draft.settings.title} aria-invalid={Boolean(errorFor("settings.title"))} aria-describedby={errorFor("settings.title") ? "booking-calendar-title-error" : undefined} onChange={event => change({ ...draft, settings: { ...draft.settings, title: event.target.value } })} />
             </Field>

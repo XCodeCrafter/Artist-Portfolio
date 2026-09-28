@@ -175,7 +175,7 @@ describe("Batch 6D Contact migration contract", () => {
     expect(classicContentActions).toContain(
       'parsed.data.pageSlug === "booking"'
     );
-    expect(classicContentEditor).toContain("Contact moved to V2");
+    expect(classicContentEditor).toContain("{LIVE_CONTACT_PAGE_LABEL} moved to V2");
     expect(classicContentEditor).toContain('href="/admin/v2/pages/contact"');
   });
 

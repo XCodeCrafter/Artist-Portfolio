@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import { useActionState, useEffect, useRef, useState, type CSSProperties, type ReactNode, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import GalleryFooter, { type FooterPreviewRegion } from "@/components/GalleryFooter";
@@ -120,7 +121,7 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
       <section aria-labelledby="appearance-preview-title" className="min-w-0 self-start overflow-hidden rounded-[26px] border border-white/10 bg-[#08080a]" style={previewStyle}>
         <div className="border-b border-white/10 px-5 py-4 text-[10px] uppercase tracking-[0.2em] text-white/40" id="appearance-preview-title">Live preview · click a region to edit · unpublished until saved</div>
         {section === "appearance" && <div className="p-6 sm:p-9">
-          <div className="flex flex-wrap gap-5 text-xs uppercase tracking-[0.12em] text-white/55" style={{ fontFamily: "var(--font-ui)" }} aria-label="Navigation typography sample"><span className="text-[#ff6049]">Home</span><span>Bio</span><span>Music</span><span>Contact</span></div>
+          <div className="flex flex-wrap gap-5 text-xs uppercase tracking-[0.12em] text-white/55" style={{ fontFamily: "var(--font-ui)" }} aria-label="Navigation typography sample"><span className="text-[#ff6049]">Home</span><span>Bio</span><span>Music</span><span>{LIVE_CONTACT_PAGE_LABEL}</span></div>
           <p className="mt-8 text-xs uppercase tracking-[0.2em] text-[#ff806c]">{draft.identity.tagline}</p>
           <h2 className="mt-4 break-words text-4xl leading-tight sm:text-6xl" style={{ fontFamily: "var(--font-display)" }}>{draft.name.artistName}</h2>
           <p className="mt-6 max-w-xl text-base leading-8 text-white/65">{draft.identity.description}</p>
@@ -155,10 +156,10 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
             </label>)}</div>
           </fieldset>
         </> : section === "identity" ? <div className="mt-6 grid gap-5">
-          <p className="text-xs leading-6 text-white/45">Shared across the footer, Contact and search previews. Your wording is kept, whether this portfolio is music, acting or both.</p>
+          <p className="text-xs leading-6 text-white/45">Shared across the footer, {LIVE_CONTACT_PAGE_LABEL} and search previews. Your wording is kept, whether this portfolio is music, acting or both.</p>
           {textField("identity", "tagline", "Short profile tagline", "Shown in the top strip of every portfolio footer.")}
-          {textField("identity", "location", "Based in", "Shared with the Contact page.")}
-          {textField("identity", "contactBlurb", "Collaboration introduction", "Shown below the footer invitation and on Contact.", true)}
+          {textField("identity", "location", "Based in", `Shared with ${LIVE_CONTACT_PAGE_LABEL}.`)}
+          {textField("identity", "contactBlurb", "Collaboration introduction", `Shown below the footer invitation and on ${LIVE_CONTACT_PAGE_LABEL}.`, true)}
           {textField("identity", "description", "Site description", "Used for HOME search results and shared-link previews; other page descriptions remain automatic.", true)}
           <Link href="/admin/v2/navigation" className="text-xs underline underline-offset-4">Owner name and platform links → Navbar</Link>
         </div> : <div className="mt-6 grid gap-5">

@@ -11,7 +11,7 @@ const data = {
   calendarToday: "2026-10-01",
 };
 
-describe("Bookings calendar integration", () => {
+describe("Live & Contact calendar integration", () => {
   it("renders real calendar before the unchanged inquiry form and hides drafts", () => {
     const html = renderToStaticMarkup(<ContactPageView data={{ ...data, calendar: INITIAL_CALENDAR_FIXTURE.draft }} />);
     expect(html).toContain('id="events"');
@@ -20,11 +20,25 @@ describe("Bookings calendar integration", () => {
     expect(html).not.toContain("Private rehearsal draft");
     expect(html).toContain('id="contact-form"');
     expect(html).toContain("Send a message");
+    expect(html).toContain('aria-label="Live &amp; Contact sections"');
+    expect(html).toContain('href="#events"');
+    expect(html).toContain('href="#form"');
+    expect(html).toContain("Live dates");
+    expect(html).toContain("Get in touch");
   });
   it.each([null, { ...INITIAL_CALENDAR_FIXTURE.draft, settings: { ...INITIAL_CALENDAR_FIXTURE.draft.settings, enabled: false } }])("retains booking inquiries while calendar is absent or disabled", calendar => {
     const html = renderToStaticMarkup(<ContactPageView data={{ ...data, calendar }} />);
     expect(html).not.toContain('id="events"');
+    expect(html).not.toContain('href="#events"');
+    expect(html).not.toContain('aria-label="Live &amp; Contact sections"');
     expect(html).toContain('id="contact-form"');
+  });
+  it("preserves owner-edited hero copy while the fallback reflects the renamed page", () => {
+    expect(FALLBACK_CONTENT.heroes.booking.title).toBe("LIVE & CONTACT");
+    const html = renderToStaticMarkup(<ContactPageView data={{ ...data, hero: { ...data.hero, title: "My custom invitation" } }} />);
+    const heading = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, "").replace(/\s|&nbsp;/g, "");
+    expect(heading).toBe("Mycustominvitation");
+    expect(html).not.toContain("LIVE &amp; CONTACT");
   });
   it("reads the public calendar separately, without altering global portfolio fallback data", () => {
     const page = readFileSync(new URL("../app/booking/page.tsx", import.meta.url), "utf8");

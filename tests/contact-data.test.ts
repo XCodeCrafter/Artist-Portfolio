@@ -164,7 +164,7 @@ describe("Admin V2 Contact data loader", () => {
     expect(result.migrationRequired).toBe(true);
     expect(result.loadError).toContain("0033");
     expect(result.snapshot.draft.hero).toMatchObject({
-      title: "CONTACT",
+      title: "LIVE & CONTACT",
       backgroundSrc: "/images/booking-hero.jpg",
     });
     expect(result.snapshot.draft.details).toEqual(details);

@@ -1,4 +1,5 @@
 import "server-only";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminBioEditorData } from "@/lib/admin/bio";
@@ -217,18 +218,18 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
     },
     {
       key: "contact",
-      label: "Contact",
-      description: "Booking form, contact details, and delivery context.",
+      label: LIVE_CONTACT_PAGE_LABEL,
+      description: "Page hero, contact form and delivery. Calendar content is managed in Events.",
       editorHref: "/admin/v2/pages/contact",
       publicHref: "/booking",
-      migrationLabel: "The Contact V2 database migration",
+      migrationLabel: `The ${LIVE_CONTACT_PAGE_LABEL} V2 database migration`,
       readiness: contact,
       navigationKey: "contact",
     },
     {
       key: "events",
       label: "Events",
-      description: "Public Bookings calendar, live dates, venues and tickets.",
+      description: `Calendar inside ${LIVE_CONTACT_PAGE_LABEL}, live dates, venues and tickets.`,
       editorHref: "/admin/v2/pages/events",
       publicHref: "/booking#events",
       migrationLabel: "The Events calendar database migration (0053)",

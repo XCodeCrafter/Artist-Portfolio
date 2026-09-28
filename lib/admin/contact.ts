@@ -1,4 +1,5 @@
 import "server-only";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import { loadHeroEditorSnapshot } from "@/lib/admin/hero-framing";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -116,7 +117,7 @@ async function loadLegacyContactSnapshot(
     return {
       snapshot: fallback,
       loadError:
-        "Contact content could not be loaded. The editor is read-only until the database is reachable.",
+        `${LIVE_CONTACT_PAGE_LABEL} content could not be loaded. The editor is read-only until the database is reachable.`,
     };
   }
 
@@ -152,7 +153,7 @@ async function loadLegacyContactSnapshot(
     ...(!settingsRow || !heroRow
       ? {
           loadError:
-            "Required Contact records are incomplete. Apply migration 0033 before editing.",
+            `Required ${LIVE_CONTACT_PAGE_LABEL} records are incomplete. Apply migration 0033 before editing.`,
         }
       : {}),
   };
@@ -214,7 +215,7 @@ export async function getAdminContactEditorData(): Promise<AdminContactEditorDat
       migrationRequired: false,
       delivery,
       loadError:
-        "Contact content could not be loaded. Nothing can be saved from this view.",
+        `${LIVE_CONTACT_PAGE_LABEL} content could not be loaded. Nothing can be saved from this view.`,
     };
   }
 
@@ -227,7 +228,7 @@ export async function getAdminContactEditorData(): Promise<AdminContactEditorDat
       migrationRequired: false,
       delivery,
       loadError:
-        "Contact content returned an unexpected shape. The editor is read-only.",
+        `${LIVE_CONTACT_PAGE_LABEL} content returned an unexpected shape. The editor is read-only.`,
     };
   }
 

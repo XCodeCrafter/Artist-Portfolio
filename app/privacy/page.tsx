@@ -50,7 +50,7 @@ export default async function PrivacyPage() {
         <section>
           <h2>05 — Your controls and requests</h2>
           <p>Use Privacy choices to accept, reject or select individual optional purposes at any time. Closing the panel without saving does not grant consent. You can also clear this site’s data in your browser. If preferences cannot be stored, optional features stay off.</p>
-          <p className="mt-3">For questions, access, correction or deletion requests, <Link href="/booking">contact the portfolio owner</Link> and describe the information concerned. The owner may need enough information to locate an enquiry and verify your request. Rights and the appropriate supervisory authority depend on the applicable data-protection law.</p>
+          <p className="mt-3">For questions, access, correction or deletion requests, <Link href="/booking#form">contact the portfolio owner</Link> and describe the information concerned. The owner may need enough information to locate an enquiry and verify your request. Rights and the appropriate supervisory authority depend on the applicable data-protection law.</p>
         </section>
       </div>
     </main>

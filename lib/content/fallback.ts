@@ -1,6 +1,7 @@
 import type { PortfolioContent } from "./types";
 import { createMixedReviewNavigationConfig } from "./navigation";
 import { DEFAULT_FOOTER_CONTENT } from "./footer";
+import { LIVE_CONTACT_NAV_LABEL } from "./live-contact";
 
 export const FALLBACK_CONTENT: PortfolioContent = {
   settings: {
@@ -72,7 +73,7 @@ export const FALLBACK_CONTENT: PortfolioContent = {
       mediaType: "video",
     },
     booking: {
-      title: "CONTACT",
+      title: LIVE_CONTACT_NAV_LABEL,
       subtitle: "LET'S WORK TOGETHER",
       ctaLabel: "WRITE",
       ctaHref: "#form",

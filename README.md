@@ -205,6 +205,17 @@ verification; mock tests cannot prove real key pairing or provider behavior.
 Observation approval does not authorize uploading. Keep current Supabase uploads
 and both ImageKit feature flags unchanged until the remaining gates are reviewed.
 
+### Live & Contact calendar
+
+The public **Live & Contact** page combines live dates and a contact form at the
+existing `/booking` address. In Admin V2, **Live & Contact** edits the Hero/form
+and **Events** manages the calendar. Migrations 0053 and 0054 are owner-confirmed
+(eight and five checks true respectively). The data-only
+`0054_live_contact_page_copy.sql` changes only stock Contact/Booking(s) hero titles.
+It preserves custom copy and never publishes events or enables the calendar.
+See [calendar setup and verification](docs/booking-calendar.md). Keep existing
+routes, API names and historical analytics identifiers unchanged.
+
 Cloudflare R2 remains a dormant future alternative. If later traffic economics
 justify it, create the private bucket, scoped credentials, billing account, and
 custom media domain under client ownership. The existing R2 variables document

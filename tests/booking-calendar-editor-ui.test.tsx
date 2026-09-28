@@ -101,10 +101,12 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe("Bookings calendar V2 editor", () => {
+describe("Live & Contact calendar V2 editor", () => {
   it("uses the same calendar in safe draft preview mode and starts with section settings", () => {
     expect(publicPreview().props).toMatchObject({ data: props.snapshot.draft, preview: true });
-    expect(text(render())).toContain("Show calendar on Bookings");
+    expect(text(render())).toContain("Show calendar on Live & Contact");
+    expect(text(render())).toContain("above the contact form on Live & Contact");
+    expect(text(render())).not.toContain("Bookings · public calendar preview");
     expect(text(render())).toContain("not advertised as available for booking");
     expect(button("Save calendar").props.disabled).toBe(true);
     expect(mocks.save).not.toHaveBeenCalled();

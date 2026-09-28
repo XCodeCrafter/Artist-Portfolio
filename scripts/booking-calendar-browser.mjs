@@ -39,7 +39,7 @@ const resources = new Map([
   ["/fixture.js", ["text/javascript; charset=utf-8", chunks[0].code]],
 ]);
 const server = createServer((request, response) => {
-  response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; connect-src 'none'; font-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'");
+  response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'");
   response.setHeader("Cache-Control", "no-store");
   response.setHeader("X-Content-Type-Options", "nosniff");
   if (request.headers.host !== `127.0.0.1:${port}` || (request.headers.origin && request.headers.origin !== origin) || request.headers["sec-fetch-site"] === "cross-site") { response.writeHead(403); response.end(); return; }

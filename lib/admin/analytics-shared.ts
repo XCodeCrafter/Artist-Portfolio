@@ -1,10 +1,12 @@
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
+
 export const ANALYTICS_RANGE_DAYS = [7, 30, 90, 180] as const;
 export type AnalyticsRangeDays = (typeof ANALYTICS_RANGE_DAYS)[number];
 
 const PAGE_LABELS: Record<string, string> = {
   "/": "Home",
   "/bio": "Bio",
-  "/booking": "Contact / Booking",
+  "/booking": LIVE_CONTACT_PAGE_LABEL,
   "/gallery": "Gallery",
   "/music": "Music",
   "/privacy": "Privacy",

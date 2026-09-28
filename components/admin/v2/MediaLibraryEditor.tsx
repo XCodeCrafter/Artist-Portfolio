@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { FaImage, FaVideo, FaTrash, FaUndo, FaFile, FaSearch, FaCopy, FaArrowRight } from "react-icons/fa";
@@ -15,7 +16,7 @@ const field = "min-h-11 w-full rounded-xl border border-white/15 bg-[#09090b] px
 const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/15 px-4 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40";
 const pageEditors = [
   ["Home", "home"], ["Bio", "bio"], ["Gallery", "gallery"],
-  ["Showreel", "showreel"], ["Music", "music"], ["Contact", "contact"],
+  ["Showreel", "showreel"], ["Music", "music"], [LIVE_CONTACT_PAGE_LABEL, "contact"],
 ] as const;
 
 type BrowseOptions = Required<Pick<MediaLibraryBrowseOptions, "attention" | "availability" | "sort">>;

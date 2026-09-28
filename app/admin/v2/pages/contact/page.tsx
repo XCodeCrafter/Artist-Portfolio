@@ -4,8 +4,9 @@ import { getAdminContactEditorData } from "@/lib/admin/contact";
 import { getMediaAssets } from "@/lib/admin/media";
 import { getContactCopyCapability } from "@/lib/admin/contact-copy";
 import Link from "next/link";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 
-export const metadata = { title: "Contact page · Admin V2" };
+export const metadata = { title: `${LIVE_CONTACT_PAGE_LABEL} · Admin V2` };
 export const dynamic = "force-dynamic";
 
 export default async function AdminV2ContactPage() {
@@ -29,15 +30,15 @@ export default async function AdminV2ContactPage() {
           </span>
         </div>
         <h1 className="heading-ui mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
-          Contact page
+          {LIVE_CONTACT_PAGE_LABEL}
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-white/46">
-          Edit the same Hero and contact area visitors see, then check where a
-          submitted inquiry is configured to go. The preview form is safely
-          disabled; it cannot create test messages while you edit.
+          One public page for live dates and getting in touch. Edit its Hero and
+          contact form here; manage the calendar in Events. The preview form is
+          safely disabled and cannot create messages while you edit.
         </p>
         <Link className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-white/15 px-4 text-sm text-white hover:bg-white/10" href="/admin/v2/pages/events">
-          Manage Bookings events calendar →
+          Manage this page’s calendar → Events
         </Link>
       </header>
 

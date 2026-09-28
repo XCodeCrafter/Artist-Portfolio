@@ -1,4 +1,5 @@
 "use server";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import { getHeroSaveCall, isMissingHeroFramingSchemaError, HERO_FRAMING_MIGRATION_MESSAGE } from "@/lib/admin/hero-framing";
 
 import { randomUUID } from "node:crypto";
@@ -76,7 +77,7 @@ export async function saveContactSectionV2(
   if (!parsedForm.success) {
     return result(
       "invalid",
-      "This Contact draft is incomplete. Check the active inspector and try again."
+      `This ${LIVE_CONTACT_PAGE_LABEL} draft is incomplete. Check the active inspector and try again.`
     );
   }
 
@@ -86,7 +87,7 @@ export async function saveContactSectionV2(
     rawPayload = JSON.parse(parsedForm.data.payload);
     rawVersions = JSON.parse(parsedForm.data.versions);
   } catch {
-    return result("invalid", "The Contact draft could not be read.");
+    return result("invalid", `The ${LIVE_CONTACT_PAGE_LABEL} draft could not be read.`);
   }
 
   const parsed = parseContactSectionSubmission(
@@ -150,7 +151,7 @@ export async function saveContactSectionV2(
     if (isMissingContactEditorSchemaError(error)) {
       return result(
         "migration-required",
-        "The Contact editor needs database migration 0033 before it can save.",
+        `The ${LIVE_CONTACT_PAGE_LABEL} editor needs database migration 0033 before it can save.`,
         { section }
       );
     }

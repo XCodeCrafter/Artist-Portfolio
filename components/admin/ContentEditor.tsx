@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import {
   createContext,
   useCallback,
@@ -3770,17 +3771,17 @@ export default function ContentEditor({
         : []),
       {
         id: "booking",
-        label: "Contact",
+        label: LIVE_CONTACT_PAGE_LABEL,
         kicker: "Public page",
         description:
           "Hero, location, contact introduction, and inquiry form context.",
         node: contactV2Enabled ? (
           <section className="rounded-[24px] border border-[#ff5a42]/22 bg-[radial-gradient(circle_at_85%_10%,rgba(255,59,31,0.16),transparent_42%),#111113] p-6 shadow-[0_22px_80px_rgba(0,0,0,0.3)] sm:p-8">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#ff715b]">
-              Contact moved to V2
+              {LIVE_CONTACT_PAGE_LABEL} moved to V2
             </p>
             <h2 className="heading-ui mt-3 text-2xl font-semibold text-white">
-              Edit the real Contact page in one place
+              Edit the real {LIVE_CONTACT_PAGE_LABEL} page in one place
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-white/46">
               The V2 editor now owns the Hero and contact details with a live
@@ -3791,13 +3792,13 @@ export default function ContentEditor({
               className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white"
               href="/admin/v2/pages/contact"
             >
-              Open Contact V2 <FaExternalLinkAlt />
+              Open {LIVE_CONTACT_PAGE_LABEL} V2 <FaExternalLinkAlt />
             </Link>
           </section>
         ) : (
           <StudioWorkspace
             description="Contact introduction and the public inquiry experience"
-            label="Contact page"
+            label={`${LIVE_CONTACT_PAGE_LABEL} page`}
             panels={[
               {
                 description: "Opening title, action, and background media.",

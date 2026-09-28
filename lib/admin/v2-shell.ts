@@ -1,3 +1,5 @@
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
+
 export const ADMIN_V2_SIDEBAR_STORAGE_KEY =
   "artist-admin-v2-sidebar-state";
 
@@ -54,15 +56,15 @@ export const ADMIN_V2_NAVIGATION = [
   {
     key: "contact",
     href: "/admin/v2/pages/contact",
-    label: "Contact page",
-    description: "Page and inquiry delivery",
+    label: LIVE_CONTACT_PAGE_LABEL,
+    description: "Page, contact form and delivery",
     group: "Portfolio",
   },
   {
     key: "events",
     href: "/admin/v2/pages/events",
     label: "Events",
-    description: "Public calendar and live dates",
+    description: `Calendar inside ${LIVE_CONTACT_PAGE_LABEL}`,
     group: "Portfolio",
   },
   {

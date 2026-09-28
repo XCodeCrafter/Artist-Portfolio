@@ -1,5 +1,6 @@
 import type { PageSlug, PortfolioType } from "./types";
 import { getVisibleNavigationModules } from "./modules";
+import { LIVE_CONTACT_PAGE_LABEL } from "./live-contact";
 
 export const PORTFOLIO_TYPES: PortfolioType[] = ["musician", "actor"];
 
@@ -35,7 +36,7 @@ export function getProfileCopy(type: PortfolioType) {
   return {
     footerBody:
       "Follow the journey. Explore releases. Send a booking inquiry or just say hi.",
-    primaryCta: "Booking",
+    primaryCta: LIVE_CONTACT_PAGE_LABEL,
     secondaryCta: "Play on Spotify",
     secondaryHref: "",
     secondaryLabel: "Play on Spotify",

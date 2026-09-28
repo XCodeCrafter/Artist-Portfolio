@@ -22,6 +22,7 @@ import useUnsavedChangesGuard, {
   type GuardedFormSubmitter,
 } from "@/components/admin/useUnsavedChangesGuard";
 import type { AnalyticsSummary } from "@/lib/admin/analytics";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import {
   getAdminAnalyticsPath,
   type AdminAnalyticsSurface,
@@ -435,7 +436,7 @@ function RankingPanel({
 function ContactActivity({ analytics }: { analytics: AnalyticsSummary }) {
   const steps = [
     { label: "Portfolio page views", value: analytics.pageViews },
-    { label: "Contact / Booking views", value: analytics.bookingPageViews },
+    { label: `${LIVE_CONTACT_PAGE_LABEL} views`, value: analytics.bookingPageViews },
     { label: "Accepted inquiries", value: analytics.bookingSubmits },
   ];
   const max = Math.max(...steps.map((step) => step.value), 1);

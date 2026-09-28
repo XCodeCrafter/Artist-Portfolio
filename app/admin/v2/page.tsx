@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import {
   FaArrowRight,
   FaChartLine,
@@ -88,7 +89,7 @@ function AttentionRow({ issue }: { issue: AdminV2OverviewIssue }) {
 
 function PageRow({ page }: { page: AdminV2PageSummary }) {
   const navbarLabel =
-    page.key === "events" ? "Inside Bookings" : page.navbarState === "shown"
+    page.key === "events" ? `Inside ${LIVE_CONTACT_PAGE_LABEL}` : page.navbarState === "shown"
       ? "In navbar"
       : page.navbarState === "hidden"
         ? "Hidden from navbar"

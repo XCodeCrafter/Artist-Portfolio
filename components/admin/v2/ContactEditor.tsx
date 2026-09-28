@@ -1,5 +1,6 @@
 "use client";
 import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
+import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 
 import Link from "next/link";
 import {
@@ -468,7 +469,7 @@ export default function ContactEditor({
   const latestSaveEventIdRef = useRef("");
   const { clearDirty, confirmDiscard, hasUnsavedChanges, markDirty } =
     useUnsavedChangesGuard(
-      "You have unsaved Contact page changes. Leave and discard them?",
+      `You have unsaved ${LIVE_CONTACT_PAGE_LABEL} page changes. Leave and discard them?`,
       true
     );
 
@@ -713,7 +714,7 @@ export default function ContactEditor({
           ? `${SECTION_META[activeSection].label} has unsaved changes`
           : dirtySections.length
             ? `${dirtySections.length} other ${dirtySections.length === 1 ? "section has" : "sections have"} unsaved changes`
-            : "All Contact changes are saved";
+            : `All ${LIVE_CONTACT_PAGE_LABEL} page changes are saved`;
   const statusDetail = migrationRequired
     ? "Database migration 0033 is required before this editor can publish."
     : loadError
@@ -749,10 +750,10 @@ export default function ContactEditor({
       />
 
       {migrationRequired || loadError || mediaLoadError ? (
-        <section aria-label="Contact editor notices" className="mb-4 grid gap-2">
+        <section aria-label={`${LIVE_CONTACT_PAGE_LABEL} editor notices`} className="mb-4 grid gap-2">
           {migrationRequired ? (
             <p className="rounded-[18px] border border-amber-300/16 bg-amber-400/[0.055] px-4 py-3 text-sm leading-6 text-amber-100/72">
-              The Contact layout is ready for review, but migration 0033 must be
+              The {LIVE_CONTACT_PAGE_LABEL} layout is ready for review, but migration 0033 must be
               applied before saving.
             </p>
           ) : null}
@@ -859,7 +860,7 @@ export default function ContactEditor({
           </div>
         </div>
         <div
-          aria-label="Contact editor sections"
+          aria-label={`${LIVE_CONTACT_PAGE_LABEL} editor sections`}
           className="flex gap-2 overflow-x-auto p-3 sm:p-4"
           role="group"
         >
@@ -900,7 +901,7 @@ export default function ContactEditor({
           selectedSection={activeSection}
         />
         <aside
-          aria-label="Contact section inspector"
+          aria-label={`${LIVE_CONTACT_PAGE_LABEL} section inspector`}
           className={`${panelClass} sticky top-4 hidden max-h-[calc(100vh-2rem)] overflow-hidden xl:block`}
         >
           {inspectorOpen ? (
@@ -943,7 +944,7 @@ export default function ContactEditor({
       </div>
 
       <dialog
-        aria-label="Contact section inspector"
+        aria-label={`${LIVE_CONTACT_PAGE_LABEL} section inspector`}
         className="m-0 ml-auto h-dvh max-h-none w-[min(94vw,440px)] max-w-none overscroll-contain bg-transparent p-0 text-white backdrop:bg-black/76 xl:hidden"
         onCancel={(event) => {
           event.preventDefault();
@@ -1021,7 +1022,7 @@ export default function ContactEditor({
                 onClick={reloadAfterConflict}
                 type="button"
               >
-                Reload saved Contact page
+                Reload saved {LIVE_CONTACT_PAGE_LABEL} page
               </button>
             ) : null}
           </div>

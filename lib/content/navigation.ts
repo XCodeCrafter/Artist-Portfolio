@@ -1,4 +1,5 @@
 import type { PageSlug, PortfolioType } from "./types";
+import { LIVE_CONTACT_NAV_LABEL } from "./live-contact";
 
 export const NAVIGATION_CONFIG_VERSIONS = [0, 1] as const;
 
@@ -152,8 +153,8 @@ export const NAVIGATION_DESTINATIONS = [
   },
   {
     key: "contact",
-    defaultLabel: "CONTACT",
-    description: "Contact for acting, music, and general collaboration.",
+    defaultLabel: LIVE_CONTACT_NAV_LABEL,
+    description: "Live event calendar and contact for bookings, acting, music, and collaboration.",
     href: "/booking",
     pageSlug: "booking",
     kind: "page",
@@ -400,7 +401,7 @@ function getLegacyLabel(
   }
 
   if (key === "contact") {
-    return portfolioType === "actor" ? "CONTACT" : "BOOKING";
+    return LIVE_CONTACT_NAV_LABEL;
   }
 
   return NAVIGATION_DESTINATION_MAP.get(key)?.defaultLabel ?? key;
