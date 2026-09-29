@@ -109,10 +109,10 @@ describe("non-destructive photo placement framing", () => {
     expect(source).toMatch(/<Image\s+alt=\{activeImage\.alt \|\| activeImage\.title\}\s+className="object-contain"/);
   });
 
-  it.each(["public", "preview"] as const)("forwards Home stories crop to desktop and mobile frames in %s", (mode) => {
+  it.each(["public", "preview"] as const)("forwards selected work independent crops in %s", (mode) => {
     const draft = createHomeDraftFromContent(FALLBACK_CONTENT);
-    draft.layout = [{ id: "stories", enabled: true }];
-    draft.stories.images = draft.stories.images.map((image, index) => ({ ...image, src: index ? "" : imageProps.src, framing }));
+    draft.layout = [{ id: "work", enabled: true }];
+    draft.work.cards = draft.work.cards.map(card => ({ ...card, image: { ...card.image, src: imageProps.src, framing } }));
     const html = renderToStaticMarkup(<HomePageView data={draft} mode={mode} programs={[]} />);
     expect(html.match(/data-photo-framing="custom"/g)?.length).toBeGreaterThanOrEqual(2);
   });

@@ -63,9 +63,9 @@ export const NAVIGATION_DESTINATIONS = [
   },
   {
     key: "home.stories",
-    defaultLabel: "STORIES",
-    description: "Selected visual stories on the portfolio homepage.",
-    href: "/#home-stories",
+    defaultLabel: "SELECTED WORK",
+    description: "Music, photography, film and live work on the homepage.",
+    href: "/#home-work",
     pageSlug: "home",
     kind: "section",
     availability: "available",

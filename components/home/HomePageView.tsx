@@ -5,9 +5,10 @@ import AboutHome from "@/components/AboutHome";
 import AdaptiveHero from "@/components/AdaptiveHero";
 import CncCodeShowcase from "@/components/CncCodeShowcase";
 import GalleryShowcase from "@/components/GalleryShowcase";
+import { LatestReleaseSection, SelectedWorkSection, PressReviewsSection } from "./HomeEditorialSections";
 import type { HomeEditorDraft, HomeEditorSection } from "@/lib/admin/home-editor";
 import type { CncProgramDefinition } from "@/lib/cnc-code";
-import type { GalleryImage, GalleryPresentation } from "@/lib/content/types";
+import type { GalleryPresentation } from "@/lib/content/types";
 
 export const HOME_PREVIEW_SELECTION_MESSAGE = "home-preview-section-select" as const;
 
@@ -19,7 +20,9 @@ const sectionLabels: Record<HomeContentSection, string> = {
   about: "About",
   cnc: "Code in motion",
   feature: "Featured video",
-  stories: "Stories",
+  release: "Latest release",
+  work: "Selected work",
+  press: "Press & reviews",
 };
 
 export type HomePreviewSelectionMessage = {
@@ -79,20 +82,6 @@ export default function HomePageView({
   onSelectSection?: (section: HomeEditorSection) => void;
   selectedSection?: HomeEditorSection;
 }) {
-  const storyImages: GalleryImage[] = data.stories.images
-    .map((image, index) => ({
-      id: `home-story-${index + 1}`,
-      src: image.src,
-      framing: image.framing,
-      title: image.title,
-      caption: image.body,
-      alt: image.alt,
-      category: "Story",
-      isMosaic: false,
-      isFreelanceStory: true,
-      freelanceStoryOrder: index,
-    }))
-    .filter((image) => Boolean(image.src));
   const presentation: GalleryPresentation = {
     introEyebrow: "",
     introTitle: "",
@@ -140,31 +129,26 @@ export default function HomePageView({
             staticPreview={mode === "preview"}
           />
         );
-      case "stories":
-        return (
-          <GalleryShowcase
-            images={storyImages}
-            mode="narrative"
-            narrativeSection="stories"
-            presentation={presentation}
-            storyBody={data.stories.body}
-            storyCtaHref={data.stories.ctaHref}
-            storyCtaLabel={data.stories.ctaLabel}
-            storyTitle={data.stories.title}
-          />
-        );
+      case "release":
+        return <LatestReleaseSection data={data.release} staticPreview={mode === "preview"} />;
+      case "work":
+        return <SelectedWorkSection data={data.work} staticPreview={mode === "preview"} />;
+      case "press":
+        return <PressReviewsSection data={data.press} staticPreview={mode === "preview"} />;
     }
   }
 
   return (
-    <main>
+    <main className="home-sections">
       {data.layout.map(({ id, enabled }) => {
         const placeholder = !enabled
           ? "Hidden on the website"
           : id === "cnc" && !programs.length
             ? "No published CNC programs yet"
-            : id === "stories" && !storyImages.length
-              ? "Add a story image to display this section"
+            : id === "release" && !data.release.releaseTitle
+              ? "Add your release title before showing this section"
+            : id === "press" && !data.press.items.some(item => item.visible)
+              ? "Add a real press item before showing this section"
               : undefined;
 
         if (mode === "public") {

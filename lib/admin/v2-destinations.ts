@@ -39,7 +39,7 @@ export const ADMIN_V2_DESTINATIONS = [
   {
     id: "home",
     label: "Home page",
-    description: "Home section order, visibility, text, and images with a live preview.",
+    description: "Home sections, latest release playback, selected work and press with a live preview.",
     href: "/admin/v2/pages/home",
     group: "Portfolio pages",
     badge: "1:1",
@@ -50,6 +50,7 @@ export const ADMIN_V2_DESTINATIONS = [
       "landing",
       "about",
       "stories",
+      "latest release", "audio", "playback", "selected work", "press", "reviews", "recenze",
       "cnc",
       "section order",
       "visibility",

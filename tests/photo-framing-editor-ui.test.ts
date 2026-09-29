@@ -12,14 +12,18 @@ describe("Photo framing editor placement wiring", () => {
     expect(source).toContain("onDeviceChange=");
     expect(source).not.toContain("MEDIA_UPLOAD_PROVIDER");
   });
-  it("wires all three separate Home placements into their section drafts", () => {
+  it("keeps existing Home placements and wires new editorial images independently", () => {
     const source = read("Home");
     expect(source).toContain("value={draft.about.framing}");
     expect(source).toContain("onChange={framing => patch({ framing })}");
     expect(source).toContain("value={draft.feature.posterFraming}");
     expect(source).toContain("onChange={posterFraming => patch({ posterFraming })}");
-    expect(source).toContain("value={image.framing}");
-    expect(source).toContain("onChange={framing => changeImage({ framing })}");
+    expect(source).toContain("<HomeEditorialInspector");
+    expect(source).not.toContain("draft.stories.images.map");
+    const editorial = readFileSync(new URL("../components/admin/v2/HomeEditorialInspector.tsx", import.meta.url), "utf8");
+    expect(editorial).toContain("value={value.framing}");
+    expect(editorial).toContain("onChange={framing => onChange({ ...value, framing })}");
+    expect(editorial).toContain("framing: src === value.src ? value.framing : null");
   });
   it.each([
     ["Bio", "props.onPortraitChange(index, { framing })"],

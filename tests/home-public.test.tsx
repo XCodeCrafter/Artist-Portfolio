@@ -13,14 +13,15 @@ describe("HOME public and preview layout", () => {
     data.feature.videoSrc = "/uploads/hidden-feature.mp4";
     data.about.imageSrc = "/images/visible-about.jpg";
     data.layout = [
-      { id: "stories", enabled: true },
+      { id: "work", enabled: true },
       { id: "hero", enabled: false },
       { id: "about", enabled: true },
       { id: "cnc", enabled: false },
       { id: "feature", enabled: false },
     ];
     const page = renderToStaticMarkup(<HomePageView data={data} programs={[...CNC_PROGRAMS]} />);
-    expect([...page.matchAll(/data-home-section="([^"]+)"/g)].map((match) => match[1])).toEqual(["stories", "about"]);
+    expect([...page.matchAll(/data-home-section="([^"]+)"/g)].map((match) => match[1])).toEqual(["work", "about"]);
+    expect(page).not.toContain("ARTIST FREELANCER LIFE");
     expect(page).not.toContain("hidden-hero.mp4");
     expect(page).not.toContain("hidden-feature.mp4");
     expect(page).not.toContain("cnc-code");
@@ -34,7 +35,7 @@ describe("HOME public and preview layout", () => {
     data.hero.backgroundSrc = "/uploads/hidden-hero.mp4";
     data.about.imageSrc = "/uploads/hidden-about.jpg";
     const preview = renderToStaticMarkup(<HomePageView data={data} programs={[]} mode="preview" selectedSection="about" />);
-    expect([...preview.matchAll(/data-home-preview-section="([^"]+)"/g)]).toHaveLength(5);
+    expect([...preview.matchAll(/data-home-preview-section="([^"]+)"/g)]).toHaveLength(7);
     expect(preview).toContain("Hidden on the website");
     expect(preview).toContain('aria-pressed="true"');
     expect(preview).toContain("inert");
@@ -55,31 +56,34 @@ describe("HOME public and preview layout", () => {
     expect(page).toContain('src="/uploads/feature.mp4"');
   });
 
-  it("renders custom CNC copy and allows feature and stories to be independently ordered", () => {
+  it("renders custom CNC copy and allows feature and selected work to be independently ordered", () => {
     const data = createHomeDraftFromContent(FALLBACK_CONTENT);
     data.cnc = { eyebrow: "CUSTOM EYEBROW", title: "CUSTOM CNC TITLE", body: "CUSTOM CNC BODY" };
     data.layout = [
-      { id: "cnc", enabled: true }, { id: "stories", enabled: true },
+      { id: "cnc", enabled: true }, { id: "work", enabled: true },
       { id: "feature", enabled: true }, { id: "about", enabled: false }, { id: "hero", enabled: false },
     ];
     const page = renderToStaticMarkup(<HomePageView data={data} programs={[...CNC_PROGRAMS]} />);
-    expect([...page.matchAll(/data-home-section="([^"]+)"/g)].map((match) => match[1])).toEqual(["cnc", "stories", "feature"]);
+    expect([...page.matchAll(/data-home-section="([^"]+)"/g)].map((match) => match[1])).toEqual(["cnc", "work", "feature"]);
     expect(page).toContain("CUSTOM CNC TITLE");
     expect(page).toContain("CUSTOM CNC BODY");
     expect(page).toContain("CUSTOM EYEBROW");
-    expect(page.match(/id="home-stories"/g)).toHaveLength(1);
+    expect(page).not.toContain('id="home-stories"');
     expect(page.match(/id="home-feature"/g)).toHaveLength(1);
   });
 
-  it("omits empty CNC and stories on the public page but explains them in preview", () => {
+  it("omits empty CNC, release and press on the public page but explains them in preview", () => {
     const data = createHomeDraftFromContent(FALLBACK_CONTENT);
-    data.stories.images = data.stories.images.map((image) => ({ ...image, src: "" }));
+    data.layout = data.layout.map(item => ({ ...item, enabled: true }));
     const page = renderToStaticMarkup(<HomePageView data={data} programs={[]} />);
     const preview = renderToStaticMarkup(<HomePageView data={data} programs={[]} mode="preview" />);
     expect(page).not.toContain('data-home-section="cnc"');
     expect(page).not.toContain('data-home-section="stories"');
     expect(preview).toContain("No published CNC programs yet");
-    expect(preview).toContain("Add a story image to display this section");
+    expect(page).not.toContain('data-home-section="release"');
+    expect(page).not.toContain('data-home-section="press"');
+    expect(preview).toContain("Add your release title");
+    expect(preview).toContain("Add a real press item");
   });
 
   it("uses edited HOME metadata but excludes media for hidden sections", () => {

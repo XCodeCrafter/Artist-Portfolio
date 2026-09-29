@@ -87,7 +87,9 @@ export function createContentSecurityPolicy(
     `child-src ${frameSrc}`,
     `img-src ${assetSrc}`,
     "font-src 'self' data: https://fonts.gstatic.com",
-    `media-src ${assetSrc}`,
+    // Admin-authored direct audio links may live on another HTTPS host. This
+    // grants media playback only, never scripts, frames, images or server fetches.
+    `media-src ${assetSrc} https:`,
     `script-src ${scriptSrc}`,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",

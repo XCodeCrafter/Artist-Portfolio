@@ -206,6 +206,8 @@ describe("ImageKit one-shot authority issuance", () => {
   });
   it.each([Date.parse(issued.issuedAt) - 5001, Date.parse(issued.authorityExpiresAt) - 29_999])("refuses future/too-short authority at time %s", async clock => {
     time = clock; issueQueue();
+    // Keep the 1 ms boundary independent of actual scheduler/CPU latency.
+    workflow = createImageKitUploadWorkflow({ admit, sign, verify, revalidate, now: () => time, monotonicNow: () => 0 });
     expect(await run("issue")).toEqual({ ok: false, code: "expired" }); expect(sign).not.toHaveBeenCalled();
   });
   it.each(["throws", "error", "wrong-expiry"])("does not expose authority when signer %s", async mode => {

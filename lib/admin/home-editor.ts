@@ -3,16 +3,20 @@ import { heroFramingSchema } from "@/lib/content/hero-framing";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import type { AboutHomeContent, HeroContent, PortfolioContent } from "@/lib/content/types";
 import { isSafeLocalMediaPath, isSafeManagedMediaSource } from "@/lib/media-source";
+import { createHomeEditorialDefaults, homeReleaseSchema, homeWorkSchema, homePressSchema, homeEditorialPreviewSchemas, sanitizeHomeEditorialPreview, type HomeRelease, type HomeWork, type HomePress } from "./home-editorial";
 
-export const HOME_CONTENT_SECTIONS = ["hero", "about", "cnc", "feature", "stories"] as const;
+export const HOME_CONTENT_SECTIONS = ["hero", "about", "cnc", "feature", "release", "work", "press"] as const;
 export const HOME_EDITOR_SECTIONS = ["layout", ...HOME_CONTENT_SECTIONS] as const;
 export type HomeContentSection = (typeof HOME_CONTENT_SECTIONS)[number];
 export type HomeEditorSection = (typeof HOME_EDITOR_SECTIONS)[number];
 export const HOME_SECTION_LABELS: Record<HomeEditorSection, string> = {
   layout: "Sections & order", hero: "Hero", about: "About", cnc: "Code in motion",
-  feature: "The interlude", stories: "Stories",
+  feature: "The interlude", release: "Latest release", work: "Selected work", press: "Press & reviews",
 };
 export type HomeEditorDraft = {
+  release: HomeRelease;
+  work: HomeWork;
+  press: HomePress;
   layout: Array<{ id: HomeContentSection; enabled: boolean }>;
   hero: HeroContent;
   about: AboutHomeContent;
@@ -29,7 +33,7 @@ export type HomeEditorDraft = {
   };
 };
 export type HomeEditorVersions = { updatedAt: string };
-export type HomeEditorSnapshot = { draft: HomeEditorDraft; versions: HomeEditorVersions; photoFramingAvailable?: true };
+export type HomeEditorSnapshot = { draft: HomeEditorDraft; versions: HomeEditorVersions; photoFramingAvailable?: true; editorialAvailable?: true };
 export type HomeSaveState = {
   status: "idle" | "saved" | "invalid" | "conflict" | "security-error" | "missing-service" | "migration-required" | "error";
   message: string;
@@ -72,6 +76,9 @@ function requireCtaDestination(value: { ctaLabel: string; ctaHref: string }, con
   if (value.ctaLabel && !value.ctaHref) context.addIssue({ code: "custom", path: ["ctaHref"], message: "Add a destination for this button, or clear its label." });
 }
 const schemas = {
+  release: homeReleaseSchema,
+  work: homeWorkSchema,
+  press: homePressSchema,
   layout: layoutSchema,
   hero: z.object({
     title: text(220).min(1), subtitle: text(500), ctaLabel: text(220), ctaHref: href,
@@ -87,17 +94,15 @@ const schemas = {
     title: text(500), body: text(10_000), ctaLabel: text(220), ctaHref: href,
     videoSrc: media, posterSrc: media, posterFraming: heroFramingSchema.nullable().optional(), label: text(500), meta: text(500), eyebrow: text(500),
   }).strict().superRefine(requireCtaDestination),
-  stories: z.object({
-    title: text(500), body: text(10_000), ctaLabel: text(220), ctaHref: href,
-    label: text(500), scrollLabel: text(1_000),
-    images: z.array(z.object({ src: media, title: text(500), body: text(10_000), alt: text(1_000), framing: heroFramingSchema.nullable().optional() }).strict()).length(4),
-  }).strict().superRefine(requireCtaDestination),
 };
 
 // Persisted legacy content must remain visible and repairable, including old
 // media URLs. Save validation is stricter; preview sanitization is separate.
 const legacyText = z.string().max(50_000);
-const legacyDraftSchema = z.object({
+const modernDraftSchema = z.object({
+  release: homeReleaseSchema,
+  work: homeWorkSchema,
+  press: homePressSchema,
   layout: layoutSchema,
   hero: z.object({ title: legacyText, subtitle: legacyText, ctaLabel: legacyText, ctaHref: legacyText, backgroundSrc: legacyText, posterSrc: legacyText, framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]) }).strict(),
   about: z.object({ heading: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, imageSrc: legacyText, imageAlt: legacyText, framing: heroFramingSchema.nullable().optional() }).strict(),
@@ -105,6 +110,21 @@ const legacyDraftSchema = z.object({
   feature: z.object({ title: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, videoSrc: legacyText, posterSrc: legacyText, posterFraming: heroFramingSchema.nullable().optional(), label: legacyText, meta: legacyText, eyebrow: legacyText }).strict(),
   stories: z.object({ title: legacyText, body: legacyText, ctaLabel: legacyText, ctaHref: legacyText, label: legacyText, scrollLabel: legacyText, images: z.array(z.object({ src: legacyText, title: legacyText, body: legacyText, alt: legacyText, framing: heroFramingSchema.nullable().optional() }).strict()).length(4) }).strict(),
 }).strict();
+
+// Older deployments remain readable during the SQL rollout. Only the exact
+// predecessor shape can be upgraded: a corrupt/partial new draft fails closed.
+// Retired stories are retained for recovery and the existing framing RPC, but
+// are no longer a public placement or an editable Home section.
+const legacyLayoutSchema = z.array(z.object({ id: z.enum(["hero", "about", "cnc", "feature", "stories"]), enabled: z.boolean() }).strict())
+  .length(5).refine(rows => new Set(rows.map(row => row.id)).size === 5 && rows.some(row => row.enabled));
+const predecessorDraftSchema = modernDraftSchema.omit({ release: true, work: true, press: true }).extend({ layout: legacyLayoutSchema });
+const legacyDraftSchema = z.union([modernDraftSchema, predecessorDraftSchema.transform(value => ({
+  ...value, ...createHomeEditorialDefaults(),
+  layout: value.layout.flatMap<HomeEditorDraft["layout"][number]>(row => row.id === "stories" ? [
+    { id: "release" as const, enabled: false }, { id: "work" as const, enabled: true }, { id: "press" as const, enabled: false },
+  ] : [{ id: row.id, enabled: row.enabled }]),
+}))]);
+const previewDraftSchema = z.union([modernDraftSchema.extend(homeEditorialPreviewSchemas), legacyDraftSchema]);
 
 function issueMap(error: z.ZodError, prefix = "") {
   const errors: Record<string, string[]> = {};
@@ -132,8 +152,15 @@ export function parseHomeEditorDraft(value: unknown): HomeEditorDraft | null {
   return parsed.success ? parsed.data : null;
 }
 export function parseHomeEditorSnapshot(value: unknown): HomeEditorSnapshot | null {
-  const parsed = z.object({ draft: legacyDraftSchema, versions: versionsSchema, photoFramingAvailable: z.literal(true).optional() }).strict().safeParse(value);
-  return parsed.success ? parsed.data : null;
+  const parsed = z.object({ draft: z.unknown(), versions: versionsSchema, photoFramingAvailable: z.literal(true).optional(), editorialAvailable: z.literal(true).optional() }).strict().safeParse(value);
+  if (!parsed.success) return null;
+  const draft = parseHomeEditorDraft(parsed.data.draft);
+  if (!draft) return null;
+  const editorialAvailable = modernDraftSchema.safeParse(parsed.data.draft).success;
+  return { draft, versions: parsed.data.versions,
+    ...(parsed.data.photoFramingAvailable ? { photoFramingAvailable: true as const } : {}),
+    ...(editorialAvailable ? { editorialAvailable: true as const } : {}),
+  };
 }
 export function createHomeDraftFromContent(content: PortfolioContent): HomeEditorDraft {
   const presentation = content.homePresentation;
@@ -142,7 +169,8 @@ export function createHomeDraftFromContent(content: PortfolioContent): HomeEdito
   const baseImages = content.galleryImages.filter((item) => item.isFreelanceStory)
     .sort((first, second) => first.freelanceStoryOrder - second.freelanceStoryOrder || first.title.localeCompare(second.title)).slice(0, 4);
   return {
-    layout: HOME_CONTENT_SECTIONS.map((id) => ({ id, enabled: true })),
+    ...createHomeEditorialDefaults(),
+    layout: HOME_CONTENT_SECTIONS.map((id) => ({ id, enabled: id !== "release" && id !== "press" })),
     hero: { ...content.heroes.home }, about: { ...content.aboutHome },
     cnc: {
       eyebrow: "ENGINEERING DETAIL / 01", title: "CODE, IN\nMOTION.",
@@ -184,7 +212,7 @@ export function getDirtyHomeSections(baseline: HomeEditorDraft, draft: HomeEdito
 export const HOME_PREVIEW_UPDATE_MESSAGE = "home-preview-update" as const;
 export type HomePreviewUpdateMessage = { type: typeof HOME_PREVIEW_UPDATE_MESSAGE; draft: HomeEditorDraft; selectedSection: HomeEditorSection; focusRequestId: number };
 export function parseHomePreviewUpdateMessage(value: unknown): HomePreviewUpdateMessage | null {
-  const parsed = z.object({ type: z.literal(HOME_PREVIEW_UPDATE_MESSAGE), draft: legacyDraftSchema, selectedSection: z.enum(HOME_EDITOR_SECTIONS), focusRequestId: z.number().int().nonnegative() }).strict().safeParse(value);
+  const parsed = z.object({ type: z.literal(HOME_PREVIEW_UPDATE_MESSAGE), draft: previewDraftSchema, selectedSection: z.enum(HOME_EDITOR_SECTIONS), focusRequestId: z.number().int().nonnegative() }).strict().safeParse(value);
   if (!parsed.success) return null;
   const draft = parsed.data.draft;
   for (const section of [draft.hero, draft.about, draft.feature, draft.stories]) {
@@ -197,5 +225,6 @@ export function parseHomePreviewUpdateMessage(value: unknown): HomePreviewUpdate
   draft.feature.videoSrc = safeMedia(draft.feature.videoSrc);
   draft.feature.posterSrc = safeMedia(draft.feature.posterSrc);
   draft.stories.images.forEach((item) => { item.src = safeMedia(item.src); });
+  sanitizeHomeEditorialPreview(draft);
   return parsed.data;
 }

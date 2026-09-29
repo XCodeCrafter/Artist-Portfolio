@@ -8,7 +8,7 @@ import { z } from "zod";
 import { verifyAdminActionOrigin } from "@/lib/admin/action-security";
 import { requireAdmin } from "@/lib/admin/auth";
 import { writeAuditLog } from "@/lib/admin/audit";
-import { isHomeEditorWriteConflict, isMissingHomeEditorSchemaError } from "@/lib/admin/home";
+import { isHomeEditorWriteConflict, isMissingHomeEditorSchemaError, isMissingHomeEditorialSchemaError } from "@/lib/admin/home";
 import { parseHomeSectionSubmission, type HomeEditorSection, type HomeSaveState } from "@/lib/admin/home-editor";
 import { createAdminServiceClient } from "@/lib/admin/service";
 
@@ -32,11 +32,15 @@ export async function saveHomeSectionV2(_previousState: HomeSaveState, formData:
   if (!supabase) return result("missing-service", "Supabase admin access is not configured, so nothing was saved.", { section });
   // This service-only RPC validates and locks live Media Library rows, then
   // checks the page version and changes only this section in one transaction.
-  const saveCall = getPhotoSaveCall("home", section, parsed.data.payload, parsed.data.versions, getHeroSaveCall("home", section, "save_home_section_v2", {
+  const editorial = ["layout", "release", "work", "press"].includes(section);
+  const originalArgs = {
     p_site_id: "main", p_section: section, p_expected_updated_at: parsed.data.versions.updatedAt, p_payload: parsed.data.payload,
-  }));
+  };
+  const saveCall = editorial ? { name: "save_home_editorial_section_v2", args: originalArgs }
+    : getPhotoSaveCall("home", section, parsed.data.payload, parsed.data.versions, getHeroSaveCall("home", section, "save_home_section_v2", originalArgs));
   const { data, error } = await supabase.rpc(saveCall.name, saveCall.args);
   if (error) {
+    if (isMissingHomeEditorialSchemaError(error)) return result("migration-required", "Apply database migration 0055 and reload to edit the new Home sections. Your draft has been kept.", { section });
     if (isMissingPhotoFramingSchemaError(error)) return result("migration-required", PHOTO_FRAMING_MIGRATION_MESSAGE, { section });
     if (isMissingHeroFramingSchemaError(error)) return result("migration-required", HERO_FRAMING_MIGRATION_MESSAGE, { section });
     if (isHomeEditorWriteConflict(error)) return result("conflict", "Home changed in another admin session. Your draft was kept. Reload before saving again.", { section });

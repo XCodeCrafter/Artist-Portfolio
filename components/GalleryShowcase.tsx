@@ -689,7 +689,7 @@ function GalleryInterlude({
   return (
     <section
       className={cx(
-        "relative left-1/2 h-[72svh] min-h-[560px] w-screen max-w-[1800px] -translate-x-1/2 overflow-hidden border-y border-white/10 bg-black lg:h-[78svh] lg:max-h-[860px] lg:min-h-[620px]",
+        "home-interlude-panel relative left-1/2 h-[72svh] min-h-[560px] w-screen max-w-[1800px] -translate-x-1/2 overflow-hidden border-y border-white/10 bg-black lg:h-[78svh] lg:max-h-[860px] lg:min-h-[620px]",
         flushTop ? "mt-0" : "mt-24 sm:mt-32"
       )}
       ref={sectionRef}
@@ -718,10 +718,10 @@ function GalleryInterlude({
         /> : null}</>}
       </motion.div>
 
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.5)_0%,rgba(0,0,0,0.08)_40%,rgba(0,0,0,0.78)_100%)]" />
+      <div className="home-interlude-shade pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.5)_0%,rgba(0,0,0,0.08)_40%,rgba(0,0,0,0.78)_100%)]" />
       <div className="pointer-events-none absolute inset-0 bg-black/10" />
 
-      <div className="relative z-10 mx-auto flex h-full max-w-[1500px] flex-col justify-end px-5 py-8 sm:px-8 sm:py-11 lg:px-12 lg:py-14">
+      <div className="home-interlude-inner relative z-10 mx-auto flex h-full max-w-[1500px] flex-col justify-end px-5 py-8 sm:px-8 sm:py-11 lg:px-12 lg:py-14">
         {label || meta ? (
           <div className="mb-auto flex flex-wrap justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/60">
             <p>{label}</p><p>{meta}</p>
@@ -736,7 +736,7 @@ function GalleryInterlude({
               {title}
             </h2>
             {body ? (
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-white/76 sm:text-xl sm:leading-9">
+              <p className="home-interlude-copy mt-6 max-w-2xl text-lg leading-8 text-white/76 sm:text-xl sm:leading-9">
                 {body}
               </p>
             ) : null}
@@ -901,7 +901,7 @@ export default function GalleryShowcase({
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),transparent_24%,rgba(255,59,31,0.045)_62%,transparent)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
 
-      <div className="relative mx-auto max-w-[1500px]">
+      <div className="gallery-showcase-inner relative mx-auto max-w-[1500px]">
         {mode === "gallery" ? (
           <>
             <div data-gallery-preview-part="introduction">

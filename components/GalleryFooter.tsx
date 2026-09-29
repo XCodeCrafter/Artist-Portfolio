@@ -253,14 +253,14 @@ export default function GalleryFooter({
       )}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-70"
+        className="footer-cool-wash pointer-events-none absolute inset-0 opacity-70"
         style={{
           background:
             "radial-gradient(700px circle at 92% 38%, rgba(18, 37, 63, 0.12), transparent 68%)",
         }}
       />
 
-      <div className="relative mx-auto max-w-[1540px]" inert={(preview && !selectRegion) || undefined} aria-hidden={(preview && !selectRegion) || undefined}>
+      <div className="footer-content relative mx-auto max-w-[1540px]" inert={(preview && !selectRegion) || undefined} aria-hidden={(preview && !selectRegion) || undefined}>
         <EditableRegion region="identity" selected={selectedRegion} onSelect={selectRegion}>
         <div className="flex min-h-[96px] flex-col justify-center gap-5 border-b border-white/10 py-7 text-xs sm:flex-row sm:items-center sm:justify-between sm:py-0">
           {publicLocation ? <div className="flex items-center gap-4">
@@ -281,7 +281,7 @@ export default function GalleryFooter({
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ff4431]">
               {copy.eyebrow}
             </p>
-            <h2 className="heading-ui mt-7 max-w-[670px] text-[3.45rem] font-medium leading-[0.98] tracking-[-0.045em] text-white sm:text-7xl xl:text-[5.5rem]">
+            <h2 className="footer-heading heading-ui mt-7 max-w-[670px] text-[3.45rem] font-medium leading-[0.98] tracking-[-0.045em] text-white sm:text-7xl xl:text-[5.5rem]">
               {copy.heading}
               <span className="text-[#ff3c28]">.</span>
             </h2>
@@ -290,7 +290,7 @@ export default function GalleryFooter({
             </p> : null}
 
             <div className="mt-11 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-              {copy.primaryLabel && copy.primaryHref && isSafeFooterHref(copy.primaryHref) ? <Link className={primaryButtonClass} href={copy.primaryHref}>
+              {copy.primaryLabel && copy.primaryHref && isSafeFooterHref(copy.primaryHref) ? <Link className={`footer-action-primary ${primaryButtonClass}`} href={copy.primaryHref}>
                 <span
                   aria-hidden="true"
                   className="absolute inset-y-[-70%] left-[-45%] w-1/3 rotate-12 bg-gradient-to-r from-transparent via-white/12 to-transparent transition-transform duration-1000 ease-out group-hover:translate-x-[440%] motion-reduce:hidden"
@@ -303,7 +303,7 @@ export default function GalleryFooter({
                 />
               </Link> : null}
 
-              {copy.secondaryLabel && copy.secondaryHref && isSafeFooterHref(copy.secondaryHref) ? <Link className={secondaryButtonClass} href={copy.secondaryHref}>
+              {copy.secondaryLabel && copy.secondaryHref && isSafeFooterHref(copy.secondaryHref) ? <Link className={`footer-action-secondary ${secondaryButtonClass}`} href={copy.secondaryHref}>
                 <FaPlay
                   aria-hidden="true"
                   className="text-xs transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transform-none"
@@ -355,6 +355,7 @@ export default function GalleryFooter({
                       aria-label={`${link.label} — opens in a new tab`}
                       className="group relative flex min-h-[94px] items-center gap-4 overflow-hidden rounded-[17px] border border-white/12 bg-gradient-to-br from-white/[0.055] to-white/[0.022] px-5 py-4 transition-[transform,border-color,background-color,box-shadow] duration-500 ease-out hover:-translate-y-0.5 hover:border-[#ff4b37]/25 hover:bg-white/[0.065] hover:shadow-[0_12px_36px_rgba(0,0,0,0.24)] active:translate-y-0 motion-reduce:transform-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5947]"
                       data-platform={platform}
+                      data-footer-social-card="true"
                       href={link.href}
                       key={link.id}
                       rel="noreferrer"

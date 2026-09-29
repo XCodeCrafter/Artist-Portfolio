@@ -15,6 +15,10 @@ export function isMissingHomeEditorSchemaError(error?: DatabaseErrorLike | null)
 export function isHomeEditorWriteConflict(error?: DatabaseErrorLike | null) {
   return Boolean(error && (error.code === "40001" || /home_page_changed/.test(error.message || "")));
 }
+export function isMissingHomeEditorialSchemaError(error?: DatabaseErrorLike | null) {
+  return Boolean(error && ["PGRST202", "42883"].includes(error.code || "") &&
+    /\bsave_home_editorial_section_v2\b/.test([error.message, error.details, error.hint].filter(Boolean).join(" ")));
+}
 export type AdminHomeEditorData = { snapshot: HomeEditorSnapshot; isConfigured: boolean; migrationRequired: boolean; loadError?: string };
 export async function getAdminHomeEditorData(): Promise<AdminHomeEditorData> {
   await requireAdmin();
@@ -37,6 +41,6 @@ export async function getAdminHomeEditorData(): Promise<AdminHomeEditorData> {
   }
   const snapshot = parseHomeEditorSnapshot(data);
   return snapshot
-    ? { snapshot, isConfigured: true, migrationRequired: false }
+    ? { snapshot, isConfigured: true, migrationRequired: snapshot.editorialAvailable !== true }
     : { snapshot: fallback, isConfigured: true, migrationRequired: false, loadError: "Home content returned an unexpected shape. Reload before editing." };
 }

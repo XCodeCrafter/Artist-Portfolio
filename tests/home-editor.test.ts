@@ -4,18 +4,18 @@ import { HOME_CONTENT_SECTIONS, HOME_EDITOR_SECTIONS, HOME_PREVIEW_UPDATE_MESSAG
 
 const versions = { updatedAt: "2026-09-20T10:00:00.000000Z" };
 describe("Home V2 editor", () => {
-  it("preserves original HOME media fallbacks and all five independently ordered sections", () => {
+  it("preserves original HOME media and exposes seven sections without retired stories", () => {
     const draft = createHomeDraftFromContent(FALLBACK_CONTENT);
     expect(draft.hero).toEqual(FALLBACK_CONTENT.heroes.home);
     expect(draft.layout.map((item) => item.id)).toEqual(HOME_CONTENT_SECTIONS);
     expect(draft.feature.videoSrc).toBe("/media/hero-loop.mp4");
     expect(draft.stories.images[0].src).toBe(FALLBACK_CONTENT.galleryImages[0].src);
     for (const section of HOME_EDITOR_SECTIONS) expect(parseHomeSectionSubmission(section, draft[section], versions).success).toBe(true);
-    expect(parseHomeEditorSnapshot({ draft, versions })).toEqual({ draft, versions });
+    expect(parseHomeEditorSnapshot({ draft, versions })).toEqual({ draft, versions, editorialAvailable: true });
   });
   it("requires an exact section permutation with at least one visible section", () => {
     const draft = createFallbackHomeEditorSnapshot().draft;
-    const reversed = [...draft.layout].reverse().map((item) => ({ ...item, enabled: item.id === "stories" }));
+    const reversed = [...draft.layout].reverse().map((item) => ({ ...item, enabled: item.id === "work" }));
     expect(parseHomeSectionSubmission("layout", reversed, versions).success).toBe(true);
     for (const layout of [draft.layout.slice(1), [...draft.layout, draft.layout[0]], draft.layout.map((item) => ({ ...item, enabled: false })), draft.layout.map(() => draft.layout[0])]) {
       expect(parseHomeSectionSubmission("layout", layout, versions).success).toBe(false);
@@ -62,7 +62,7 @@ describe("Home V2 editor", () => {
     const snapshot = createFallbackHomeEditorSnapshot();
     snapshot.draft.hero.backgroundSrc = "https://legacy-cdn.example/home.jpg";
     expect(parseHomeEditorDraft(snapshot.draft)).toEqual(snapshot.draft);
-    expect(parseHomeEditorSnapshot(snapshot)).toEqual(snapshot);
+    expect(parseHomeEditorSnapshot(snapshot)).toEqual({ ...snapshot, editorialAvailable: true });
     expect(parseHomeEditorSnapshot({ ...snapshot, versions: { updatedAt: "yesterday" } })).toBeNull();
     expect(parseHomeEditorDraft({ ...snapshot.draft, stories: { images: [] } })).toBeNull();
   });

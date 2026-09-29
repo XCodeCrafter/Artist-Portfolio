@@ -29,10 +29,10 @@ export default function AboutHome({
         "
       />
 
-      <div className="relative z-10 mx-auto max-w-[1400px] px-5 sm:px-8">
+      <div className="home-about-inner relative z-10 mx-auto max-w-[1400px] px-5 sm:px-8">
         <div
           className="
-            grid min-h-[560px] items-center gap-10
+            home-about-grid grid min-h-[560px] items-center gap-10
             md:grid-cols-[1fr_480px] md:gap-16
             lg:min-h-[720px] lg:grid-cols-[1fr_620px]
           "
@@ -46,7 +46,7 @@ export default function AboutHome({
               {content.heading}
             </h2>
 
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/75 sm:text-xl">
+            <p className="home-about-copy mt-6 max-w-xl text-lg leading-relaxed text-white/75 sm:text-xl">
               {content.body}
             </p>
 
@@ -58,7 +58,7 @@ export default function AboutHome({
           </div>
 
           <div className="w-full max-w-[620px] justify-self-end">
-            <div className="relative overflow-hidden rounded-3xl bg-black/40 ring-1 ring-white/10 backdrop-blur-[2px]">
+            <div className="home-about-photo relative overflow-hidden rounded-3xl bg-black/40 ring-1 ring-white/10 backdrop-blur-[2px]">
               <div className="relative aspect-[3/4] lg:aspect-[4/5]">
                 <FramedImage
                   framing={content.framing}
@@ -70,7 +70,7 @@ export default function AboutHome({
                   className="object-cover brightness-[0.92] contrast-[1.04]"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                <div className="absolute left-5 top-5 flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-black/40 text-xl font-light text-white/70 backdrop-blur-md">
+                <div className="home-about-photo-mark absolute left-5 top-5 flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-black/40 text-xl font-light text-white/70 backdrop-blur-md">
                   *
                 </div>
               </div>

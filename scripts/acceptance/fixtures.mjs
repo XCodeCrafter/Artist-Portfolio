@@ -24,7 +24,7 @@ const about = {
   imageSrc: ACCEPTANCE_MEDIA.landscape, imageAlt: "Synthetic colored landscape",
 };
 export const ACCEPTANCE_HOME_DRAFT = {
-  layout: ["hero", "about", "cnc", "feature", "stories"].map((id) => ({ id, enabled: id !== "cnc" })),
+  layout: ["hero", "about", "cnc", "feature", "release", "work", "press"].map((id) => ({ id, enabled: id !== "cnc" })),
   hero,
   about,
   cnc: { eyebrow: "LOCAL FIXTURE", title: "Test program", body: "Synthetic program, not production source." },
@@ -40,6 +40,35 @@ export const ACCEPTANCE_HOME_DRAFT = {
       src: position % 2 ? ACCEPTANCE_MEDIA.portrait : ACCEPTANCE_MEDIA.landscape,
       title: `Fixture frame ${position}`, body: "Disposable test story.", alt: `Synthetic frame ${position}`,
     })),
+  },
+  release: {
+    eyebrow: "FICTIONAL RELEASE", title: "Local test release", subtitle: "Synthetic audio-player fixture",
+    body: "No real release, music or owner artwork is used here.",
+    background: { src: ACCEPTANCE_MEDIA.landscape, alt: "Synthetic release background", framing: null },
+    cover: { src: ACCEPTANCE_MEDIA.portrait, alt: "Synthetic release cover", framing: null },
+    releaseTitle: "Acceptance sample", artist: "Fixture Artist", note: "Disposable local test content.",
+    playback: { kind: "none", url: "" }, primaryLabel: "", primaryHref: "",
+    secondaryLabel: "Fixture music", secondaryHref: "/music",
+  },
+  work: {
+    eyebrow: "FICTIONAL WORK", title: "Synthetic work cards", body: "Local navigation and crop fixtures.",
+    note: "No owner photographs.", background: { src: ACCEPTANCE_MEDIA.landscape, alt: "Synthetic work background", framing: null },
+    cards: [
+      ["music", "/music"], ["photography", "/gallery"], ["film", "/video"], ["live", "/booking#events"],
+    ].map(([id, href], index) => ({
+      id, title: `Fixture ${id}`, body: "Disposable work card.", href, tone: id === "film" ? "red" : "mono",
+      image: { src: index % 2 ? ACCEPTANCE_MEDIA.landscape : ACCEPTANCE_MEDIA.portrait, alt: `Synthetic ${id} image`, framing: null },
+    })),
+  },
+  press: {
+    eyebrow: "FICTIONAL PRESS", title: "Local test quotations", body: "These are synthetic review fixtures, not real endorsements.",
+    buttonLabel: "Explore fixture press", background: { src: ACCEPTANCE_MEDIA.landscape, alt: "Synthetic press background", framing: null },
+    featuredId: "13a00000-0000-4000-8000-000000000002",
+    items: [{
+      id: "13a00000-0000-4000-8000-000000000002", kind: "review", title: "Fixture review", quote: "A synthetic quotation for local interaction tests.",
+      publication: "Fictional Fixture Journal", date: "2026-09-29", href: "https://press.example.test/acceptance",
+      image: { src: ACCEPTANCE_MEDIA.portrait, alt: "Synthetic review clipping", framing: null }, visible: true,
+    }],
   },
 };
 

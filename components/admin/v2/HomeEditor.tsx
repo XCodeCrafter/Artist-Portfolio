@@ -1,9 +1,10 @@
 "use client";
 import HeroFramingControls from "@/components/admin/v2/HeroFramingControls";
 import PhotoFramingControls from "@/components/admin/v2/PhotoFramingControls";
+import HomeEditorialInspector from "@/components/admin/v2/HomeEditorialInspector";
 
 import Link from "next/link";
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { FaArrowDown, FaArrowUp, FaCheck, FaDesktop, FaExternalLinkAlt, FaMobileAlt, FaSlidersH, FaSpinner, FaTimes } from "react-icons/fa";
 import { saveHomeSectionV2 } from "@/app/admin/v2/pages/home/actions";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
@@ -51,6 +52,10 @@ function ContentInspector({ section, draft, assets, errors, instance, onChange, 
   errors: FieldErrors; instance: string; onChange: (next: HomeEditorDraft) => void;
   device: HomePreviewDevice; onDeviceChange: (device: HomePreviewDevice) => void;
 }) {
+  if (section === "release" || section === "work" || section === "press") {
+    return <HomeEditorialInspector section={section} draft={draft} assets={assets} errors={errors}
+      instance={instance} onChange={onChange} device={device} onDeviceChange={onDeviceChange} />;
+  }
   const value = draft[section];
   const patch = (fields: Record<string, unknown>) => onChange({ ...draft, [section]: { ...value, ...fields } });
   const field = (key: string, label: string, multiline = false, maxLength = 2000) => <TextField
@@ -95,27 +100,7 @@ function ContentInspector({ section, draft, assets, errors, instance, onChange, 
       <div className="mt-4 grid gap-4">{field("label", "Section label", false, 220)}{field("eyebrow", "Eyebrow", false, 220)}{field("meta", "Video caption", false, 220)}</div>
     </details>
   </div>;
-  return <div className="grid gap-5">
-    {field("title", "Default story heading", false, 220)}{field("body", "Default story text", true, 5000)}{cta}
-    {draft.stories.images.map((image, index) => {
-      const changeImage = (fields: Partial<typeof image>) => patch({ images: draft.stories.images.map((item, position) => position === index ? { ...item, ...fields } : item) });
-      return <section className="grid gap-4 rounded-2xl border border-white/10 bg-black/20 p-4" key={index}>
-        <h3 className="text-xs font-semibold text-white/75">Story {index + 1}</h3>
-        <MediaAssetPicker assets={assets} kind="image" label="Story image" name={`${instance}-home-story-${index}`} value={image.src}
-          error={errors[`images.${index}.src`]?.join(" ")} onValueChange={(src, asset) => changeImage({ src, ...(asset?.alt ? { alt: asset.alt } : {}) })} />
-        <PhotoFramingControls value={image.framing} src={image.src} onChange={framing => changeImage({ framing })} saveSection="Stories"
-          device={device} onDeviceChange={onDeviceChange} previewViewport={{ desktop: { width: 748, height: 756 }, mobile: { width: 400, height: 500 } }} />
-        <p className="text-xs leading-5 text-white/40">Clear the image to leave this story out. Its text is kept.</p>
-        {([['title', 'Story heading'], ['body', 'Story text'], ['alt', 'Image description']] as const).map(([key, label]) => <TextField
-          key={key} id={`${instance}-home-story-${index}-${key}`} path={`images.${index}.${key}`} label={label}
-          errors={errors} value={image[key]} multiline={key === "body"} maxLength={key === "body" ? 5000 : key === "alt" ? 500 : 220}
-          onChange={(next) => changeImage({ [key]: next })} />)}
-      </section>;
-    })}
-    <details className="rounded-2xl border border-white/10 p-4"><summary className="cursor-pointer text-xs text-white/60">Small labels</summary>
-      <div className="mt-4 grid gap-4">{field("label", "Section label", false, 220)}{field("scrollLabel", "Scroll hint", false, 220)}</div>
-    </details>
-  </div>;
+  return null;
 }
 
 export default function HomeEditor({ assets, snapshot, disabled, migrationRequired, loadError, mediaLoadError }: Props) {
@@ -124,6 +109,8 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
   const [versions, setVersions] = useState(snapshot.versions);
   const draftRef = useRef(draft);
   const baselineRef = useRef(baseline);
+  const savingRef = useRef(false);
+  const versionsRef = useRef(versions);
   const [activeSection, setActiveSection] = useState<HomeEditorSection>("layout");
   const [device, setDevice] = useState<HomePreviewDevice>("desktop");
   const [focusRequestId, setFocusRequestId] = useState(0);
@@ -136,29 +123,45 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
   const { markDirty, clearDirty, confirmDiscard } = useUnsavedChangesGuard("You have unsaved Home changes. Leave and discard them?", true);
 
   const clientAction = useCallback(async (previous: HomeSaveState, formData: FormData) => {
-    return runEditorSave(previous, () => saveHomeSectionV2(previous, formData), (result) => {
-      if (result.status === "saved" && result.section === formData.get("section") && result.section && result.canonicalSection && result.versions) {
-        const parsed = parseHomeSectionSubmission(result.section, result.canonicalSection, result.versions);
-        if (parsed.success) {
-          const next = { ...draftRef.current, [result.section]: parsed.data.payload } as HomeEditorDraft;
-          const saved = { ...baselineRef.current, [result.section]: parsed.data.payload } as HomeEditorDraft;
-          draftRef.current = next;
-          baselineRef.current = saved;
-          setDraft(next); setBaseline(saved); setVersions(parsed.data.versions as HomeEditorVersions);
-          if (!getDirtyHomeSections(saved, next).length) clearDirty();
-          setAnnouncement(`${HOME_SECTION_LABELS[result.section]} saved and published.`);
-          return true;
+    if (disabled || migrationRequired || loadError || !snapshot.editorialAvailable || savingRef.current ||
+      previous.status === "migration-required" || previous.status === "security-error" || previous.status === "missing-service") return previous;
+    const section = formData.get("section");
+    if (typeof section !== "string" || !HOME_EDITOR_SECTIONS.includes(section as HomeEditorSection)) return previous;
+    const key = section as HomeEditorSection;
+    // Do not let a double-submit send a stale section or CAS version.
+    if (formData.get("payload") !== JSON.stringify(draftRef.current[key]) ||
+      formData.get("versions") !== JSON.stringify(versionsRef.current) ||
+      !getDirtyHomeSections(baselineRef.current, draftRef.current).includes(key) ||
+      !parseHomeSectionSubmission(key, draftRef.current[key], versionsRef.current).success) return previous;
+    savingRef.current = true;
+    try {
+      return await runEditorSave(previous, () => saveHomeSectionV2(INITIAL_HOME_SAVE_STATE, formData), (result) => {
+        if (result.status === "saved" && result.section === formData.get("section") && result.section && result.canonicalSection && result.versions) {
+          const parsed = parseHomeSectionSubmission(result.section, result.canonicalSection, result.versions);
+          if (parsed.success) {
+            const next = { ...draftRef.current, [result.section]: parsed.data.payload } as HomeEditorDraft;
+            const saved = { ...baselineRef.current, [result.section]: parsed.data.payload } as HomeEditorDraft;
+            draftRef.current = next;
+            baselineRef.current = saved;
+            versionsRef.current = parsed.data.versions as HomeEditorVersions;
+            setDraft(next); setBaseline(saved); setVersions(parsed.data.versions as HomeEditorVersions);
+            if (!getDirtyHomeSections(saved, next).length) clearDirty();
+            setAnnouncement(`${HOME_SECTION_LABELS[result.section]} saved and published.`);
+            return true;
+          }
         }
-      }
-      return false;
-    });
-  }, [clearDirty]);
+        return false;
+      });
+    } finally { savingRef.current = false; }
+  }, [clearDirty, disabled, migrationRequired, loadError, snapshot.editorialAvailable]);
   const [saveState, formAction, pending] = useActionState(clientAction, INITIAL_HOME_SAVE_STATE);
   const dirty = getDirtyHomeSections(baseline, draft);
   const validation = parseHomeSectionSubmission(activeSection, draft[activeSection], versions);
   const visibleResponse = needsEditorReload(saveState) || Boolean(saveState.eventId && saveState.eventId !== dismissedEvent);
   const errors: FieldErrors = { ...(!validation.success ? validation.fieldErrors : {}), ...(visibleResponse && saveState.section === activeSection ? saveState.fieldErrors : {}) };
-  const locked = disabled || pending || needsEditorReload(saveState);
+  const unavailable = disabled || migrationRequired || Boolean(loadError) || !snapshot.editorialAvailable;
+  const locked = unavailable || pending || needsEditorReload(saveState) || saveState.status === "migration-required" ||
+    saveState.status === "security-error" || saveState.status === "missing-service";
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -178,7 +181,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
   }, []);
 
   function change(next: HomeEditorDraft) {
-    if (locked) return;
+    if (locked || savingRef.current) return;
     draftRef.current = next; setDraft(next); setDismissedEvent(saveState.eventId);
     if (getDirtyHomeSections(baselineRef.current, next).length) markDirty(); else clearDirty();
   }
@@ -236,12 +239,17 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
     {pending ? <FaSpinner className="animate-spin" /> : <FaCheck />} {pending ? "Saving…" : `Save ${HOME_SECTION_LABELS[activeSection]}`}
   </button>;
 
-  return <form action={formAction} data-unsaved-guard-bypass="true">
+  return <form data-unsaved-guard-bypass="true" onSubmit={(event) => {
+    event.preventDefault();
+    if (locked || savingRef.current || !dirty.includes(activeSection) || !validation.success) return;
+    const data = new FormData(event.currentTarget);
+    startTransition(() => formAction(data));
+  }}>
     <input type="hidden" name="section" value={activeSection} readOnly />
     <input type="hidden" name="payload" value={JSON.stringify(draft[activeSection])} readOnly />
     <input type="hidden" name="versions" value={JSON.stringify(versions)} readOnly />
     <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
-    {migrationRequired ? <p className="mb-4 rounded-2xl border border-amber-300/20 bg-amber-300/5 p-4 text-sm text-amber-100/80">Home V2 is ready for review. Apply migration 0037 to enable editing and publishing.</p> : null}
+    {migrationRequired || !snapshot.editorialAvailable ? <p className="mb-4 rounded-2xl border border-amber-300/20 bg-amber-300/5 p-4 text-sm text-amber-100/80">Home V2 is ready for review. Apply migration 0055 and its prerequisites, then reload to enable editing and publishing.</p> : null}
     {loadError || mediaLoadError ? <p role="alert" className="mb-4 rounded-2xl bg-red-400/5 p-4 text-sm text-red-200">{loadError || mediaLoadError}</p> : null}
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <div className="flex flex-1 flex-wrap gap-2" aria-label="Home editor sections">
@@ -261,7 +269,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
             <button type="button" className={buttonClass} ref={inspectorTriggerRef} aria-label="Open Home inspector" onClick={() => select(activeSection)}><FaSlidersH /> Editor</button>
           </div>
         </div>
-        <HomePreviewFrame device={device} draft={draft} focusRequestId={focusRequestId} selectedSection={activeSection} onSelectSection={select} isLive={!disabled} />
+        <HomePreviewFrame device={device} draft={draft} focusRequestId={focusRequestId} selectedSection={activeSection} onSelectSection={select} isLive={!unavailable} />
       </section>
       {inspectorOpen ? <aside className={`${panelClass} sticky top-5 hidden min-w-0 overflow-hidden xl:block`} aria-label="Home section inspector">
         <div className="flex items-center justify-between border-b border-white/8 p-4"><h2 className="heading-ui font-semibold text-white">{HOME_SECTION_LABELS[activeSection]}</h2><button type="button" className={buttonClass} aria-label="Hide Home inspector" onClick={() => { setInspectorOpen(false); requestAnimationFrame(() => inspectorTriggerRef.current?.focus()); }}><FaTimes /></button></div>
@@ -273,7 +281,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
       {needsEditorReload(saveState) || saveState.status === "error" ? <button type="button" className={`${buttonClass} ml-3`} onClick={() => confirmDiscard(() => window.location.reload())}>Reload saved Home</button> : null}
     </div> : null}
     <footer className={`${panelClass} sticky bottom-3 z-20 mt-4 flex flex-wrap items-center justify-between gap-4 p-4 shadow-xl`}>
-      <div><p className="text-sm font-semibold text-white/85">{disabled ? "Review-only editor" : dirty.length ? `${dirty.length} unsaved ${dirty.length === 1 ? "section" : "sections"}` : "All Home changes saved"}</p>
+      <div><p className="text-sm font-semibold text-white/85">{unavailable ? "Review-only editor" : dirty.length ? `${dirty.length} unsaved ${dirty.length === 1 ? "section" : "sections"}` : "All Home changes saved"}</p>
         <p className="mt-1 text-xs leading-5 text-white/45">Only {HOME_SECTION_LABELS[activeSection]} will be published.{activeSection !== "layout" && dirty.includes("layout") ? ` Visibility and order still need Save ${HOME_SECTION_LABELS.layout}.` : ""}</p>
         {!validation.success ? <p className="mt-1 text-xs text-amber-100/70">{Object.values(validation.fieldErrors).flat()[0]}</p> : null}
       </div>

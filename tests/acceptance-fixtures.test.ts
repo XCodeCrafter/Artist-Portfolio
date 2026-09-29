@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parseHomeEditorDraft, parseHomeSectionSubmission } from "../lib/admin/home-editor";
+import { HOME_EDITOR_SECTIONS, parseHomeEditorDraft, parseHomeSectionSubmission } from "../lib/admin/home-editor";
 import {
   ACCEPTANCE_BOOTSTRAP_SQL, ACCEPTANCE_SEED_SQL, ACCEPTANCE_HOME_DRAFT,
   ACCEPTANCE_HERO_SLUGS, ACCEPTANCE_MEDIA, ACCEPTANCE_OWNER_EMAIL,
@@ -53,9 +53,12 @@ describe("isolated acceptance fixtures", () => {
   it("passes the actual strict Home draft and every section submission schema", () => {
     expect(parseHomeEditorDraft(ACCEPTANCE_HOME_DRAFT)).not.toBeNull();
     const versions = { updatedAt: "2026-09-22T12:00:00.000Z" };
-    for (const [section, value] of Object.entries(ACCEPTANCE_HOME_DRAFT)) {
-      expect(parseHomeSectionSubmission(section, value, versions), section).toMatchObject({ success: true });
+    for (const section of HOME_EDITOR_SECTIONS) {
+      expect(parseHomeSectionSubmission(section, ACCEPTANCE_HOME_DRAFT[section], versions), section).toMatchObject({ success: true });
     }
+    expect(ACCEPTANCE_HOME_DRAFT.layout.map(item => item.id)).not.toContain("stories");
+    expect(ACCEPTANCE_HOME_DRAFT.work.cards).toHaveLength(4);
+    expect(ACCEPTANCE_HOME_DRAFT.press.items).toHaveLength(1);
     expect(ACCEPTANCE_HOME_DRAFT.stories.images).toHaveLength(4);
   });
 

@@ -1,8 +1,49 @@
 # Artist Portfolio V2 Roadmap
 
-Updated: 2026-09-28
+Updated: 2026-09-29
 
-## Current focus — Live & Contact + V2 Events editor
+## Current focus — Home editorial sections (owner-approved)
+
+Owner approved Latest release + Selected work + compact Press & reviews on
+2026-09-29, retaining the monochrome/red photographic design. Replace the old
+Home “Artist freelancer life” placement; do not delete shared media or Gallery.
+
+- [x] Implement the shared public/preview components and V2 Home inspectors,
+      independent desktop/mobile photo framing, direct audio / provider links,
+      and a single manual Press reader instead of a second Gallery page.
+- [x] Prepare additive **0055_home_editorial_sections.sql** and its nine checks.
+      Keep retired content recoverable, preserve unrelated Home settings,
+      service-only validation/CAS/media guards and reject obsolete writers.
+- [x] Local verification: 5,378 tests / 193 files, typecheck, lint and production
+      build passed. Isolated PostgreSQL/PGlite passed, including CAS, source
+      guards, old-writer rejection and safe reruns. Actual-component browser QA
+      covered desktop/mobile layouts (down to 320 px), audio, Press navigation,
+      admin save/reload, conflict preservation and the missing-migration lock.
+      These are local checks, not hosted write acceptance.
+- [x] Owner-approved Home visual integration: shared spacing/gutters/palette,
+      readable typography, quieter About decoration and Home footer, aligned
+      interlude. About text and saved ordering/visibility remain untouched.
+      Full navigation-to-footer local preview and 320/390/1280px browser checks;
+      5,388 tests / 194 files pass after the follow-up. Other pages stay unchanged.
+- [x] Owner's media follow-up: microphone background for Latest release; restore
+      original guitarist video in the isolated Interlude preview. Live Interlude's
+      existing video/settings remain preserved. Home content/media controls verified.
+- [x] Final pre-push audit: all seven Home sections mapped through editor/save/render;
+      isolated browser saves/reloads confirmed changed Release photo/text, Work text
+      and Press quotation. 5,392 tests / 194 files, typecheck, lint, build and SQL
+      checks passed. Clarified automatic Press selection; stabilized a pre-existing
+      millisecond-boundary test without changing ImageKit runtime behavior.
+- [ ] Deploy new code **before** applying 0055. Pre-migration editor is read-only;
+      old deployed code cannot parse the new layout. No hosted SQL executed here.
+- [ ] Owner: apply 0055 and its checks, then add real release and attributed press
+      content in Home. Release/Press stay hidden until ready; no fake endorsements.
+      Verify one hosted save/reload and playback with the actual chosen source.
+- [ ] Return to the parked ImageKit owner-key/account-verification checkpoint
+      below, plus pending live Events acceptance. Do not activate ImageKit flags.
+
+Implementation / rollout details: [Home editorial sections](docs/home-editorial-sections.md).
+
+## Previous focus — Live & Contact + V2 Events editor
 
 Owner clarified on 2026-09-28 that the public destination is currently labelled
 Contact, not a separate Bookings page. Keep the calendar above the form on that
@@ -25,10 +66,13 @@ let visitors jump to live dates or the contact form when the calendar is enabled
       BOOKING(S) hero titles to LIVE & CONTACT; custom/blank titles, media,
       framing, CTA, events and publication flags are preserved. Do not replay
       owner-confirmed 0053 or 0054. The agent did not execute hosted SQL.
-- [ ] Verify deployment of the Live & Contact code rename after the
-      owner-requested GitHub delivery (2026-09-28). The database copy migration
-      alone does not deploy navbar, admin labels or section shortcuts, and a
-      successful Git push is not confirmation of a successful Vercel deployment.
+- [x] Verified Vercel success for the Live & Contact code deployment at commit
+      `318567d` on 2026-09-28. This is not hosted Events write acceptance.
+- [ ] Events save follow-up: owner supplied a POST 404 log on 2026-09-28,
+      “Failed to find Server Action”, indicating a deployment/client mismatch.
+      That specific request did not reach the calendar mutation. Copy any draft,
+      hard-reload the editor and verify one intentional real save/reload. Do not
+      reapply calendar migrations as a response to this framework lookup error.
 
 Owner requested an interactive calendar of planned public events in Bookings,
 **preview first** (2026-09-27), then explicitly approved implementation in the

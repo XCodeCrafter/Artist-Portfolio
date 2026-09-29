@@ -1,0 +1,126 @@
+/* Shared Home rhythm, also used by the real admin preview. Other pages keep
+   the default appearance of the shared Gallery and footer components. */
+:root {
+  --home-surface: var(--background);
+  --home-ink: var(--foreground);
+  --home-muted: #b8b8b8;
+  --home-accent: var(--accent);
+  --home-content-width: 1400px;
+  --home-gutter: 20px;
+  --home-section-space: 56px;
+  --home-heading-size: clamp(2.75rem, 5.4vw, 5.5rem);
+  --home-body-size: clamp(1rem, 1.2vw, 1.125rem);
+}
+@media (min-width: 640px) {
+  :root { --home-gutter: 32px; --home-section-space: 80px; }
+}
+@media (min-width: 1024px) {
+  :root { --home-section-space: 96px; }
+}
+.home-sections { background: var(--home-surface); color: var(--home-ink); }
+.home-sections .home-section-heading {
+  color: var(--home-ink);
+  font-size: var(--home-heading-size);
+  font-weight: 400;
+  line-height: .98;
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+.home-sections .home-section-cta {
+  min-height: 48px;
+  font-size: 12px;
+  letter-spacing: .16em;
+  color: var(--home-accent);
+}
+.home-sections .home-section-cta:hover { color: var(--home-ink); }
+.home-sections #home-about { padding-block: var(--home-section-space); }
+.home-sections .home-about-inner,
+.home-sections .home-interlude-inner {
+  width: 100%;
+  max-width: var(--home-content-width);
+  padding-inline: var(--home-gutter);
+  box-sizing: border-box;
+}
+.home-sections .home-about-grid { min-height: 0; gap: clamp(2rem, 5vw, 5rem); }
+.home-sections .home-about-copy,
+.home-sections .home-interlude-copy {
+  color: var(--home-muted);
+  font-size: var(--home-body-size);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.home-sections #home-about .parallax-shards { opacity: .035 !important; }
+.home-sections .home-about-photo { border-radius: 4px; background: var(--home-surface); }
+.home-sections .home-about-photo-mark { display: none; }
+.home-sections .home-interlude-inner { padding-block: var(--home-section-space); }
+.home-sections #home-feature { padding-inline: 0; }
+.home-sections #home-feature > .gallery-showcase-inner { max-width: none; }
+.home-sections #home-feature .home-interlude-panel {
+  width: 100%;
+  max-width: none;
+  /* Parallax overscan must be clipped without creating an inner scrollport:
+     focusing the player controls would otherwise move the fixed overlays. */
+  overflow: clip;
+  left: auto;
+  translate: none;
+  transform: none;
+  border-color: #ffffff12;
+  background: var(--home-surface);
+}
+.home-sections #home-feature .home-interlude-shade {
+  background: linear-gradient(180deg, var(--home-surface), #0a0a0a20 35%, #0a0a0ac9 75%, var(--home-surface));
+}
+.home-sections .cnc-showcase { padding-block: var(--home-section-space); }
+.home-sections .cnc-showcase-inner {
+  width: 100%;
+  max-width: var(--home-content-width);
+  padding-inline: var(--home-gutter);
+  box-sizing: border-box;
+}
+/* A quieter Home outro, not a global footer redesign. */
+.home-page > footer[data-footer-effect] { margin-top: 0; padding-inline: 0; background: var(--home-surface); }
+.home-page > footer .footer-content {
+  width: 100%;
+  max-width: var(--home-content-width);
+  padding-inline: var(--home-gutter);
+  box-sizing: border-box;
+}
+.home-page > footer .footer-heading {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: var(--home-heading-size);
+  font-weight: 400;
+  color: var(--home-ink);
+}
+.home-page > footer .footer-pointer-glow,
+.home-page > footer .footer-pointer-entity { opacity: .35; }
+.home-page > footer .footer-cool-wash { display: none; }
+.home-page > footer .footer-action-primary,
+.home-page > footer .footer-action-secondary {
+  min-height: 48px;
+  padding-inline: 20px;
+  border-radius: 2px;
+  font-size: 12px;
+  letter-spacing: .16em;
+  box-shadow: none;
+  transform: none;
+  white-space: normal;
+  text-align: center;
+}
+.home-page > footer .footer-action-primary { border-color: transparent; background: color-mix(in srgb, var(--home-accent) 70%, #000); }
+.home-page > footer .footer-action-primary:hover { background: color-mix(in srgb, var(--home-accent) 80%, #000); }
+.home-page > footer .footer-action-primary > span[aria-hidden] { display: none; }
+.home-page > footer .footer-action-secondary { background: transparent; border-color: #ffffff40; }
+.home-page > footer .footer-action-secondary:hover { background: #ffffff08; border-color: var(--home-ink); }
+.home-page > footer [data-footer-social-card] { border-radius: 4px; background: #ffffff03; box-shadow: none; }
+@media (min-width: 768px) {
+  .home-sections .home-about-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 639px) {
+  .home-sections #home-feature .home-interlude-panel { height: auto; min-height: 600px; }
+  .home-sections .home-interlude-inner { min-height: 600px; }
+  .home-page > footer .footer-touch-ambient { opacity: .35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-page > footer .footer-pointer-glow { opacity: 0; }
+  .home-page > footer .footer-pointer-entity { display: none; }
+}

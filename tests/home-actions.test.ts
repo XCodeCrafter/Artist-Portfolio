@@ -35,7 +35,7 @@ describe("Home V2 server action", () => {
     const rpc = vi.fn().mockResolvedValue({ data: { canonicalSection: draft[section], versions: nextVersions }, error: null });
     mocks.service.mockReturnValue({ rpc });
     expect(await saveHomeSectionV2(INITIAL_HOME_SAVE_STATE, form(section, draft[section]))).toMatchObject({ status: "saved", section, canonicalSection: draft[section], versions: nextVersions });
-    expect(rpc).toHaveBeenCalledWith("save_home_section_v2", { p_site_id: "main", p_section: section, p_expected_updated_at: versions.updatedAt, p_payload: draft[section] });
+    expect(rpc).toHaveBeenCalledWith(["layout", "release", "work", "press"].includes(section) ? "save_home_editorial_section_v2" : "save_home_section_v2", { p_site_id: "main", p_section: section, p_expected_updated_at: versions.updatedAt, p_payload: draft[section] });
     expect(mocks.revalidate).toHaveBeenCalledWith("/");
     expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ tableName: "home_page_config", metadata: { section } }));
   });
@@ -53,5 +53,15 @@ describe("Home V2 server action", () => {
     mocks.service.mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: { versions: nextVersions }, error: null }) });
     expect(await saveHomeSectionV2(INITIAL_HOME_SAVE_STATE, form("cnc", draft.cnc))).toMatchObject({ status: "error" });
     expect(mocks.audit).not.toHaveBeenCalled();
+  });
+  it("identifies missing editorial migration without retrying a legacy write", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST202", message: "Could not find the function public.save_home_editorial_section_v2 in the schema cache" } });
+    mocks.service.mockReturnValue({ rpc });
+    const response = await saveHomeSectionV2(INITIAL_HOME_SAVE_STATE, form("work", draft.work));
+    expect(response.status).toBe("migration-required");
+    expect(response.message).toContain("0055");
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(mocks.audit).not.toHaveBeenCalled();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
   });
 });

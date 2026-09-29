@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const homeSectionHeadingClass =
-  "font-display text-[clamp(3rem,6.2vw,6.75rem)] font-semibold leading-[0.92] tracking-[-0.035em]";
+  "home-section-heading font-display text-[clamp(3rem,6.2vw,6.75rem)] font-semibold leading-[0.92] tracking-[-0.035em]";
 
 type HomeSectionCtaProps = {
   className?: string;
@@ -18,7 +18,7 @@ export default function HomeSectionCta({
 
   return (
     <Link
-      className={`group inline-flex items-center gap-5 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--accent)] transition-colors duration-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/45 ${className}`}
+      className={`home-section-cta group inline-flex items-center gap-5 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--accent)] transition-colors duration-500 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/45 ${className}`}
       href={href}
       data-analytics-event="cta_click"
     >

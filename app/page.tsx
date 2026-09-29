@@ -23,7 +23,7 @@ export default async function HomePage() {
     : [];
 
   return (
-    <>
+    <div className="home-page">
       <JsonLd data={createHomeJsonLd(withHomeSeoContent(content, home))} />
       <HomePageView data={home} programs={programs} />
       <NewsletterBlock
@@ -34,6 +34,6 @@ export default async function HomePage() {
         socialLinks={content.socialLinks}
         tagline={content.settings.tagline}
       />
-    </>
+    </div>
   );
 }

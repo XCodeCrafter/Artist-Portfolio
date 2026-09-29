@@ -42,11 +42,9 @@ function adapters(): Adapter[] {
   const md = (value: unknown, empty = false) => ({ ...m.draft, platforms: { items: empty ? [] : m.draft.platforms.items.map(item => crop(item, value)) } });
   const gd = (value: unknown, empty = false) => ({ ...g.draft, frames: { items: empty ? [] : g.draft.frames.items.map(item => crop(item, value)) } });
   const sd = (value: unknown, empty = false) => ({ ...s.draft, works: { items: empty ? [] : s.draft.works.items.map(item => crop(item, value)) } });
-  const result: Adapter[] = (["about", "feature", "stories"] as const).map(section => {
-    const draft = (value: unknown) => ({ ...h.draft, [section]: section === "stories"
-      ? { ...h.draft.stories, images: h.draft.stories.images.map(item => crop(item, value)) }
-      : crop(h.draft[section], value, section === "feature" ? "posterFraming" : "framing") });
-    const payloadPath: Array<string | number> = section === "stories" ? ["images", 0, "framing"] : [section === "feature" ? "posterFraming" : "framing"];
+  const result: Adapter[] = (["about", "feature"] as const).map(section => {
+    const draft = (value: unknown) => ({ ...h.draft, [section]: crop(h.draft[section], value, section === "feature" ? "posterFraming" : "framing") });
+    const payloadPath: Array<string | number> = [section === "feature" ? "posterFraming" : "framing"];
     return { name: `Home/${section}`, section,
       snapshot: (value, capability) => home.parseHomeEditorSnapshot({ ...h, draft: draft(value), ...flags(capability) }),
       save: value => home.parseHomeSectionSubmission(section, draft(value)[section], h.versions),
