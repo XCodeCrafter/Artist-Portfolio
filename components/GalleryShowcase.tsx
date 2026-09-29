@@ -688,6 +688,34 @@ function GalleryInterlude({
     }
   }
 
+  const background = <>
+    <motion.div
+      className="absolute -inset-y-[12%] inset-x-0"
+      style={{ scale: mediaScale, y: mediaY }}
+    >
+      {staticPreview || !videoSrc ? (
+        posterSrc ? <FramedImage alt="" className="object-cover" fill framing={posterFraming} sizes="100vw" src={posterSrc} /> : null
+      ) : <><video
+        autoPlay={!reduceMotion}
+        className="h-full w-full object-cover"
+        loop
+        muted
+        onPause={() => setIsPlaying(false)}
+        onPlay={() => setIsPlaying(true)}
+        playsInline
+        poster={posterSrc}
+        preload="metadata"
+        ref={videoRef}
+        src={videoSrc}
+      />{posterSrc && normalizeHeroFraming(posterFraming) ? <FramedVideoPoster
+        alt="" className="object-cover" fill framing={posterFraming} sizes="100vw" src={posterSrc}
+        videoRef={videoRef} videoSrc={videoSrc}
+      /> : null}</>}
+    </motion.div>
+    <div className="home-interlude-shade pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.5)_0%,rgba(0,0,0,0.08)_40%,rgba(0,0,0,0.78)_100%)]" />
+    <div className="pointer-events-none absolute inset-0 bg-black/10" />
+  </>;
+
   return (
     <section
       className={cx(
@@ -698,33 +726,11 @@ function GalleryInterlude({
         flushTop ? "mt-0" : "mt-24 sm:mt-32"
       )}
       ref={sectionRef}
+      data-home-transition-frame={contained ? "" : undefined}
     >
-      <motion.div
-        className="absolute -inset-y-[12%] inset-x-0"
-        style={{ scale: mediaScale, y: mediaY }}
-      >
-        {staticPreview || !videoSrc ? (
-          posterSrc ? <FramedImage alt="" className="object-cover" fill framing={posterFraming} sizes="100vw" src={posterSrc} /> : null
-        ) : <><video
-          autoPlay={!reduceMotion}
-          className="h-full w-full object-cover"
-          loop
-          muted
-          onPause={() => setIsPlaying(false)}
-          onPlay={() => setIsPlaying(true)}
-          playsInline
-          poster={posterSrc}
-          preload="metadata"
-          ref={videoRef}
-          src={videoSrc}
-        />{posterSrc && normalizeHeroFraming(posterFraming) ? <FramedVideoPoster
-          alt="" className="object-cover" fill framing={posterFraming} sizes="100vw" src={posterSrc}
-          videoRef={videoRef} videoSrc={videoSrc}
-        /> : null}</>}
-      </motion.div>
-
-      <div className="home-interlude-shade pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.5)_0%,rgba(0,0,0,0.08)_40%,rgba(0,0,0,0.78)_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-black/10" />
+      {/* Bound the optional fade to the fixed panel, not its moving overscan.
+          The legacy Gallery DOM and all foreground/control layers stay intact. */}
+      {contained ? <div className="absolute inset-0" data-home-transition-media="">{background}</div> : background}
 
       <div className="home-interlude-inner relative z-10 mx-auto flex h-full max-w-[1500px] flex-col justify-end px-5 py-8 sm:px-8 sm:py-11 lg:px-12 lg:py-14">
         {label || meta ? (

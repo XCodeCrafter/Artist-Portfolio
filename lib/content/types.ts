@@ -68,6 +68,7 @@ export type SiteSettings = {
   navigationConfigVersion: NavigationConfigVersion;
   hiddenNavPageSlugs: PageSlug[];
   footerEffect: FooterEffect;
+  homeSectionTransitionsEnabled: boolean;
   artistName: string;
   displayFont: DisplayFontKey;
   bodyFont: BodyFontKey;

@@ -46,10 +46,10 @@ function EditorialPhoto({ image, sizes, className }: { image: HomeEditorialImage
 
 function EditorialBackdrop({ image }: { image: HomeEditorialImage }) {
   return <>
-    <div aria-hidden="true" className={styles.backdrop}>
+    <div aria-hidden="true" className={styles.backdrop} data-home-transition-media="">
       {image.src ? <FramedImage alt="" src={image.src} framing={image.framing} fill sizes="100vw" /> : null}
     </div>
-    <div className={styles.shade} />
+    <div className={styles.shade} data-home-transition-media="" />
   </>;
 }
 
@@ -206,7 +206,7 @@ function ReleaseRecord({ data, staticPreview }: { data: HomeRelease; staticPrevi
 
 export function LatestReleaseSection({ data, staticPreview = false }: { data: HomeRelease; staticPreview?: boolean }) {
   const titleId = useId();
-  return <section id="home-release" className={`${styles.section} ${styles.release}`} aria-labelledby={titleId}>
+  return <section id="home-release" className={`${styles.section} ${styles.release}`} aria-labelledby={titleId} data-home-transition-frame="">
     <EditorialBackdrop image={data.background} />
     <div className={styles.inner}>
       <div className={styles.releaseCopy}>
@@ -227,7 +227,7 @@ export function LatestReleaseSection({ data, staticPreview = false }: { data: Ho
 
 export function SelectedWorkSection({ data }: { data: HomeWork; staticPreview?: boolean }) {
   const titleId = useId();
-  return <section id="home-work" className={`${styles.section} ${styles.work}`} aria-labelledby={titleId}>
+  return <section id="home-work" className={`${styles.section} ${styles.work}`} aria-labelledby={titleId} data-home-transition-frame="">
     <EditorialBackdrop image={data.background} />
     <div className={styles.inner}>
       <div className={styles.workCopy}>
@@ -376,7 +376,7 @@ export function PressReviewsSection({ data, staticPreview = false }: { data: Hom
   if (!items.length) return null;
   const featured = items.find(item => item.id === data.featuredId) || items.find(item => Boolean(item.quote)) || items[0];
   const images = items.filter(item => Boolean(item.image.src)).slice(0, 3);
-  return <section id="home-press" className={`${styles.section} ${styles.press}`} data-collage={Boolean(images.length)} aria-labelledby={titleId}>
+  return <section id="home-press" className={`${styles.section} ${styles.press}`} data-collage={Boolean(images.length)} aria-labelledby={titleId} data-home-transition-frame="">
     <EditorialBackdrop image={data.background} />
     <div className={styles.inner}>
       <div className={styles.pressCopy}>

@@ -10,6 +10,7 @@ export const FALLBACK_CONTENT: PortfolioContent = {
     navigationConfigVersion: 1,
     hiddenNavPageSlugs: [],
     footerEffect: "soul",
+    homeSectionTransitionsEnabled: false,
     artistName: "Franky Fugazi",
     displayFont: "playfair-display",
     bodyFont: "inter",

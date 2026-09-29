@@ -4,7 +4,7 @@ import { BODY_FONT_KEYS, DISPLAY_FONT_KEYS, UI_FONT_KEYS } from "@/lib/content/f
 import { FOOTER_EFFECTS } from "@/lib/content/types";
 import { DEFAULT_FOOTER_CONTENT, footerContentSchema } from "@/lib/content/footer";
 
-export const APPEARANCE_EDITOR_SECTIONS = ["name", "appearance", "identity", "footer"] as const;
+export const APPEARANCE_EDITOR_SECTIONS = ["name", "appearance", "homeTransitions", "identity", "footer"] as const;
 export type AppearanceEditorSection = (typeof APPEARANCE_EDITOR_SECTIONS)[number];
 
 const nameSchema = z.object({
@@ -17,6 +17,7 @@ const appearanceSchema = z.object({
   uiFont: z.enum(UI_FONT_KEYS),
   footerEffect: z.enum(FOOTER_EFFECTS),
 }).strict();
+const homeTransitionsSchema = z.object({ enabled: z.boolean() }).strict();
 const identitySchema = z.object({
   tagline: z.string().trim().max(220),
   description: z.string().trim().max(1000),
@@ -29,8 +30,11 @@ const versionsSchema = z.object({
     "The saved version is invalid. Reload this editor."
   ),
 }).strict();
-const schemas = { name: nameSchema, appearance: appearanceSchema, identity: identitySchema, footer: footerContentSchema };
+const schemas = { name: nameSchema, appearance: appearanceSchema, homeTransitions: homeTransitionsSchema, identity: identitySchema, footer: footerContentSchema };
 const draftSchema = z.object(schemas).strict();
+// Older read snapshots remain compatible. Submissions use the strict schema
+// above, so an omitted or coerced boolean can never silently publish OFF.
+const snapshotDraftSchema = draftSchema.extend({ homeTransitions: homeTransitionsSchema.default({ enabled: false }) });
 
 export type AppearanceEditorDraft = z.infer<typeof draftSchema>;
 export type AppearanceEditorVersions = z.infer<typeof versionsSchema>;
@@ -85,7 +89,7 @@ export function parseAppearanceSubmission(section: unknown, payload: unknown, ve
 }
 
 export function parseAppearanceEditorSnapshot(value: unknown): AppearanceEditorSnapshot | null {
-  const parsed = z.object({ draft: draftSchema, versions: versionsSchema }).strict().safeParse(value);
+  const parsed = z.object({ draft: snapshotDraftSchema, versions: versionsSchema }).strict().safeParse(value);
   return parsed.success ? parsed.data : null;
 }
 
@@ -100,6 +104,7 @@ export function createFallbackAppearanceEditorSnapshot(): AppearanceEditorSnapsh
         uiFont: settings.uiFont,
         footerEffect: settings.footerEffect,
       },
+      homeTransitions: { enabled: settings.homeSectionTransitionsEnabled },
       identity: { tagline: settings.tagline, description: settings.description, location: settings.location, contactBlurb: settings.contactBlurb },
       footer: { ...DEFAULT_FOOTER_CONTENT },
     },

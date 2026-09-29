@@ -24,7 +24,7 @@ describe("Home visual integration", () => {
   });
 
   it("scopes shared component and footer overrides to Home, never hero or the entire site", () => {
-    expect(pageSource).toContain('<div className="home-page">');
+    expect(pageSource).toContain('<div className="home-page" data-home-transitions=');
     for (const selector of [".home-section-heading", ".home-interlude-panel", ".home-about-photo", ".cnc-showcase-inner"])
       expect(css).toMatch(new RegExp(`\\.home-sections[^{}]*${selector.replaceAll(".", "\\.")}`));
     expect(css).toContain(".home-page > footer[data-footer-effect]");

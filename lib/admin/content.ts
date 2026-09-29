@@ -117,6 +117,7 @@ type SiteSettingsRow = {
   hidden_nav_page_slugs_actor?: unknown;
   hidden_nav_page_slugs_musician?: unknown;
   footer_effect?: string | null;
+  home_section_transitions_enabled?: unknown;
   artist_name: string;
   display_font?: string | null;
   body_font?: string | null;
@@ -352,6 +353,7 @@ function mapSettings(row?: SiteSettingsRow): EditablePortfolioContent["settings"
         : row.hidden_nav_page_slugs_musician
     ),
     footerEffect: normalizeFooterEffect(row.footer_effect),
+    homeSectionTransitionsEnabled: row.home_section_transitions_enabled === true,
     artistName: row.artist_name,
     displayFont: normalizeDisplayFont(row.display_font),
     bodyFont: normalizeBodyFont(row.body_font),

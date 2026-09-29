@@ -113,7 +113,7 @@ export default function HeroCinematic({
       ].join(" ")}
     >
       {/* BG */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" data-home-transition-media="">
         {customFraming ? (
           <HeroMedia backgroundSrc={backgroundSrc} framing={customFraming} mediaType="image" />
         ) : (

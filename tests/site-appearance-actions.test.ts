@@ -68,6 +68,51 @@ describe("Site appearance V2 server action", () => {
     expect(query.eq.mock.calls).toEqual([["id", "main"], ["updated_at", versions.updatedAt]]);
     expect(mocks.revalidate).toHaveBeenCalledWith("/admin/v2/settings/appearance");
   });
+  it.each([true, false])("publishes only Home transitions=%s with the exact settings version", async (enabled) => {
+    const { query } = database({ data: { home_section_transitions_enabled: enabled, updated_at: updatedAt }, error: null });
+    expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("homeTransitions", { enabled }))).toMatchObject({
+      status: "saved", section: "homeTransitions", canonicalSection: { enabled }, versions: { updatedAt },
+    });
+    expect(query.update).toHaveBeenCalledExactlyOnceWith({ home_section_transitions_enabled: enabled });
+    expect(query.select).toHaveBeenCalledExactlyOnceWith("home_section_transitions_enabled,updated_at");
+    expect(query.eq.mock.calls).toEqual([["id", "main"], ["updated_at", versions.updatedAt]]);
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({
+      tableName: "site_settings", metadata: { section: "homeTransitions", fields: ["home_section_transitions_enabled"] },
+    }));
+    expect(mocks.revalidate).toHaveBeenCalledWith("/", "layout");
+    expect(mocks.revalidate).toHaveBeenCalledWith("/admin/v2/pages/home");
+    expect(mocks.revalidate).toHaveBeenCalledWith("/admin/v2-preview/home");
+  });
+  it("rejects missing, coerced and injected Home transitions values before privileged access", async () => {
+    for (const payload of [{}, { enabled: "false" }, { enabled: 1 }, { enabled: null }, { enabled: true, artistName: "Changed" }]) {
+      expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("homeTransitions", payload))).toMatchObject({ status: "invalid" });
+    }
+    expect(mocks.service).not.toHaveBeenCalled();
+  });
+  it("identifies the additive Home transitions migration without blocking legacy appearance saves", async () => {
+    database({ data: null, error: { code: "PGRST204", message: "Could not find home_section_transitions_enabled in the schema cache" } });
+    expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("homeTransitions", { enabled: true }))).toMatchObject({
+      status: "migration-required", message: expect.stringContaining("0057_home_section_transitions.sql"),
+    });
+    expect(mocks.audit).not.toHaveBeenCalled();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+  it("keeps stale Home transitions saves as conflicts without confirming a write", async () => {
+    database({ data: null, error: null });
+    expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("homeTransitions", { enabled: true }))).toMatchObject({ status: "conflict" });
+    expect(mocks.audit).not.toHaveBeenCalled();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+  it.each([
+    { home_section_transitions_enabled: true, updated_at: versions.updatedAt },
+    { home_section_transitions_enabled: "true", updated_at: updatedAt },
+    { updated_at: updatedAt },
+  ])("rejects unconfirmed Home transitions responses %#", async (data) => {
+    database({ data, error: null });
+    expect(await saveSiteAppearanceV2(INITIAL_APPEARANCE_SAVE_STATE, form("homeTransitions", { enabled: true }))).toMatchObject({ status: "error" });
+    expect(mocks.audit).not.toHaveBeenCalled();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
   it("saves identity only using CAS, without changing name, fonts or footer content", async () => {
     const payload = { tagline: "Music producer", description: "Music-only description", location: "Prague", contactBlurb: "Music bookings" };
     const values = { tagline: payload.tagline, description: payload.description, location: payload.location, contact_blurb: payload.contactBlurb };

@@ -25,6 +25,27 @@ describe("Site appearance editor contract", () => {
     for (const uiFont of UI_FONT_KEYS) expect(parseAppearanceSubmission("appearance", { ...snapshot.draft.appearance, uiFont }, versions).success).toBe(true);
     for (const footerEffect of ["soul", "red-light"]) expect(parseAppearanceSubmission("appearance", { ...snapshot.draft.appearance, footerEffect }, versions).success).toBe(true);
   });
+  it("defaults Home transitions OFF only for fallback and legacy read snapshots", () => {
+    expect(snapshot.draft.homeTransitions).toEqual({ enabled: false });
+    const legacyDraft = { ...snapshot.draft } as Partial<typeof snapshot.draft>;
+    delete legacyDraft.homeTransitions;
+    expect(parseAppearanceEditorSnapshot({ ...snapshot, draft: legacyDraft })?.draft.homeTransitions).toEqual({ enabled: false });
+    expect(parseAppearanceSubmission("homeTransitions", undefined, versions).success).toBe(false);
+    expect(parseAppearanceSubmission("homeTransitions", {}, versions).success).toBe(false);
+  });
+  it("accepts only an explicit boolean for the independent Home transitions section", () => {
+    for (const enabled of [true, false]) {
+      expect(parseAppearanceSubmission("homeTransitions", { enabled }, versions)).toEqual({
+        success: true, data: { section: "homeTransitions", payload: { enabled }, versions },
+      });
+    }
+    for (const enabled of [null, undefined, "true", "false", 0, 1, [], {}]) {
+      expect(parseAppearanceSubmission("homeTransitions", { enabled }, versions).success).toBe(false);
+      expect(parseAppearanceEditorSnapshot({ ...snapshot, draft: { ...snapshot.draft, homeTransitions: { enabled } } })).toBeNull();
+    }
+    expect(parseAppearanceSubmission("homeTransitions", { enabled: true, displayFont: "prata" }, versions).success).toBe(false);
+    expect(parseAppearanceSubmission("appearance", { ...snapshot.draft.appearance, enabled: true }, versions).success).toBe(false);
+  });
   it.each([
     { displayFont: "inter" }, { bodyFont: "prata" }, { uiFont: "https://attacker.invalid/font.css" }, { footerEffect: "other" },
   ])("rejects unsupported and cross-role appearance values %#", (change) => {

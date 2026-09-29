@@ -31,7 +31,7 @@ describe("isolated Home editorial browser fixture", () => {
   it("keeps Home and footer direct siblings under the production Home styling boundary", () => {
     const fixture = readFileSync(new URL("./fixtures/home-editorial-browser.tsx", import.meta.url), "utf8");
     // .home-page > footer must apply just as it does to the production route.
-    expect(fixture).toMatch(/<div className="home-page relative z-10">\s*<HomePageView\b[^]*?\/>\s*<GalleryFooter\b[^]*?\/>\s*<\/div>/);
+    expect(fixture).toMatch(/<div className="home-page relative z-10" data-home-transitions=\{transitions \? "on" : undefined\}>\s*<HomePageView\b[^]*?\/>\s*<GalleryFooter\b[^]*?\/>\s*<\/div>/);
     expect(fixture.match(/className="home-page\b/g)).toHaveLength(1);
   });
   it("allows the actual preview iframe and local media without opening external capabilities", () => {

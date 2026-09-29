@@ -39,6 +39,26 @@ describe("Site appearance V2 data", () => {
     expect(await getAdminAppearanceData()).toMatchObject({ isConfigured: true, migrationRequired: false, footerMigrationRequired: true,
       snapshot: { draft: { identity: { tagline: "Music producer" }, footer: DEFAULT_FOOTER_CONTENT } } });
   });
+  it("keeps existing settings editable while the Home transitions migration is pending", async () => {
+    database(row);
+    expect(await getAdminAppearanceData()).toMatchObject({
+      isConfigured: true, migrationRequired: false, homeTransitionsMigrationRequired: true,
+      snapshot: { draft: { homeTransitions: { enabled: false }, appearance: { footerEffect: "red-light" } }, versions: { updatedAt: row.updated_at } },
+    });
+  });
+  it.each([true, false])("preserves the persisted Home transitions boolean %s", async (enabled) => {
+    database({ ...row, home_section_transitions_enabled: enabled });
+    expect(await getAdminAppearanceData()).toMatchObject({
+      isConfigured: true, migrationRequired: false, homeTransitionsMigrationRequired: false,
+      snapshot: { draft: { homeTransitions: { enabled } }, versions: { updatedAt: row.updated_at } },
+    });
+  });
+  it.each([null, "false", "true", 0, 1, {}])("fails read-only on malformed persisted Home transitions %#", async (enabled) => {
+    database({ ...row, home_section_transitions_enabled: enabled });
+    expect(await getAdminAppearanceData()).toMatchObject({
+      isConfigured: true, migrationRequired: false, loadError: expect.any(String),
+    });
+  });
   it("fails closed on malformed persisted footer content", async () => {
     database({ ...row, footer_content: { ...DEFAULT_FOOTER_CONTENT, primaryHref: "javascript:alert(1)" } });
     expect(await getAdminAppearanceData()).toMatchObject({ loadError: expect.any(String) });

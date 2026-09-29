@@ -4,6 +4,8 @@ import AppearanceEditor from "@/components/admin/v2/AppearanceEditor";
 import { createFallbackAppearanceEditorSnapshot, type AppearanceSaveState } from "@/lib/admin/site-appearance-editor";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import { DISPLAY_FONT_OPTIONS } from "@/lib/content/fonts";
+import type { AdminAppearanceData } from "@/lib/admin/site-appearance";
+import HomeTransitionsPreview from "@/components/admin/v2/HomeTransitionsPreview";
 
 // Execute the real action callback and draft handlers with deterministic hooks.
 // This verifies state transitions, not browser layout or focus behavior.
@@ -40,6 +42,7 @@ const snapshot = createFallbackAppearanceEditorSnapshot();
 const savedVersion = snapshot.versions.updatedAt;
 const nextVersion = "2026-09-21T20:00:00.000001Z";
 const nextFont = DISPLAY_FONT_OPTIONS.find(option => option.key !== snapshot.draft.appearance.displayFont)!.key;
+let dataOverrides: Partial<AdminAppearanceData> = {};
 type Element = ReactElement<Record<string, unknown>>;
 function nodes(tree: ReactNode): Element[] {
   return Children.toArray(tree).flatMap(node => isValidElement<Record<string, unknown>>(node)
@@ -52,7 +55,7 @@ function text(tree: ReactNode): string {
 function render() {
   mocks.cursor = 0;
   return AppearanceEditor({
-    data: { snapshot, isConfigured: true, migrationRequired: false },
+    data: { snapshot, isConfigured: true, migrationRequired: false, ...dataOverrides },
     settings: FALLBACK_CONTENT.settings, socialLinks: FALLBACK_CONTENT.socialLinks,
   });
 }
@@ -68,6 +71,8 @@ function field(id: string) {
   return found;
 }
 function change(id: string, value: string) { (field(id).props.onChange as (event: unknown) => void)({ target: { value } }); }
+function toggleHomeTransitions(enabled: boolean) { (field("home-dark-transitions").props.onChange as (event: unknown) => void)({ target: { checked: enabled } }); }
+function inspector() { return nodes(render()).find(node => node.type === "fieldset")!; }
 function hidden(name: string) {
   return nodes(render()).find(node => node.type === "input" && node.props.name === name)!.props.value as string;
 }
@@ -88,14 +93,17 @@ function success(overrides: Record<string, unknown> = {}) {
 }
 beforeEach(() => {
   vi.clearAllMocks(); mocks.values = []; mocks.cursor = 0; mocks.dirty = false;
+  dataOverrides = {};
   mocks.markDirty.mockImplementation(() => { mocks.dirty = true; });
   mocks.clearDirty.mockImplementation(() => { mocks.dirty = false; });
-  change("displayFont", nextFont);
-  expect(mocks.dirty).toBe(true);
-  expect(button("Save appearance").props.disabled).toBe(false);
 });
 
 describe("Appearance confirmed-save boundary", () => {
+  beforeEach(() => {
+    change("displayFont", nextFont);
+    expect(mocks.dirty).toBe(true);
+    expect(button("Save appearance").props.disabled).toBe(false);
+  });
   it.each([
     ["null response", null],
     ["unknown status", { status: "success", message: "Saved" }],
@@ -179,5 +187,104 @@ describe("Appearance confirmed-save boundary", () => {
     expect(field("site-identity-tagline").props.value).toBe("Keep this separate draft");
     expect(button("Save profile & introduction").props.disabled).toBe(false);
     expect(JSON.parse(hidden("versions"))).toEqual({ updatedAt: nextVersion });
+  });
+});
+
+describe("Home transitions appearance section", () => {
+  it("starts OFF with an accessible switch and a preview following the draft", () => {
+    click("Home transitions");
+    expect(field("home-dark-transitions").props).toMatchObject({ type: "checkbox", role: "switch", checked: false, "aria-checked": false });
+    expect(nodes(render()).find(node => node.type === "label" && node.props.htmlFor === "home-dark-transitions")?.props.children).toBeTruthy();
+    expect(text(inspector().props.children as ReactNode)).toContain("Dark section transitionsOFF");
+    expect(nodes(render()).find(node => node.type === HomeTransitionsPreview)?.props.enabled).toBe(false);
+    expect(button("Save Home transitions").props.disabled).toBe(true);
+    expect(mocks.save).not.toHaveBeenCalled();
+    toggleHomeTransitions(true);
+    expect(nodes(render()).find(node => node.type === HomeTransitionsPreview)?.props.enabled).toBe(true);
+    expect(text(inspector().props.children as ReactNode)).toContain("Dark section transitionsON");
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("publishes only its boolean payload when saving %s", async enabled => {
+    dataOverrides = { snapshot: { ...snapshot, draft: { ...snapshot.draft, homeTransitions: { enabled: !enabled } } } };
+    click("Home transitions");
+    toggleHomeTransitions(enabled);
+    expect(hidden("section")).toBe("homeTransitions");
+    expect(JSON.parse(hidden("payload"))).toEqual({ enabled });
+    expect(button("Save Home transitions").props.disabled).toBe(false);
+    mocks.save.mockResolvedValue(success({ section: "homeTransitions", canonicalSection: { enabled } }));
+    expect((await submit()).status).toBe("saved");
+    const submitted = mocks.save.mock.calls[0][1] as FormData;
+    expect(submitted.get("section")).toBe("homeTransitions");
+    expect(JSON.parse(String(submitted.get("payload")))).toEqual({ enabled });
+    expect(field("home-dark-transitions").props.checked).toBe(enabled);
+    expect(JSON.parse(hidden("versions"))).toEqual({ updatedAt: nextVersion });
+    expect(button("Save Home transitions").props.disabled).toBe(true);
+    expect(mocks.dirty).toBe(false);
+    expect(mocks.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("guards discard and restores only this section while retaining a font draft", () => {
+    change("displayFont", nextFont);
+    click("Home transitions");
+    toggleHomeTransitions(true);
+    click("Discard this section");
+    expect(mocks.confirmDiscard).toHaveBeenCalledWith(expect.any(Function));
+    expect(field("home-dark-transitions").props.checked).toBe(true);
+    (mocks.confirmDiscard.mock.calls[0][0] as () => void)();
+    expect(field("home-dark-transitions").props.checked).toBe(false);
+    expect(button("Save Home transitions").props.disabled).toBe(true);
+    expect(mocks.dirty).toBe(true);
+    click("Fonts & light •");
+    expect(field("displayFont").props.value).toBe(nextFont);
+    expect(button("Save appearance").props.disabled).toBe(false);
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+
+  it("keeps other sections editable when only migration 0057 is missing", () => {
+    dataOverrides = { homeTransitionsMigrationRequired: true };
+    click("Home transitions");
+    expect(inspector().props.disabled).toBe(true);
+    expect(button("Save Home transitions").props.disabled).toBe(true);
+    expect(text(render())).toContain("Home transitions requires migration 0057");
+    click("Fonts & light");
+    expect(inspector().props.disabled).toBe(false);
+    change("displayFont", nextFont);
+    expect(button("Save appearance").props.disabled).toBe(false);
+    click("Profile & introduction");
+    expect(inspector().props.disabled).toBe(false);
+    change("site-identity-tagline", "Editable profile");
+    expect(button("Save profile & introduction").props.disabled).toBe(false);
+    click("Footer content");
+    expect(inspector().props.disabled).toBe(false);
+    change("site-footer-heading", "Editable invitation");
+    expect(button("Save footer content").props.disabled).toBe(false);
+  });
+
+  it.each([{ isConfigured: false }, { migrationRequired: true }, { loadError: "Settings failed to load" }])("inherits unavailable settings protection %#", overrides => {
+    dataOverrides = overrides;
+    click("Home transitions");
+    expect(inspector().props.disabled).toBe(true);
+    expect(button("Save Home transitions").props.disabled).toBe(true);
+  });
+
+  it.each([
+    ["missing response", null],
+    ["invalid canonical boolean", success({ section: "homeTransitions", canonicalSection: { enabled: "true" } })],
+    ["confirmation for another section", success()],
+  ])("preserves the transition draft and original CAS after %s", async (_label, response) => {
+    click("Home transitions");
+    toggleHomeTransitions(true);
+    mocks.save.mockResolvedValue(response);
+    expect(await submit()).toMatchObject({ status: "error", requiresReload: true });
+    expect(field("home-dark-transitions").props.checked).toBe(true);
+    expect(JSON.parse(hidden("versions"))).toEqual({ updatedAt: savedVersion });
+    expect(mocks.dirty).toBe(true);
+    expect(button("Save Home transitions").props.disabled).toBe(true);
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    await submit();
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    click("Reload saved settings");
+    expect(mocks.confirmDiscard).toHaveBeenCalledWith(expect.any(Function));
   });
 });

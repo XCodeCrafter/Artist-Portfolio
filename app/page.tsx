@@ -23,9 +23,9 @@ export default async function HomePage() {
     : [];
 
   return (
-    <div className="home-page">
+    <div className="home-page" data-home-transitions={content.settings.homeSectionTransitionsEnabled ? "on" : undefined}>
       <JsonLd data={createHomeJsonLd(withHomeSeoContent(content, home))} />
-      <HomePageView data={home} programs={programs} />
+      <HomePageView data={home} programs={programs} sectionTransitionsEnabled={content.settings.homeSectionTransitionsEnabled} />
       <NewsletterBlock
         artistName={content.settings.artistName}
         contactBlurb={content.settings.contactBlurb}

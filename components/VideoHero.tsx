@@ -109,7 +109,7 @@ export default function VideoHero({
       ].join(" ")}
     >
       {/* BG (VIDEO) */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" data-home-transition-media="">
         {customFraming ? (
           <HeroMedia
             backgroundSrc={backgroundSrc}

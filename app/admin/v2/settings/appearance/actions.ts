@@ -44,7 +44,8 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
     : parsed.data.section === "identity" ? {
       tagline: parsed.data.payload.tagline, description: parsed.data.payload.description,
       location: parsed.data.payload.location, contact_blurb: parsed.data.payload.contactBlurb,
-    } : parsed.data.section === "footer" ? { footer_content: parsed.data.payload } : {
+    } : parsed.data.section === "footer" ? { footer_content: parsed.data.payload }
+    : parsed.data.section === "homeTransitions" ? { home_section_transitions_enabled: parsed.data.payload.enabled } : {
       display_font: parsed.data.payload.displayFont,
       body_font: parsed.data.payload.bodyFont,
       ui_font: parsed.data.payload.uiFont,
@@ -53,7 +54,8 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
   const columns = section === "name"
     ? "artist_name,updated_at"
     : section === "identity" ? "tagline,description,location,contact_blurb,updated_at"
-    : section === "footer" ? "footer_content,updated_at" : "display_font,body_font,ui_font,footer_effect,updated_at";
+    : section === "footer" ? "footer_content,updated_at"
+    : section === "homeTransitions" ? "home_section_transitions_enabled,updated_at" : "display_font,body_font,ui_font,footer_effect,updated_at";
   const { data, error } = await supabase.from("site_settings")
     .update(values)
     .eq("id", "main")
@@ -62,7 +64,10 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
     .maybeSingle<Record<string, unknown>>();
   if (error) {
     if (error.code === "40001") return result("conflict", "Site settings changed in another admin session. Your draft was kept. Reload before saving again.", { section });
-    if (isMissingSiteAppearanceSchemaError(error)) return result("migration-required", section === "footer" ? "Apply migration 0039_footer_content_editor.sql and its check before publishing footer content." : "The database is missing existing site settings fields. Check the settings migrations before saving.", { section });
+    if (isMissingSiteAppearanceSchemaError(error)) return result("migration-required",
+      section === "homeTransitions" ? "Apply migration 0057_home_section_transitions.sql and its check before publishing Home transitions."
+        : section === "footer" ? "Apply migration 0039_footer_content_editor.sql and its check before publishing footer content."
+          : "The database is missing existing site settings fields. Check the settings migrations before saving.", { section });
     if (error.code === "22023" || error.code === "23514") return result("invalid", "The database rejected these settings. Review your selections and try again.", { section });
     console.error("Admin V2 appearance save failed.", { section, code: error.code });
     return result("error", "Settings could not be saved. Your local changes are still here.", { section });
@@ -73,9 +78,10 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
     ? { artistName: data.artist_name }
     : section === "identity" ? { tagline: data.tagline, description: data.description, location: data.location, contactBlurb: data.contact_blurb }
     : section === "footer" ? data.footer_content
+    : section === "homeTransitions" ? { enabled: data.home_section_transitions_enabled }
     : { displayFont: data.display_font, bodyFont: data.body_font, uiFont: data.ui_font, footerEffect: data.footer_effect };
   const confirmed = parseAppearanceSubmission(section, canonicalSection, { updatedAt: data.updated_at });
-  if (!confirmed.success) return result("error", "The save response could not be confirmed. Reload to verify your saved settings.", { section });
+  if (!confirmed.success || confirmed.data.versions.updatedAt === parsed.data.versions.updatedAt) return result("error", "The save response could not be confirmed. Reload to verify your saved settings.", { section });
 
   await writeAuditLog({
     actorId: admin.id, action: `site_appearance_v2_${section}_save`, tableName: "site_settings", recordId: "main",
@@ -83,7 +89,11 @@ export async function saveSiteAppearanceV2(_previousState: AppearanceSaveState, 
   });
   revalidatePath("/", "layout");
   for (const path of ["/admin/v2", "/admin/v2/navigation", "/admin/v2/settings/appearance", "/admin/v2/pages/contact", "/admin/content", "/admin/settings"]) revalidatePath(path);
-  const labels = { name: "Owner name", appearance: "Appearance", identity: "Profile & introduction", footer: "Footer content" };
+  if (section === "homeTransitions") {
+    revalidatePath("/admin/v2/pages/home");
+    revalidatePath("/admin/v2-preview/home");
+  }
+  const labels = { name: "Owner name", appearance: "Appearance", homeTransitions: "Home transitions", identity: "Profile & introduction", footer: "Footer content" };
   return result("saved", `${labels[section]} saved and published.`, {
     section, canonicalSection: confirmed.data.payload, versions: confirmed.data.versions, savedAt: new Date().toISOString(),
   });

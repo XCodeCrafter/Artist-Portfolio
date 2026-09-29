@@ -7,9 +7,10 @@ import type { CncProgramDefinition } from "@/lib/cnc-code";
 
 export const HOME_PREVIEW_READY_MESSAGE = "home-preview-ready" as const;
 
-export default function HomePreviewRuntime({ initialSnapshot, programs }: {
+export default function HomePreviewRuntime({ initialSnapshot, programs, sectionTransitionsEnabled = false }: {
   initialSnapshot: HomeEditorSnapshot;
   programs: CncProgramDefinition[];
+  sectionTransitionsEnabled?: boolean;
 }) {
   const [draft, setDraft] = useState(initialSnapshot.draft);
   const [selectedSection, setSelectedSection] = useState<HomeEditorSection>("layout");
@@ -39,7 +40,7 @@ export default function HomePreviewRuntime({ initialSnapshot, programs }: {
   }, [focusRequestId, selectedSection]);
 
   return <div className="min-h-screen bg-black text-white">
-    <HomePageView data={draft} programs={programs} mode="preview" selectedSection={selectedSection}
+    <HomePageView data={draft} programs={programs} mode="preview" selectedSection={selectedSection} sectionTransitionsEnabled={sectionTransitionsEnabled}
       onSelectSection={(section) => {
         if (window.parent !== window) window.parent.postMessage({ type: HOME_PREVIEW_SELECTION_MESSAGE, section }, window.location.origin);
       }} />

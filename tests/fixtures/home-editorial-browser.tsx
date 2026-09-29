@@ -37,6 +37,7 @@ function Fixture() {
   const [mode, setMode] = useState("full");
   const [revision, setRevision] = useState(0);
   const [conflict, setConflict] = useState(false);
+  const [transitions, setTransitions] = useState(false);
   function reload() { setSnapshot(readFixtureHome()); setRevision(value => value + 1); }
   const controls = <header className="fixture-controls grid gap-3 rounded-2xl border border-white/20 bg-[#111] p-4">
       <h1 className="font-ui text-xl">Home editorial sections · isolated UI QA</h1>
@@ -44,6 +45,7 @@ function Fixture() {
       <div className="flex flex-wrap items-center gap-4">
         <label>QA view <select aria-label="QA view" className="ml-2 rounded-lg bg-black p-2" value={mode} onChange={event => { reload(); setMode(event.target.value); }}><option value="full">Full Home · navigation to footer</option><option value="public">Public Home · editorial sections only</option><option value="admin">Home admin editor</option><option value="migration">Migration missing</option></select></label>
         <label><input type="checkbox" checked={conflict} onChange={event => { setConflict(event.target.checked); setFixtureConflict(event.target.checked); }} /> Simulate version conflict</label>
+        <label><input type="checkbox" checked={transitions} onChange={event => setTransitions(event.target.checked)} /> Dark section transitions</label>
         <button type="button" className="rounded-lg border border-white/30 px-4 py-2" onClick={reload}>Reload saved test state</button>
       </div>
     </header>;
@@ -56,12 +58,12 @@ function Fixture() {
     {mode === "full" ? <>
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 opacity-60 noise" />
       <TopNav artistName={settings.artistName} navigationItems={navigationItems} socialLinks={FALLBACK_CONTENT.socialLinks} />
-      <div className="home-page relative z-10">
-        <HomePageView key={revision} data={createFullHomeFixtureDraft(snapshot.draft)} programs={[]} />
+      <div className="home-page relative z-10" data-home-transitions={transitions ? "on" : undefined}>
+        <HomePageView key={revision} data={createFullHomeFixtureDraft(snapshot.draft)} programs={[]} sectionTransitionsEnabled={transitions} />
         <GalleryFooter artistName={settings.artistName} contactBlurb={settings.contactBlurb} location={settings.location}
           footerEffect={settings.footerEffect} socialLinks={FALLBACK_CONTENT.socialLinks} tagline={settings.tagline} />
       </div>
-    </> : mode === "public" ? <HomePageView key={revision} data={snapshot.draft} programs={[]} />
+    </> : mode === "public" ? <HomePageView key={revision} data={snapshot.draft} programs={[]} sectionTransitionsEnabled={transitions} />
       : <HomeEditor key={revision} assets={assets} snapshot={mode === "migration" ? { ...snapshot, editorialAvailable: undefined } : snapshot} disabled={mode === "migration"} migrationRequired={mode === "migration"} />}
     </div>
     </FooterContentProvider></PrivacyProvider>

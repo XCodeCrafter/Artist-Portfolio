@@ -2,7 +2,33 @@
 
 Updated: 2026-09-29
 
-## Current focus — editable Sharing & SEO
+## Current focus — optional Home transitions only
+
+- [x] Owner clarified: keep the existing mobile AND desktop arrangement, sizes,
+      section order, spacing, copy and media. The compact/reordered previews were
+      isolated visualizations, not project edits; the worktree was clean before
+      this change. No GitHub restore or destructive reset was needed.
+- [x] Add Home-only background edge fades and Settings → Appearance → Home
+      transitions ON/OFF (default OFF). About's glass parallax, foreground text,
+      controls and independently framed photos remain unchanged.
+- [x] Prepare additive **0057_home_section_transitions.sql** plus four read-only
+      checks. An absent column blocks only this new control, not other settings.
+- [x] Verification: **5,620 tests / 204 files**, typecheck, lint, production build
+      and isolated PostgreSQL/PGlite passed. Optimized actual-component browser
+      checks at 320/390/1280px confirm identical ON/OFF section geometry, no
+      horizontal overflow, bounded Interlude masks and preserved About rendering.
+- [x] Owner confirmed **0057** with all four matching checks true by screenshot
+      on 2026-09-29 and authorized the GitHub push. No hosted SQL was executed
+      by the agent; do not replay the migration.
+- [ ] After deployment, verify one authenticated Home transitions save/reload.
+      Leave OFF until the owner chooses to enable it. Deployment and hosted
+      persistence are not confirmed by the migration checks alone.
+- [ ] Resume the parked ImageKit account/key checkpoint and live Events
+      acceptance after this visual change; do not activate provider flags.
+
+Details: [Home section transitions](docs/home-section-transitions.md).
+
+## Previous focus — editable Sharing & SEO
 
 - [x] Separate Home link/search title from the campaign hero heading. Use the
       owner's saved name for person identity; keep subpage URLs and SEO distinct.

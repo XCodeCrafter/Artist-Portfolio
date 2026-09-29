@@ -5,6 +5,7 @@ import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
 import { useActionState, useEffect, useRef, useState, type CSSProperties, type ReactNode, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import GalleryFooter, { type FooterPreviewRegion } from "@/components/GalleryFooter";
+import HomeTransitionsPreview from "@/components/admin/v2/HomeTransitionsPreview";
 import useUnsavedChangesGuard from "@/components/admin/useUnsavedChangesGuard";
 import { saveSiteAppearanceV2 } from "@/app/admin/v2/settings/appearance/actions";
 import { INITIAL_APPEARANCE_SAVE_STATE, parseAppearanceSubmission, type AppearanceSaveState, type AppearanceEditorDraft } from "@/lib/admin/site-appearance-editor";
@@ -18,11 +19,12 @@ const fontRoles = [
   { key: "bodyFont", label: "Body / paragraphs", description: "Descriptions, biography and longer reading text.", options: BODY_FONT_OPTIONS },
   { key: "uiFont", label: "UI / navigation", description: "Navigation, buttons and interface headings.", options: UI_FONT_OPTIONS },
 ] as const;
-type Section = "appearance" | "identity" | "footer";
+type Section = "appearance" | "identity" | "footer" | "homeTransitions";
 const sections: { id: Section; label: string }[] = [
   { id: "appearance", label: "Fonts & light" },
   { id: "identity", label: "Profile & introduction" },
   { id: "footer", label: "Footer content" },
+  { id: "homeTransitions", label: "Home transitions" },
 ];
 const inputClass = "mt-2 min-h-11 w-full rounded-xl border border-white/15 bg-[#08080a] px-3 py-2 text-sm font-normal outline-none focus:border-white/60";
 const buttonClass = "min-h-11 rounded-xl border border-white/15 px-4 text-xs font-semibold text-white/70 disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
@@ -78,7 +80,8 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
   }, INITIAL_APPEARANCE_SAVE_STATE);
   const unavailable = !data.isConfigured || data.migrationRequired || Boolean(data.loadError);
   const footerBlocked = Boolean(data.footerMigrationRequired) && section === "footer";
-  const blocked = unavailable || footerBlocked;
+  const homeTransitionsBlocked = Boolean(data.homeTransitionsMigrationRequired) && section === "homeTransitions";
+  const blocked = unavailable || footerBlocked || homeTransitionsBlocked;
   const appearance = draft.appearance;
   function change<Selected extends Section>(selected: Selected, next: AppearanceEditorDraft[Selected]) {
     const nextDraft = { ...draft, [selected]: next };
@@ -111,6 +114,7 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
     <input type="hidden" name="versions" value={JSON.stringify(versions)} />
     {unavailable && <p role="alert" className="rounded-2xl border border-amber-200/20 p-4 text-sm text-amber-200">{data.loadError || "The settings database is unavailable. The preview is read-only."}</p>}
     {data.footerMigrationRequired && <p role="status" className="rounded-2xl border border-amber-200/20 p-4 text-sm text-amber-200">Footer content requires migration 0039. Fonts, light and profile text still work. Apply 0039_footer_content_editor.sql and its verification check, then reload.</p>}
+    {!unavailable && homeTransitionsBlocked && <p role="status" className="rounded-2xl border border-amber-200/20 p-4 text-sm text-amber-200">Home transitions requires migration 0057. Apply the migration and its verification check, then reload. The other settings sections remain available.</p>}
     <nav aria-label="Site-wide editor sections" className="flex flex-wrap gap-2">
       {sections.map((item) => <button type="button" key={item.id} disabled={pending} aria-pressed={section === item.id}
         onClick={() => setSection(item.id)} className={`${buttonClass} ${section === item.id ? "border-[#ff6049]/70 bg-[#ff3b1f]/10 text-white" : ""}`}>
@@ -119,7 +123,8 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
     </nav>
     <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,0.7fr)]">
       <section aria-labelledby="appearance-preview-title" className="min-w-0 self-start overflow-hidden rounded-[26px] border border-white/10 bg-[#08080a]" style={previewStyle}>
-        <div className="border-b border-white/10 px-5 py-4 text-[10px] uppercase tracking-[0.2em] text-white/40" id="appearance-preview-title">Live preview · click a region to edit · unpublished until saved</div>
+        <div className="border-b border-white/10 px-5 py-4 text-[10px] uppercase tracking-[0.2em] text-white/40" id="appearance-preview-title">{section === "homeTransitions" ? "Home transitions preview · unpublished until saved" : "Live preview · click a region to edit · unpublished until saved"}</div>
+        {section === "homeTransitions" && <HomeTransitionsPreview enabled={draft.homeTransitions.enabled} />}
         {section === "appearance" && <div className="p-6 sm:p-9">
           <div className="flex flex-wrap gap-5 text-xs uppercase tracking-[0.12em] text-white/55" style={{ fontFamily: "var(--font-ui)" }} aria-label="Navigation typography sample"><span className="text-[#ff6049]">Home</span><span>Bio</span><span>Music</span><span>{LIVE_CONTACT_PAGE_LABEL}</span></div>
           <p className="mt-8 text-xs uppercase tracking-[0.2em] text-[#ff806c]">{draft.identity.tagline}</p>
@@ -127,11 +132,11 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
           <p className="mt-6 max-w-xl text-base leading-8 text-white/65">{draft.identity.description}</p>
           <p className="mt-3 text-sm leading-7 text-white/40">Příběhy, které stojí za pozornost. Žluťoučký kůň · 0123456789.</p>
         </div>}
-        <div className="border-t border-white/10 px-5 py-4 text-xs leading-5 text-white/45">The actual portfolio footer, scaled to fit. Click the introduction, invitation or social headings. Links are disabled; the pointer light stays interactive.</div>
+        {section !== "homeTransitions" && <><div className="border-t border-white/10 px-5 py-4 text-xs leading-5 text-white/45">The actual portfolio footer, scaled to fit. Click the introduction, invitation or social headings. Links are disabled; the pointer light stays interactive.</div>
         <FooterPreview><GalleryFooter artistName={draft.name.artistName} {...draft.identity} socialLinks={socialLinks} content={draft.footer} footerEffect={appearance.footerEffect} preview
           selectedRegion={section === "identity" ? "identity" : section === "footer" ? footerRegion : undefined}
           onSelectRegion={(region) => { if (pending) return; if (region === "identity") setSection("identity"); else { setFooterRegion(region); setSection("footer"); } }} />
-        </FooterPreview>
+        </FooterPreview></>}
         {section === "identity" && <div className="border-t border-white/10 p-5"><p className="text-[10px] uppercase tracking-[0.2em] text-white/40">Search / share description preview</p><p className="mt-3 text-lg text-white">{draft.name.artistName}</p><p className="mt-2 text-sm leading-6 text-white/60">{draft.identity.description || "An automatic portfolio description will be used."}</p></div>}
       </section>
       <fieldset disabled={blocked || pending} className="min-w-0 self-start rounded-[26px] border border-white/10 bg-[#101012] p-5 disabled:opacity-50 sm:p-6">
@@ -163,6 +168,24 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
           {textField("identity", "description", "Site description", "Default introduction for HOME search results and shared links. A custom description in Sharing & SEO takes priority.", true)}
           <Link href="/admin/v2/settings/sharing" className="text-xs underline underline-offset-4">Link title, description & preview cover → Sharing &amp; SEO</Link>
           <Link href="/admin/v2/navigation" className="text-xs underline underline-offset-4">Owner name and platform links → Navbar</Link>
+        </div> : section === "homeTransitions" ? <div className="mt-6 grid gap-5">
+          <p id="home-transitions-help" className="text-xs leading-6 text-white/55">Softens Home background edges with dark transitions. Section order, layout, spacing and content stay unchanged on desktop, tablet and mobile.</p>
+          <label htmlFor="home-dark-transitions" className="flex min-h-16 cursor-pointer items-center justify-between gap-4 rounded-2xl border border-white/15 bg-black/20 p-4">
+            <span className="text-sm font-semibold text-white/85">Dark section transitions</span>
+            <span className="flex shrink-0 items-center gap-3">
+              <span className="text-[10px] font-semibold tracking-[0.14em] text-white/60" aria-hidden="true">{draft.homeTransitions.enabled ? "ON" : "OFF"}</span>
+              <input id="home-dark-transitions" type="checkbox" role="switch" checked={draft.homeTransitions.enabled} aria-checked={draft.homeTransitions.enabled}
+                aria-invalid={state.section === "homeTransitions" && Boolean(state.fieldErrors?.enabled)}
+                aria-describedby={state.section === "homeTransitions" && state.fieldErrors?.enabled ? "home-transitions-help home-transitions-error" : "home-transitions-help"}
+                onChange={(event) => change("homeTransitions", { enabled: event.target.checked })}
+                className="peer sr-only" />
+              <span aria-hidden="true" className={`relative h-7 w-12 rounded-full border transition-colors motion-reduce:transition-none peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-white ${draft.homeTransitions.enabled ? "border-[#ff6049] bg-[#ff6049]" : "border-white/25 bg-white/10"}`}>
+                <span className={`absolute left-0 top-1 h-[18px] w-[18px] rounded-full bg-white transition-transform motion-reduce:transition-none ${draft.homeTransitions.enabled ? "translate-x-6" : "translate-x-1"}`} />
+              </span>
+            </span>
+          </label>
+          {state.section === "homeTransitions" && state.fieldErrors?.enabled && <p id="home-transitions-error" className="text-xs text-amber-200">{state.fieldErrors.enabled.join(" ")}</p>}
+          <p className="text-xs leading-6 text-white/45">Default: OFF. The preview follows this draft; save to publish the setting.</p>
         </div> : <div className="mt-6 grid gap-5">
           <div className="flex flex-wrap gap-2">{([{ id: "callout", label: "Invitation & buttons" }, { id: "social", label: "Social headings" }] as const).map((region) => <button key={region.id} type="button" className={buttonClass} aria-pressed={footerRegion === region.id} onClick={() => setFooterRegion(region.id)}>{region.label}</button>)}</div>
           {footerRegion === "social" ? <>
@@ -185,7 +208,7 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
       <div className="flex w-full flex-wrap gap-2 sm:w-auto">
         {needsEditorReload(state) && <button type="button" onClick={() => confirmDiscard(() => window.location.reload())} className={buttonClass}>Reload saved settings</button>}
         <button type="button" disabled={pending || !sectionDirty} onClick={() => confirmDiscard(() => change(section, saved[section]))} className={buttonClass}>Discard this section</button>
-        <button type="submit" disabled={blocked || pending || !sectionDirty || needsEditorReload(state)} className="min-h-11 flex-1 rounded-xl bg-white px-3 text-xs font-semibold text-black disabled:opacity-35 sm:flex-none">{pending ? "Saving…" : section === "appearance" ? "Save appearance" : section === "identity" ? "Save profile & introduction" : "Save footer content"}</button>
+        <button type="submit" disabled={blocked || pending || !sectionDirty || needsEditorReload(state)} className="min-h-11 flex-1 rounded-xl bg-white px-3 text-xs font-semibold text-black disabled:opacity-35 sm:flex-none">{pending ? "Saving…" : section === "appearance" ? "Save appearance" : section === "identity" ? "Save profile & introduction" : section === "homeTransitions" ? "Save Home transitions" : "Save footer content"}</button>
       </div>
     </div>
   </form>;

@@ -75,12 +75,14 @@ export default function HomePageView({
   mode = "public",
   onSelectSection,
   selectedSection,
+  sectionTransitionsEnabled = false,
 }: {
   data: HomeEditorDraft;
   programs: CncProgramDefinition[];
   mode?: ViewMode;
   onSelectSection?: (section: HomeEditorSection) => void;
   selectedSection?: HomeEditorSection;
+  sectionTransitionsEnabled?: boolean;
 }) {
   const presentation: GalleryPresentation = {
     introEyebrow: "",
@@ -139,7 +141,7 @@ export default function HomePageView({
   }
 
   return (
-    <main className="home-sections">
+    <main className="home-sections" data-home-transitions={sectionTransitionsEnabled ? "on" : undefined}>
       {data.layout.map(({ id, enabled }) => {
         const placeholder = !enabled
           ? "Hidden on the website"

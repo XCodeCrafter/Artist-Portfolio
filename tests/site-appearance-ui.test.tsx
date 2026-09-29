@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AppearanceEditor from "@/components/admin/v2/AppearanceEditor";
+import HomeTransitionsPreview from "@/components/admin/v2/HomeTransitionsPreview";
 import NavbarNameEditor from "@/components/admin/v2/NavbarNameEditor";
 import { NavbarUnsavedChangesProvider } from "@/components/admin/v2/NavbarUnsavedChangesProvider";
 import GalleryFooter from "@/components/GalleryFooter";
@@ -117,6 +118,24 @@ describe("Appearance and navbar name V2 controls", () => {
     const html = appearance({ footerMigrationRequired: true });
     expect(html).toContain("Footer content requires migration 0039");
     expect(html).not.toMatch(/<fieldset disabled=""/);
+  });
+  it("offers Home transitions without disabling fonts when migration 0057 is missing", () => {
+    const html = appearance({ homeTransitionsMigrationRequired: true });
+    expect(html).toContain("Home transitions");
+    expect(html).not.toMatch(/<fieldset disabled=""/);
+  });
+  it("uses the public background mask markers while leaving preview text and panel geometry unchanged", () => {
+    const off = renderToStaticMarkup(<HomeTransitionsPreview enabled={false} />);
+    const on = renderToStaticMarkup(<HomeTransitionsPreview enabled />);
+    expect(off).toContain('data-home-transitions="off"');
+    expect(on).toContain('data-home-transitions="on"');
+    for (const html of [off, on]) {
+      expect(html.match(/data-home-preview-section/g)).toHaveLength(2);
+      expect(html.match(/data-home-transition-frame/g)).toHaveLength(2);
+      expect(html.match(/data-home-transition-media/g)).toHaveLength(2);
+      expect(html).toMatch(/data-home-transition-media[^>]*><\/div><div class="relative z-10">/);
+    }
+    expect(on.match(/<section.*?<\/section>/g)).toEqual(off.match(/<section.*?<\/section>/g));
   });
   it("keeps draft state and blocks blind retry after an uncertain save response", () => {
     mocks.state = { ...INITIAL_APPEARANCE_SAVE_STATE, status: "error", message: "The save outcome could not be confirmed." };
