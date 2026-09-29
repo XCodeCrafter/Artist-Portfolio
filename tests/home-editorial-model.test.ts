@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { createHomeEditorialDefaults, getHomePlaybackEmbedUrl, homePressSchema, homeReleaseSchema, homeWorkSchema, isSafeHomePlayback } from "@/lib/admin/home-editorial";
+import { createHomeEditorialDefaults, getHomePlaybackEmbedUrl, homePressSchema, homeReleaseSchema, homeWorkSchema, isSafeEditorialHref, isSafeEditorialHttpsUrl, isSafeHomePlayback } from "@/lib/admin/home-editorial";
 import { createFallbackHomeEditorSnapshot, parseHomeEditorDraft, parseHomeEditorSnapshot, parseHomePreviewUpdateMessage, parseHomeSectionSubmission, HOME_PREVIEW_UPDATE_MESSAGE } from "@/lib/admin/home-editor";
 import { createContentSecurityPolicy } from "@/lib/security/csp";
 
 describe("Home editorial playback boundaries", () => {
+  it.each([
+    "https:cdn.example.org/song.mp3", "https:/cdn.example.org/song.mp3", "https:///cdn.example.org/song.mp3",
+    "https:////cdn.example.org/song.mp3", "https://cdn.example.org:/song.mp3", "https://cdn.example.org:0443/song.mp3",
+    "https://cdn.example.org:000443/song.mp3", "https://[::1]/song.mp3",
+  ])("rejects browser-repaired HTTPS syntax that cannot pass the database boundary: %s", url => {
+    expect(isSafeEditorialHttpsUrl(url)).toBe(false);
+    expect(isSafeEditorialHref(url)).toBe(false);
+    expect(isSafeHomePlayback({ kind: "audio", url })).toBe(false);
+    const { release } = createHomeEditorialDefaults();
+    expect(homeReleaseSchema.safeParse({ ...release, primaryHref: url }).success).toBe(false);
+  });
+  it.each(["https://example.org", "HTTPS://EXAMPLE.ORG:443/release?source=home#listen", "https://example.org/a%20b"])("retains supported explicit HTTPS destinations: %s", url => {
+    expect(isSafeEditorialHttpsUrl(url)).toBe(true);
+    expect(isSafeEditorialHref(url)).toBe(true);
+  });
   it.each(["https://cdn.example.org/song.mp3", "/media/song.ogg", "https://cdn.example.org/song.m4a?token=example", "https://cdn.example.org/song.WAV"])("accepts a direct media file %s", url => {
     expect(isSafeHomePlayback({ kind: "audio", url })).toBe(true);
   });
@@ -20,6 +35,27 @@ describe("Home editorial playback boundaries", () => {
     const canonical = homeReleaseSchema.parse({ ...release, playback: { kind: "spotify", url: "HTTPS://OPEN.SPOTIFY.COM:443/track/1234567890123456789012" } });
     expect(canonical.playback.url).toBe("https://open.spotify.com/track/1234567890123456789012");
     expect(isSafeHomePlayback({ kind: "youtube", url: "https://youtube.com/watch?v=bad&v=abcdefghijk" })).toBe(false);
+  });
+  it.each([
+    ["https://www.youtube.com/watch?%76=abcdefghijk", "https://www.youtube.com/watch?v=abcdefghijk"],
+    ["https://www.youtube.com/watch?v=%61bcdefghijk", "https://www.youtube.com/watch?v=abcdefghijk"],
+    ["https://www.youtube.com/watch?%76=abcdefghijk&v=wrong&t=20", "https://www.youtube.com/watch?v=abcdefghijk&t=20"],
+  ])("serializes the same YouTube ID validated by the browser for the database: %s", (url, canonical) => {
+    const { release } = createHomeEditorialDefaults();
+    const parsed = homeReleaseSchema.parse({ ...release, playback: { kind: "youtube", url } });
+    expect(parsed.playback.url).toBe(canonical);
+    expect(getHomePlaybackEmbedUrl(parsed.playback)).toBe("https://www.youtube-nocookie.com/embed/abcdefghijk");
+    expect(homeReleaseSchema.parse(parsed)).toEqual(parsed);
+  });
+  it("never canonicalizes a later valid YouTube ID over an invalid first one", () => {
+    const { release } = createHomeEditorialDefaults();
+    for (const url of [
+      "https://www.youtube.com/watch?%76=wrong&v=abcdefghijk",
+      "https://www.youtube.com/watch?v=wrong&%76=abcdefghijk",
+      "https://www.youtube.com/watch?v=abcdefghijk%0A",
+    ]) {
+      expect(homeReleaseSchema.safeParse({ ...release, playback: { kind: "youtube", url } }).success).toBe(false);
+    }
   });
   it("widens only media-src for admin-authored HTTPS audio", () => {
     const csp = createContentSecurityPolicy("test");

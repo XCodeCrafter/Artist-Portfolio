@@ -33,6 +33,11 @@ Home “Artist freelancer life” placement; do not delete shared media or Galle
       and Press quotation. 5,392 tests / 194 files, typecheck, lint, build and SQL
       checks passed. Clarified automatic Press selection; stabilized a pre-existing
       millisecond-boundary test without changing ImageKit runtime behavior.
+- [x] Additional Home hardening after commit 45d5b65: explicit URL/database parity,
+      bounded audio/RPC/audit waits, stale-response protection, precise cache/audit
+      warnings, and safer Press dialog/navigation gestures. 5,449 tests / 195 files,
+      typecheck, lint, production build, PGlite and local browser checks passed.
+      No new SQL migration or provider keys required.
 - [ ] Deploy new code **before** applying 0055. Pre-migration editor is read-only;
       old deployed code cannot parse the new layout. No hosted SQL executed here.
 - [ ] Owner: apply 0055 and its checks, then add real release and attributed press

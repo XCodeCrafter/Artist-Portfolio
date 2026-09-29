@@ -75,6 +75,34 @@ The CSP expansion is limited to `media-src https:` for admin-authored audio URLs
 
 ## Verification tools
 
+### Additional hardening after the initial push
+
+- Home saves reject duplicate/missing/non-text contract fields. RPC requests have
+  a 10-second abort deadline; uncertain outcomes require reload and never retry
+  the write. Server and editor reject a success with an unchanged CAS version,
+  preserving full PostgreSQL microsecond strings and unrelated unsaved sections.
+- A confirmed database write keeps its canonical state even if subsequent audit
+  or cache work fails. Audit confirmation waits at most two seconds, every cache
+  path is attempted independently, and visible/screen-reader messages accurately
+  distinguish saved data from an unconfirmed cache refresh.
+- Explicit HTTPS spellings match SQL validation. Encoded YouTube video parameters
+  are normalized once to the validated first ID without allowing a later duplicate
+  to override an invalid first value.
+- Direct audio has a 15-second loading watchdog, one active start attempt, stale
+  promise fencing, and resource release on error/unmount. Retrying is explicit;
+  no media request is started before visitor interaction.
+- Press selection follows stable item IDs. Interior clicks and drags do not act
+  as backdrop dismissal; modified arrow keys, scan controls and cancelled or
+  multi-touch gestures are not interpreted as article navigation.
+
+Verification: **5,449 tests / 195 files**, typecheck, lint, production build and
+isolated PGlite checks passed. Actual-component browser QA confirmed native audio,
+Press arrow navigation, interior/backdrop clicks, focus return and scroll unlock.
+No new migration, hosted write or ImageKit activation was needed for this
+hardening follow-up. Hosted rollout and real save verification remain separate.
+
+### Initial pre-push audit
+
 Final pre-push audit: **5,392 tests in 194 files passed**, plus typecheck,
 ESLint, production build and isolated PGlite checks. All seven Home inspectors
 were compared against their saved/public contracts. The actual isolated UI

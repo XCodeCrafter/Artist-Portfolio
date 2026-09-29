@@ -138,7 +138,9 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
       return await runEditorSave(previous, () => saveHomeSectionV2(INITIAL_HOME_SAVE_STATE, formData), (result) => {
         if (result.status === "saved" && result.section === formData.get("section") && result.section && result.canonicalSection && result.versions) {
           const parsed = parseHomeSectionSubmission(result.section, result.canonicalSection, result.versions);
-          if (parsed.success) {
+          // Every confirmed write advances the page CAS, even a canonical no-op.
+          // Compare the full value; Date.parse would lose PostgreSQL microseconds.
+          if (parsed.success && parsed.data.versions.updatedAt !== versionsRef.current.updatedAt) {
             const next = { ...draftRef.current, [result.section]: parsed.data.payload } as HomeEditorDraft;
             const saved = { ...baselineRef.current, [result.section]: parsed.data.payload } as HomeEditorDraft;
             draftRef.current = next;
@@ -146,7 +148,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
             versionsRef.current = parsed.data.versions as HomeEditorVersions;
             setDraft(next); setBaseline(saved); setVersions(parsed.data.versions as HomeEditorVersions);
             if (!getDirtyHomeSections(saved, next).length) clearDirty();
-            setAnnouncement(`${HOME_SECTION_LABELS[result.section]} saved and published.`);
+            setAnnouncement(`${HOME_SECTION_LABELS[result.section]}: ${result.message}`);
             return true;
           }
         }

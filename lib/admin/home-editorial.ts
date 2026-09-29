@@ -5,6 +5,10 @@ import { isSafeLocalMediaPath, isSafeManagedMediaSource } from "@/lib/media-sour
 const text = (max: number) => z.string().trim().max(max);
 export function isSafeEditorialHttpsUrl(value: string) {
   if (/[\\\s\u0000-\u001f\u007f]/.test(value)) return false;
+  // URL() repairs missing slashes and empty/zero-padded ports. Reject those
+  // spellings up front: the database deliberately accepts explicit HTTPS
+  // authorities only, so an accepted editor link must not fail at save time.
+  if (!/^https:\/\/[^\s/?#:@]+(?::443)?(?:[/?#][^\s]*)?$/i.test(value)) return false;
   try {
     const url = new URL(value);
     return url.protocol === "https:" && !url.username && !url.password && (!url.port || url.port === "443");
@@ -50,7 +54,17 @@ export function isSafeHomePlayback(playback: HomePlayback) {
 }
 const playbackSchema = z.object({ kind: z.enum(HOME_PLAYBACK_KINDS), url: text(2048) }).strict()
   .refine(isSafeHomePlayback, "Use a direct .mp3, .m4a, .ogg or .wav URL, or a supported Spotify / YouTube link matching the selected source.")
-  .transform(value => ({ ...value, url: value.kind === "spotify" || value.kind === "youtube" ? new URL(value.url).href : value.url }));
+  .transform(value => {
+    if (value.kind !== "spotify" && value.kind !== "youtube") return value;
+    const url = new URL(value.url);
+    // URLSearchParams reads percent-encoded keys/IDs, whereas the SQL boundary
+    // validates the serialized first v parameter. Persist that exact validated
+    // value in an unambiguous spelling, including removal of duplicate v keys.
+    if (value.kind === "youtube" && url.pathname === "/watch") {
+      url.searchParams.set("v", url.searchParams.get("v")!);
+    }
+    return { ...value, url: url.href };
+  });
 
 export const homeReleaseSchema = z.object({
   eyebrow: text(220), title: text(220), subtitle: text(500), body: text(2000),

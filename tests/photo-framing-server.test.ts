@@ -155,6 +155,9 @@ function actionCases() {
 }
 describe.each(actionCases())("$page photo framing server action", ({ page, section, payload, versions, run }) => {
   function form() { const data = new FormData(); data.set("section", section); data.set("payload", JSON.stringify(payload)); data.set("versions", JSON.stringify(versions)); return data; }
+  function actionRpcFor(response: unknown) {
+    return vi.fn(() => { const result = Promise.resolve(response); return Object.assign(result, { abortSignal: vi.fn(() => result) }); });
+  }
   it("authenticates and rejects a wrong origin before privileged database access", async () => {
     mocks.auth.mockRejectedValueOnce(new Error("unauthorized")); await expect(run(form())).rejects.toThrow("unauthorized");
     expect(mocks.service).not.toHaveBeenCalled();
@@ -162,18 +165,20 @@ describe.each(actionCases())("$page photo framing server action", ({ page, secti
     expect(mocks.service).not.toHaveBeenCalled();
   });
   it("uses a single atomic crop write and preserves the normal successful response", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { canonicalSection: payload, versions }, error: null }); mocks.service.mockReturnValue({ rpc });
+    const savedVersions = page === "home" ? { updatedAt: "2026-09-23T10:00:01.000001Z" } : versions;
+    const rpc = actionRpcFor({ data: { canonicalSection: payload, versions: savedVersions }, error: null }); mocks.service.mockReturnValue({ rpc });
     expect(await run(form())).toMatchObject({ status: "saved" });
     expect(rpc).toHaveBeenCalledExactlyOnceWith("save_photo_section_with_framing_v2", expect.objectContaining({ p_page: page, p_section: section, p_versions: versions }));
   });
   it("does not retry a missing additive write using a crop-dropping legacy save", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST202", message: "save_photo_section_with_framing_v2 missing" } }); mocks.service.mockReturnValue({ rpc });
+    const rpc = actionRpcFor({ data: null, error: { code: "PGRST202", message: "save_photo_section_with_framing_v2 missing" } }); mocks.service.mockReturnValue({ rpc });
     const result = await run(form()); expect(result).toMatchObject({ status: "migration-required" }); expect(result.message).toContain("0051");
     expect(rpc).toHaveBeenCalledTimes(1); expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.revalidate).not.toHaveBeenCalled();
   });
   it("does not retry ambiguous transport errors or publish a success", async () => {
-    const rpc = vi.fn().mockRejectedValue(new Error("connection interrupted")); mocks.service.mockReturnValue({ rpc });
-    await expect(run(form())).rejects.toThrow("connection interrupted");
+    const rpc = vi.fn(() => { const result = Promise.reject(new Error("connection interrupted")); return Object.assign(result, { abortSignal: vi.fn(() => result) }); }); mocks.service.mockReturnValue({ rpc });
+    if (page === "home") expect(await run(form())).toMatchObject({ status: "error" });
+    else await expect(run(form())).rejects.toThrow("connection interrupted");
     expect(rpc).toHaveBeenCalledTimes(1); expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.revalidate).not.toHaveBeenCalled();
   });
 });

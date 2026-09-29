@@ -93,9 +93,18 @@ await rejects("release", { ...release, background: { src: "", alt: "", framing: 
 await rejects("release", { ...release, title: "x".repeat(221) });
 await rejects("release", { ...release, primaryLabel: "Listen", primaryHref: "" });
 for (const href of ["javascript:alert(1)", "//evil.example/", "/\\evil.example/", "https://user:secret@example.com/", "https://example.com:444/", "https://exam ple.com/"]) await rejects("release", { ...release, primaryHref: href });
+for (const href of ["https:example.com/song.mp3", "https:/example.com/song.mp3", "https:///example.com/song.mp3", "https:////example.com/song.mp3", "https://example.com:/song.mp3", "https://example.com:0443/song.mp3", "https://example.com:000443/song.mp3", "https://[::1]/song.mp3"]) {
+  await rejects("release", { ...release, primaryHref: href });
+  await rejects("release", { ...release, playback: { kind: "audio", url: href } });
+}
 for (const playback of [{ kind: "none", url: "https://example.com/a.mp3" }, { kind: "audio", url: "https://example.com/page" }, { kind: "audio", url: "javascript:alert(1).mp3" }, { kind: "spotify", url: "https://evil.example/track/1111111111111111111111" }, { kind: "spotify", url: "https://open.spotify.com/track/too-short" }, { kind: "youtube", url: "https://evil.example/watch?v=dQw4w9WgXcQ" }, { kind: "youtube", url: "https://youtube.com/watch?v=bad" }, { kind: "iframe", url: "https://example.com/" }]) await rejects("release", { ...release, playback });
 for (const url of ["https://youtube.com/watch?v=bad&v=dQw4w9WgXcQ", "https://youtube.com/watch?foo=bar#&v=dQw4w9WgXcQ"]) await rejects("release", { ...release, playback: { kind: "youtube", url } });
 for (const playback of [{ kind: "none", url: "" }, { kind: "audio", url: "/audio/sample.mp3" }, { kind: "audio", url: "https://cdn.example.com/sample.M4A?token=fixture" }, { kind: "spotify", url: "https://open.spotify.com/track/1111111111111111111111?si=fixture" }, { kind: "spotify", url: "https://open.spotify.com/intl-cs/embed/album/1111111111111111111111" }, { kind: "youtube", url: "https://youtu.be/dQw4w9WgXcQ" }, { kind: "youtube", url: "https://www.youtube.com/watch?feature=share&v=dQw4w9WgXcQ" }, { kind: "youtube", url: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" }]) assert.deepEqual((await save("release", { ...release, playback })).canonicalSection.playback, playback);
+// The application resolves encoded/duplicate v keys before this boundary.
+for (const url of ["https://www.youtube.com/watch?v=abcdefghijk", "https://www.youtube.com/watch?v=abcdefghijk&t=20"]) {
+  const playback = { kind: "youtube", url };
+  assert.deepEqual((await save("release", { ...release, playback })).canonicalSection.playback, playback);
+}
 for (const cards of [work.cards.slice(1), work.cards.map(() => work.cards[0]), work.cards.map((item, index) => index ? item : { ...item, id: "other" }), work.cards.map((item, index) => index ? item : { ...item, tone: "blue" })]) await rejects("work", { ...work, cards });
 for (const item of [{ ...pressItem, title: "" }, { ...pressItem, publication: "" }, { ...pressItem, quote: "", href: "" }, { ...pressItem, id: "not-a-uuid" }, { ...pressItem, date: "2026-02-30" }, { ...pressItem, date: "2025-02-29" }, { ...pressItem, kind: "other" }, { ...pressItem, visible: "true" }, { ...pressItem, extra: true }]) await rejects("press", { ...press, items: [item] });
 await rejects("press", { ...press, items: [pressItem, pressItem] });

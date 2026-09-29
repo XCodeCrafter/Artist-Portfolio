@@ -43,6 +43,12 @@ function clientFor(response: unknown) {
   const rpc = vi.fn(() => ({ abortSignal }));
   return { client: { rpc } as unknown as SupabaseClient, rpc, abortSignal };
 }
+function actionRpcFor(response: unknown) {
+  return vi.fn(() => {
+    const result = Promise.resolve(response);
+    return Object.assign(result, { abortSignal: vi.fn(() => result) });
+  });
+}
 beforeEach(() => { vi.clearAllMocks(); mocks.auth.mockResolvedValue({ id: "admin-id" }); mocks.origin.mockResolvedValue(true); mocks.audit.mockResolvedValue({ ok: true }); });
 
 describe("additive Hero framing snapshot bridge", () => {
@@ -104,14 +110,14 @@ describe("Hero framing write routing", () => {
 
 describe.each(cases)("$page Hero framing server action", ({ page, legacy, run }) => {
   it.each([framing, null])("saves the configured frame or explicit reset through the atomic wrapper", async crop => {
-    const payload = { ...hero, framing: crop }; const rpc = vi.fn().mockResolvedValue({ data: { canonicalSection: payload, versions: nextVersions }, error: null }); mocks.service.mockReturnValue({ rpc });
+    const payload = { ...hero, framing: crop }; const rpc = actionRpcFor({ data: { canonicalSection: payload, versions: nextVersions }, error: null }); mocks.service.mockReturnValue({ rpc });
     expect(await run(form(payload))).toMatchObject({ status: "saved", canonicalSection: payload, versions: nextVersions });
     expect(rpc).toHaveBeenCalledExactlyOnceWith("save_hero_with_framing_v2", { p_page: page, p_site_id: "main", p_expected_updated_at: versions.updatedAt, p_payload: payload });
     expect(mocks.audit).toHaveBeenCalledTimes(1); expect(mocks.revalidate).toHaveBeenCalled();
     expect(JSON.stringify(mocks.audit.mock.calls)).not.toContain("framing");
   });
   it("does not switch a legacy Hero draft to the new write API", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: { canonicalSection: hero, versions: nextVersions }, error: null }); mocks.service.mockReturnValue({ rpc });
+    const rpc = actionRpcFor({ data: { canonicalSection: hero, versions: nextVersions }, error: null }); mocks.service.mockReturnValue({ rpc });
     expect(await run(form(hero))).toMatchObject({ status: "saved", canonicalSection: hero });
     expect(rpc).toHaveBeenCalledExactlyOnceWith(legacy, expect.objectContaining({ p_payload: hero, p_expected_updated_at: versions.updatedAt }));
   });
@@ -130,15 +136,17 @@ describe.each(cases)("$page Hero framing server action", ({ page, legacy, run })
     mocks.origin.mockResolvedValueOnce(false); expect(await run(form({ ...hero, framing }))).toMatchObject({ status: "security-error" }); expect(mocks.service).not.toHaveBeenCalled();
   });
   it("asks for 0046 without falling back to a write that could drop the crop", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST202", message: "Could not find save_hero_with_framing_v2 in schema cache" } }); mocks.service.mockReturnValue({ rpc });
+    const rpc = actionRpcFor({ data: null, error: { code: "PGRST202", message: "Could not find save_hero_with_framing_v2 in schema cache" } }); mocks.service.mockReturnValue({ rpc });
     const result = await run(form({ ...hero, framing })); expect(result).toMatchObject({ status: "migration-required", section: "hero" }); expect(result.message).toContain("0046"); expect(rpc).toHaveBeenCalledTimes(1); expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.revalidate).not.toHaveBeenCalled();
   });
   it("keeps the draft after an exact-version conflict without publication or retry", async () => {
-    const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "40001", message: "hero changed" } }); mocks.service.mockReturnValue({ rpc });
+    const rpc = actionRpcFor({ data: null, error: { code: "40001", message: "hero changed" } }); mocks.service.mockReturnValue({ rpc });
     expect(await run(form({ ...hero, framing }))).toMatchObject({ status: "conflict" }); expect(rpc).toHaveBeenCalledTimes(1); expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.revalidate).not.toHaveBeenCalled();
   });
   it("does not retry an ambiguous transport failure on the legacy save endpoint", async () => {
-    const rpc = vi.fn().mockRejectedValue(new Error("connection interrupted")); mocks.service.mockReturnValue({ rpc });
-    await expect(run(form({ ...hero, framing }))).rejects.toThrow("connection interrupted"); expect(rpc).toHaveBeenCalledTimes(1); expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.revalidate).not.toHaveBeenCalled();
+    const rpc = vi.fn(() => { const result = Promise.reject(new Error("connection interrupted")); return Object.assign(result, { abortSignal: vi.fn(() => result) }); }); mocks.service.mockReturnValue({ rpc });
+    if (page === "home") expect(await run(form({ ...hero, framing }))).toMatchObject({ status: "error" });
+    else await expect(run(form({ ...hero, framing }))).rejects.toThrow("connection interrupted");
+    expect(rpc).toHaveBeenCalledTimes(1); expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.revalidate).not.toHaveBeenCalled();
   });
 });

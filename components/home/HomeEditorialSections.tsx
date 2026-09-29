@@ -69,6 +69,7 @@ export function formatHomeAudioTime(seconds: number) {
 function DirectAudioPlayer({ source, title }: { source: string; title: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const mounted = useRef(false);
+  const attemptRef = useRef<{ timer: ReturnType<typeof setTimeout> | null } | null>(null);
   const [playing, setPlaying] = useState(false);
   const [pending, setPending] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -78,29 +79,75 @@ function DirectAudioPlayer({ source, title }: { source: string; title: string })
   useEffect(() => {
     mounted.current = true;
     const audio = audioRef.current;
-    return () => { mounted.current = false; audio?.pause(); };
+    return () => {
+      mounted.current = false;
+      if (attemptRef.current?.timer) clearTimeout(attemptRef.current.timer);
+      attemptRef.current = null;
+      if (audio) {
+        audio.pause();
+        // Abort the pending fetch/play promise as well as stopping audible playback.
+        audio.removeAttribute("src");
+        audio.load();
+      }
+    };
   }, []);
+
+  function finishAttempt() {
+    if (attemptRef.current?.timer) clearTimeout(attemptRef.current.timer);
+    attemptRef.current = null;
+    setPending(false);
+  }
+
+  function failPlayback(message: string) {
+    finishAttempt();
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    setPlaying(false);
+    setDuration(0);
+    setCurrentTime(0);
+    setError(message);
+  }
 
   async function togglePlayback() {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || attemptRef.current) return;
     if (!audio.paused) { audio.pause(); return; }
     setError("");
     setPending(true);
+    const attempt = { timer: null as ReturnType<typeof setTimeout> | null };
+    attemptRef.current = attempt;
+    // A media host can leave play() unsettled indefinitely; keep the player retryable.
+    attempt.timer = setTimeout(() => {
+      if (mounted.current && attemptRef.current === attempt) {
+        failPlayback("Audio is taking too long to load. Try again, or use a listening link below.");
+      }
+    }, 15000);
     // Even a metadata request to an external audio host waits for this deliberate click.
     if (!audio.getAttribute("src")) audio.src = source;
-    try { await audio.play(); }
+    try {
+      await audio.play();
+      if (mounted.current && attemptRef.current === attempt) {
+        finishAttempt();
+        setPlaying(!audio.paused);
+      }
+    }
     catch {
-      if (mounted.current) setError("Playback could not start. Try again, or use a listening link below.");
-    } finally { if (mounted.current) setPending(false); }
+      if (mounted.current && attemptRef.current === attempt) {
+        failPlayback("Playback could not start. Try again, or use a listening link below.");
+      }
+    }
   }
 
   return <>
     <audio ref={audioRef} preload="none"
       onDurationChange={event => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : 0)}
-      onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
-      onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)}
-      onError={() => { setPlaying(false); setPending(false); setError("This audio could not be loaded. Please use a listening link below."); }} />
+      onTimeUpdate={event => setCurrentTime(Number.isFinite(event.currentTarget.currentTime) ? event.currentTarget.currentTime : 0)}
+      onPlaying={() => { finishAttempt(); setPlaying(true); }} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)}
+      onError={() => failPlayback("This audio could not be loaded. Please use a listening link below.")} />
     <TrackLine progress={duration ? currentTime / duration : 0} />
     <div className={styles.playback}>
       <button type="button" className={styles.playButton} disabled={pending} aria-label={`${playing ? "Pause" : "Play"} ${title || "latest release"}`} onClick={togglePlayback}>
@@ -225,12 +272,14 @@ function PressScan({ image }: { image: HomeEditorialImage }) {
 }
 
 function PressReader({ items, initialId, onClose }: { items: HomePressItem[]; initialId: string; onClose: () => void }) {
-  const [index, setIndex] = useState(Math.max(0, items.findIndex(item => item.id === initialId)));
+  const [selectedId, setSelectedId] = useState(initialId);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const backdropPointerDown = useRef(false);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const titleId = useId();
-  const item = items[Math.min(index, items.length - 1)];
+  const index = Math.max(0, items.findIndex(item => item.id === selectedId));
+  const item = items[index];
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -248,23 +297,43 @@ function PressReader({ items, initialId, onClose }: { items: HomePressItem[]; in
   }, []);
 
   function navigate(direction: number) {
-    setIndex(current => Math.max(0, Math.min(items.length - 1, current + direction)));
+    setSelectedId(current => {
+      const currentIndex = Math.max(0, items.findIndex(entry => entry.id === current));
+      return items[Math.max(0, Math.min(items.length - 1, currentIndex + direction))]?.id ?? current;
+    });
     dialogRef.current?.scrollTo({ top: 0, behavior: "instant" });
   }
 
+  function isBackdrop(event: { currentTarget: HTMLDialogElement; target: EventTarget; clientX: number; clientY: number }) {
+    if (event.currentTarget !== event.target) return false;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  }
+
+  if (!item) return null;
+
   return <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId}
     onCancel={event => { event.preventDefault(); onClose(); }}
-    onClick={event => { if (event.currentTarget === event.target) onClose(); }}
+    onPointerDown={event => { backdropPointerDown.current = isBackdrop(event); }}
+    onPointerCancel={() => { backdropPointerDown.current = false; }}
+    onClick={event => {
+      const startedOnBackdrop = backdropPointerDown.current;
+      backdropPointerDown.current = false;
+      if (startedOnBackdrop && isBackdrop(event)) onClose();
+    }}
     onKeyDown={event => {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       if (event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable=true], [role=region]")) return;
       if (event.key === "ArrowLeft") { event.preventDefault(); navigate(-1); }
       if (event.key === "ArrowRight") { event.preventDefault(); navigate(1); }
     }}
     onTouchStart={event => {
-      if (event.target instanceof Element && event.target.closest("input, [role=region]")) { swipeStart.current = null; return; }
+      if (event.target instanceof Element && event.target.closest("a, button, input, textarea, select, [contenteditable=true], [role=region]")) { swipeStart.current = null; return; }
       const touch = event.touches[0];
-      swipeStart.current = event.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
+      swipeStart.current = event.touches.length === 1 && touch ? { x: touch.clientX, y: touch.clientY } : null;
     }}
+    onTouchMove={event => { if (event.touches.length !== 1) swipeStart.current = null; }}
+    onTouchCancel={() => { swipeStart.current = null; }}
     onTouchEnd={event => {
       const start = swipeStart.current;
       swipeStart.current = null;
@@ -281,7 +350,7 @@ function PressReader({ items, initialId, onClose }: { items: HomePressItem[]; in
       </button>
     </header>
     <article className={styles.pressEntry} data-has-image={Boolean(item.image.src)}>
-      {item.image.src ? <PressScan key={item.id} image={item.image} /> : null}
+      {item.image.src ? <PressScan key={`${item.id}:${item.image.src}`} image={item.image} /> : null}
       <div className={styles.entryText}>
         <p className={styles.eyebrow}>{PRESS_KIND_LABELS[item.kind]}</p>
         <h3 id={titleId}>{item.title}</h3>

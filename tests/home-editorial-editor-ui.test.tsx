@@ -221,9 +221,29 @@ describe("Home editorial versioned save integration", () => {
     select("Selected work"); field("desktop-home-work-title", "First heading");
     mocks.save.mockResolvedValue(result("work", draft().work)); await mocks.action!(form());
     field("desktop-home-work-title", "Second heading");
-    mocks.save.mockResolvedValue(result("work", draft().work)); const data = form(); await mocks.action!(data);
+    mocks.save.mockResolvedValue({ ...result("work", draft().work), versions: { updatedAt: "2026-09-29T14:00:01.000002Z" } }); const data = form(); await mocks.action!(data);
     expect(mocks.save).toHaveBeenLastCalledWith(INITIAL_HOME_SAVE_STATE, data);
     expect(mocks.save).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(hidden("versions")).updatedAt).toBe("2026-09-29T14:00:01.000002Z");
+    expect(button("Save Selected work").props.disabled).toBe(true);
+  });
+  it.each(["unchanged-version", "wrong-section", "malformed-content"])("preserves dirty sections and CAS on an unconfirmed saved response: %s", async failure => {
+    select("Selected work"); field("desktop-home-work-title", "Keep unsaved work");
+    select("Latest release"); field("desktop-home-release-releaseTitle", "Keep unsaved release");
+    const before = structuredClone(draft());
+    const response = result("release", before.release);
+    if (failure === "unchanged-version") response.versions = { updatedAt: version };
+    if (failure === "wrong-section") { response.section = "work"; response.canonicalSection = before.work; }
+    if (failure === "malformed-content") response.canonicalSection = {};
+    mocks.save.mockResolvedValue(response);
+    const state = await mocks.action!(form());
+    expect(state.status).toBe("error");
+    expect(draft()).toEqual(before);
+    expect(JSON.parse(hidden("versions"))).toEqual({ updatedAt: version });
+    expect(button("Save Latest release").props.disabled).toBe(true);
+    expect(button("Discard section changes").props.disabled).toBe(true);
+    await mocks.action!(form());
+    expect(mocks.save).toHaveBeenCalledOnce();
   });
   it("locks an unavailable migration, including direct change handler invocations", () => {
     props.snapshot.editorialAvailable = undefined;
@@ -232,6 +252,16 @@ describe("Home editorial versioned save integration", () => {
     expect(button("Save Selected work").props.disabled).toBe(true);
     expect(content()).toContain("migration 0055"); expect(preview().props.isLive).toBe(false);
     expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it("announces a confirmed save warning without claiming the public cache was refreshed", async () => {
+    select("Selected work"); field("desktop-home-work-title", "Saved heading");
+    const message = "Section saved. The page cache could not be fully refreshed.";
+    mocks.save.mockResolvedValue({ ...result("work", draft().work), message });
+    await mocks.action!(form());
+    const announcement = find(node => node.type === "p" && node.props.role === "status");
+    expect(text(announcement.props.children as ReactNode)).toBe(`Selected work: ${message}`);
+    expect(JSON.parse(hidden("versions"))).toEqual({ updatedAt: nextVersion });
+    expect(button("Save Selected work").props.disabled).toBe(true);
   });
   it("keeps unsaved content after an uncertain save and requires reconciliation", async () => {
     select("Latest release"); field("desktop-home-release-releaseTitle", "Keep this release");
