@@ -79,6 +79,26 @@ The CSP expansion is limited to `media-src https:` for admin-authored audio URLs
 
 ## Verification tools
 
+### About glass and production editor copy cleanup
+
+Removed the Home-only `opacity: .035 !important` override that suppressed the
+existing About glass backdrop. Original layered images, pointer movement, mobile
+opacity and reduced-motion handling remain unchanged, as do authored About text,
+portrait and framing. Optimized browser checks confirm desktop opacity 0.7,
+mobile opacity 0.13, and pointer-responsive background positions.
+
+Removed the temporary AI-placeholder setup paragraph from Release, Selected work
+and Press inspectors, plus the sample-review announcement in the empty Press
+state. Kept functional format help, validation/save/migration messages and public
+configuration privacy warnings. Test-only fixture disclosures and media alt text
+are not production callouts and remain unchanged.
+
+Verification: 5,459 tests / 195 files, typecheck, lint and production build pass.
+The real production build was checked locally on desktop and mobile; the actual
+inspector UI confirms the setup note is absent and the privacy warning remains.
+Verification used no migration or hosted content write. Production deployment
+is a separate release step.
+
 ### Production Interlude alignment fix
 
 The optimized production CSS removed a `translate: none` reset while Tailwind's

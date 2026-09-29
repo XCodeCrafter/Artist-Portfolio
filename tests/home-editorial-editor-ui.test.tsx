@@ -105,9 +105,24 @@ describe("Home editorial section inspector", () => {
     expect(draft().layout.find(item => item.id === "press")?.enabled).toBe(false);
     expect(mocks.save).not.toHaveBeenCalled();
   });
+  it.each(["Latest release", "Selected work", "Press & reviews"])("omits temporary photo setup copy from %s", label => {
+    select(label);
+    const copy = content();
+    expect(copy).not.toContain("The supplied photos are AI-generated placeholders.");
+    expect(copy).not.toContain("Replace them here whenever your own photos are ready.");
+    expect(copy).not.toContain("Position and zoom are saved separately for every image, on desktop and mobile.");
+  });
+  it("keeps the empty Press guidance and privacy warning without a sample-review announcement", () => {
+    select("Press & reviews");
+    expect(draft().press.items).toEqual([]);
+    const copy = content();
+    expect(copy).toContain("No press items yet.");
+    expect(copy).not.toContain("No sample reviews will be published.");
+    expect(copy).toContain("Hidden content remains in the public Home configuration — it is not private.");
+    expect(copy).toContain("Do not enter confidential drafts here.");
+  });
   it("edits direct audio and listening links separately, with no player when unset", () => {
     select("Latest release");
-    expect(content()).toContain("AI-generated placeholders");
     expect(render().some(node => node.props.id === "desktop-home-release-playback-url")).toBe(false);
     field("desktop-home-release-releaseTitle", "New single");
     field("desktop-home-release-playback-kind", "audio"); field("desktop-home-release-playback-url", "https://audio.example.com/song.mp3");

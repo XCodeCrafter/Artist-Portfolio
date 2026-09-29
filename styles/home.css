@@ -49,7 +49,6 @@
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
-.home-sections #home-about .parallax-shards { opacity: .035 !important; }
 .home-sections .home-about-photo { border-radius: 4px; background: var(--home-surface); }
 .home-sections .home-about-photo-mark { display: none; }
 .home-sections .home-interlude-inner { padding-block: var(--home-section-space); }

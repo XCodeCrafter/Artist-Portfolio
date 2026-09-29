@@ -44,6 +44,18 @@ describe("Home visual integration", () => {
     expect(css).toContain(".home-page > footer .footer-pointer-glow { opacity: 0; }");
   });
 
+  it.each(["public", "preview"] as const)("preserves About's original glass parallax in %s without a Home dimming override", mode => {
+    const data = createHomeDraftFromContent(FALLBACK_CONTENT);
+    data.layout = data.layout.map(row => ({ ...row, enabled: row.id === "about" }));
+    const html = renderToStaticMarkup(<HomePageView data={data} mode={mode} programs={[]} />);
+    expect(html).toContain("parallax-shards");
+    expect(html).toContain("mask-radial");
+    expect(html).toContain(data.about.body);
+    // The shared backdrop owns opacity, including its mobile/reduced-motion
+    // behavior; Home's visual integration must not suppress the existing glass.
+    expect(css).not.toMatch(/[^{}]*\.parallax-shards[^{}]*\{[^}]*\}/);
+  });
+
   it("clips Home Interlude parallax without a scrollport that can displace its shade on focus", () => {
     const panelStyles = css.match(/\.home-sections #home-feature \.home-interlude-panel\s*\{([^}]+)\}/)?.[1];
     expect(panelStyles).toMatch(/overflow:\s*clip\s*;/);

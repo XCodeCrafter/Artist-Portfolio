@@ -45,6 +45,12 @@ Home “Artist freelancer life” placement; do not delete shared media or Galle
       production pipeline; public/preview/legacy regression tests added. 5,453
       tests, typecheck, lint and production build pass; 390/768/1280/1850px browser
       checks confirm panel bounds, video coverage and retained clipping.
+- [x] Restore About's existing glass parallax by removing the Home-only 3.5%
+      opacity override; preserve original motion, mobile styling, copy and photo.
+      Remove temporary AI-photo setup notes from all three Home editorial
+      inspectors and the sample-review announcement from empty Press. Functional
+      validation, privacy and save warnings remain. 5,459 tests, typecheck, lint,
+      production build and desktop/mobile browser checks pass. No migration.
 - [ ] Add real release and attributed press content in Home.
       Release/Press stay hidden until ready; no fake endorsements.
       Verify one hosted save/reload and playback with the actual chosen source.

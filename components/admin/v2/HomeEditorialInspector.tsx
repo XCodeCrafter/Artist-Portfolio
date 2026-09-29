@@ -82,10 +82,8 @@ export default function HomeEditorialInspector({ section, draft, assets, errors,
   const image = (path: string, label: string, value: HomeEditorialImage, onChange: (next: HomeEditorialImage) => void, shape?: "landscape" | "portrait" | "square") => <ImageField
     id={`${baseId}-${path.replaceAll(".", "-")}`} path={path} label={label} value={value} onChange={onChange}
     assets={assets} errors={errors} device={device} onDeviceChange={onDeviceChange} saveSection={section === "release" ? "Latest release" : section === "work" ? "Selected work" : "Press & reviews"} shape={shape} />;
-  const intro = <p className="rounded-2xl bg-white/5 p-4 text-xs leading-5 text-white/55">The supplied photos are AI-generated placeholders. Replace them here whenever your own photos are ready. Position and zoom are saved separately for every image, on desktop and mobile.</p>;
 
   if (section === "release") return <div className="grid gap-5">
-    {intro}
     {field("eyebrow", "Small label")}{field("title", "Heading", true)}{field("subtitle", "Subtitle", false, 500)}{field("body", "Description", true, 2000)}
     <details className={boxClass}><summary className="cursor-pointer text-xs font-semibold text-white/75">Background photo</summary>
       {image("background", "Release background", draft.release.background, background => patch({ background }))}
@@ -119,7 +117,7 @@ export default function HomeEditorialInspector({ section, draft, assets, errors,
   </div>;
 
   if (section === "work") return <div className="grid gap-5">
-    {intro}{field("eyebrow", "Small label")}{field("title", "Heading", true)}{field("body", "Introduction", true, 2000)}{field("note", "Handwritten note", true, 500)}
+    {field("eyebrow", "Small label")}{field("title", "Heading", true)}{field("body", "Introduction", true, 2000)}{field("note", "Handwritten note", true, 500)}
     <details className={boxClass}><summary className="cursor-pointer text-xs font-semibold text-white/75">Atmosphere photo</summary>
       {image("background", "Work background", draft.work.background, background => patch({ background }))}
     </details>
@@ -168,7 +166,7 @@ export default function HomeEditorialInspector({ section, draft, assets, errors,
     patch({ items });
   };
   return <div className="grid gap-5">
-    {intro}{field("eyebrow", "Small label")}{field("title", "Heading", true)}{field("body", "Introduction", true, 2000)}{field("buttonLabel", "Browse press button", false, 100)}
+    {field("eyebrow", "Small label")}{field("title", "Heading", true)}{field("body", "Introduction", true, 2000)}{field("buttonLabel", "Browse press button", false, 100)}
     <details className={boxClass}><summary className="cursor-pointer text-xs font-semibold text-white/75">Background photo</summary>
       {image("background", "Press background", press.background, background => patch({ background }))}
     </details>
@@ -222,7 +220,7 @@ export default function HomeEditorialInspector({ section, draft, assets, errors,
             setRemoveId(""); setSelectedPressId("");
           }}>Confirm removal</button><button type="button" className={buttonClass} onClick={() => setRemoveId("")}>Keep item</button></div>
         </div> : <button type="button" className={`${buttonClass} justify-self-start`} onClick={() => setRemoveId(selected.id)}><FaTrash /> Remove press item</button>}
-      </> : <p className="text-xs leading-5 text-white/45">No press items yet. Add a real quotation, article, interview or radio feature when ready. No sample reviews will be published.</p>}
+      </> : <p className="text-xs leading-5 text-white/45">No press items yet. Add a real quotation, article, interview or radio feature when ready.</p>}
     </section>
   </div>;
 }
