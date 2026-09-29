@@ -160,7 +160,8 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
           {textField("identity", "tagline", "Short profile tagline", "Shown in the top strip of every portfolio footer.")}
           {textField("identity", "location", "Based in", `Shared with ${LIVE_CONTACT_PAGE_LABEL}.`)}
           {textField("identity", "contactBlurb", "Collaboration introduction", `Shown below the footer invitation and on ${LIVE_CONTACT_PAGE_LABEL}.`, true)}
-          {textField("identity", "description", "Site description", "Used for HOME search results and shared-link previews; other page descriptions remain automatic.", true)}
+          {textField("identity", "description", "Site description", "Default introduction for HOME search results and shared links. A custom description in Sharing & SEO takes priority.", true)}
+          <Link href="/admin/v2/settings/sharing" className="text-xs underline underline-offset-4">Link title, description & preview cover → Sharing &amp; SEO</Link>
           <Link href="/admin/v2/navigation" className="text-xs underline underline-offset-4">Owner name and platform links → Navbar</Link>
         </div> : <div className="mt-6 grid gap-5">
           <div className="flex flex-wrap gap-2">{([{ id: "callout", label: "Invitation & buttons" }, { id: "social", label: "Social headings" }] as const).map((region) => <button key={region.id} type="button" className={buttonClass} aria-pressed={footerRegion === region.id} onClick={() => setFooterRegion(region.id)}>{region.label}</button>)}</div>

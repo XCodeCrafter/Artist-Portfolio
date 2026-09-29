@@ -2,7 +2,32 @@
 
 Updated: 2026-09-29
 
-## Current focus — Home editorial sections (owner-approved)
+## Current focus — editable Sharing & SEO
+
+- [x] Separate Home link/search title from the campaign hero heading. Use the
+      owner's saved name for person identity; keep subpage URLs and SEO distinct.
+- [x] Add Settings → Sharing & SEO with editable title, description, public cover
+      and alt text, live preview, safe save/recovery and media usage protection.
+      Automatic 1200 × 630 microphone card matches the existing dark/orange site.
+- [x] Prepare private singleton migration **0056_site_sharing_metadata.sql** and
+      ten read-only checks. No existing Home or identity content is rewritten.
+- [x] Local verification: **5,572 tests / 202 files**, typecheck, lint, production
+      build and isolated PostgreSQL/PGlite passed. Production PNG returned 200;
+      crawler HTML contains OG/Twitter metadata in head. Browser checks covered
+      desktop, 390/320px, custom image save/reload, conflict, lost response and
+      missing migration. No hosted write or messaging-app delivery test claimed.
+- [x] Owner applied **0056** and confirmed all ten matching checks true by
+      screenshot on 2026-09-29. No hosted SQL executed by the agent; do not replay.
+- [ ] Owner rollout: push/deploy the prepared code, reload Sharing & SEO and
+      confirm a real save/new link share.
+      Existing messages/third-party caches can retain previous previews.
+- [ ] Resume the parked ImageKit account/key checkpoint below after this feature;
+      no ImageKit keys or flag changes are needed for social previews.
+
+Details: [Sharing & SEO](docs/site-sharing.md). The owner said Vercel was resolved;
+do not continue the previous manual Vercel deployment/login workflow.
+
+## Previous focus — Home editorial sections (owner-approved)
 
 Owner approved Latest release + Selected work + compact Press & reviews on
 2026-09-29, retaining the monochrome/red photographic design. Replace the old

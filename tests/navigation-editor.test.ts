@@ -403,9 +403,11 @@ describe("Admin V2 shell helpers", () => {
       "inbox",
       "insights",
       "appearance",
+      "sharing",
       "settings",
     ]);
     expect(getAdminV2ActiveItem("/admin/v2").key).toBe("overview");
+    expect(getAdminV2ActiveItem("/admin/v2/settings/sharing").key).toBe("sharing");
     expect(getAdminV2ActiveItem("/admin/v2/navigation").key).toBe(
       "navigation"
     );

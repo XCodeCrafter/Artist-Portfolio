@@ -581,6 +581,10 @@ V2 move requires no database migration.
 - Canonical URLs, page-specific Open Graph/Twitter metadata, a web manifest,
   and `WebSite`, `Person`, and `ProfilePage` structured data are generated from
   the published content.
+- **Settings → Sharing & SEO** controls Home's link/search title, description and
+  a shared social cover. Includes an automatic dark 1200 × 630 image and a custom
+  Media Library cover option. Apply **0056_site_sharing_metadata.sql** and its
+  matching checks. See [sharing setup and cache behavior](docs/site-sharing.md).
 
 Set one canonical HTTPS `SITE_URL`/`NEXT_PUBLIC_SITE_URL`, add the exact
 verification token from Google Search Console as `GOOGLE_SITE_VERIFICATION`,

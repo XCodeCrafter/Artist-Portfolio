@@ -27,6 +27,7 @@ import {
   FaMusic,
   FaPalette,
   FaShieldAlt,
+  FaShareAlt,
   FaUserAlt,
   FaTimes,
   FaVideo,
@@ -85,6 +86,7 @@ function iconFor(key: AdminV2NavigationKey) {
     media: <FaImages />,
     insights: <FaChartLine />,
     appearance: <FaPalette />,
+    sharing: <FaShareAlt />,
     settings: <FaShieldAlt />,
   };
   return icons[key];

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { PageSlug, PortfolioContent } from "@/lib/content";
 import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
+import { resolveSiteSharing, SOCIAL_IMAGE_SIZE } from "@/lib/site-sharing-preview";
 import {
   getSiteUrl,
   isNonProductionVercelDeployment,
@@ -70,7 +71,8 @@ function neutralSiteDescription(location: string) {
 
 export function getSeoIdentity(content: PortfolioContent) {
   const brandName = cleanText(content.settings.artistName) || "Artist Portfolio";
-  const personName = cleanText(content.heroes.home.title) || brandName;
+  // A campaign headline (e.g. CIGAR BOX) is not the artist's identity.
+  const personName = brandName;
   const location = cleanText(content.settings.location);
   const configuredDescription = cleanText(content.settings.description);
   // The owner controls saved copy. Demo cleanup belongs in an explicit migration,
@@ -132,17 +134,18 @@ function pageDescription(content: PortfolioContent, page: PublicSeoPage) {
 
 export function getPageSeo(content: PortfolioContent, page: PublicSeoPage) {
   const identity = getSeoIdentity(content);
+  const sharing = resolveSiteSharing(content.settings);
   const label = pageLabel(page);
   const legalPage = page === "privacy" || page === "terms";
   const title = legalPage
     ? joinUnique([label, identity.brandName])
     : page === "home"
-      ? joinUnique([identity.personName, label, identity.brandName])
+      ? sharing.title
       : joinUnique([label, identity.personName, identity.brandName]);
 
   return {
     ...identity,
-    description: pageDescription(content, page),
+    description: page === "home" ? sharing.description : pageDescription(content, page),
     label,
     path: PAGE_PATHS[page],
     title,
@@ -154,6 +157,13 @@ export function createPageMetadata(
   page: PublicSeoPage
 ): Metadata {
   const seo = getPageSeo(content, page);
+  const sharing = resolveSiteSharing(content.settings);
+  const image = {
+    url: new URL(sharing.imageSrc || sharing.generatedImagePath, `${getSiteUrl()}/`).href,
+    alt: sharing.imageAlt,
+    // Custom covers keep their intrinsic dimensions; never advertise a false ratio.
+    ...(sharing.imageSrc ? {} : { ...SOCIAL_IMAGE_SIZE, type: "image/png" }),
+  };
 
   return {
     title: { absolute: seo.title },
@@ -165,25 +175,13 @@ export function createPageMetadata(
       title: seo.title,
       description: seo.description,
       url: seo.path,
-      images: [
-        {
-          url: "/opengraph-image",
-          width: 1200,
-          height: 630,
-          alt: `${seo.title} portfolio preview`,
-        },
-      ],
+      images: [image],
     },
     twitter: {
       card: "summary_large_image",
       title: seo.title,
       description: seo.description,
-      images: [
-        {
-          url: "/twitter-image",
-          alt: `${seo.title} portfolio preview`,
-        },
-      ],
+      images: [image],
     },
   };
 }

@@ -5,6 +5,7 @@ import { normalizeFooterContent } from "./footer";
 import { normalizeHeroFraming } from "./hero-framing";
 import { applyPublicPhotoFramings } from "./photo-framing";
 import { loadPublicPhotoFramings } from "./photo-framing.server";
+import { loadPublicSiteSharing } from "./site-sharing.server";
 import { PAGE_SLUGS, normalizeHiddenNavPageSlugs } from "./modules";
 import {
   normalizeBodyFont,
@@ -539,6 +540,7 @@ async function readSupabaseContent(
     actorResume,
     actorCredits,
     photoFramings,
+    sharingMetadata,
   ] = await Promise.all([
     supabase
       .from("site_settings")
@@ -663,6 +665,7 @@ async function readSupabaseContent(
       .order("sort_order", { ascending: true })
       .returns<ActorCreditRow[]>(),
     loadPublicPhotoFramings(supabase),
+    loadPublicSiteSharing(supabase),
   ]);
 
   const errors = [
@@ -709,7 +712,7 @@ async function readSupabaseContent(
   const mappedSettings = mapSettings(settingsRow);
 
   const content: PortfolioContent = {
-    settings: mappedSettings,
+    settings: { ...mappedSettings, ...(sharingMetadata ? { sharingMetadata } : {}) },
     navigation: resolveNavigationConfig({
       version: mappedSettings.navigationConfigVersion,
       rows: navigationResult.data ?? [],

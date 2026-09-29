@@ -96,6 +96,13 @@ export const ADMIN_V2_NAVIGATION = [
     group: "Settings",
   },
   {
+    key: "sharing",
+    href: "/admin/v2/settings/sharing",
+    label: "Sharing & SEO",
+    description: "Link text and preview cover",
+    group: "Settings",
+  },
+  {
     key: "settings",
     href: "/admin/v2/settings",
     label: "Settings",

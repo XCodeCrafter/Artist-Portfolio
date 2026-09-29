@@ -5,6 +5,7 @@ import {
   FaListUl,
   FaPalette,
   FaShieldAlt,
+  FaShareAlt,
   FaTools,
   FaUserAlt,
 } from "react-icons/fa";
@@ -33,7 +34,7 @@ export default function AdminV2SettingsPage() {
               Settings
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-white/46">
-              Fonts, profile text, footer content, dashboard access, and technical
+              Fonts, profile text, sharing previews, footer content, dashboard access, and technical
               checks now have one predictable home. Pick the subject; the
               implementation details can keep their dramatic monologues to
               themselves.
@@ -85,6 +86,16 @@ export default function AdminV2SettingsPage() {
             <span className="mt-5 inline-flex items-center gap-2 text-[11px] font-semibold text-white/48 transition group-hover:text-white">
               Edit fonts, profile or footer <FaArrowRight className="text-[9px]" />
             </span>
+          </Link>
+
+          <Link className={cardClass} href="/admin/v2/settings/sharing">
+            <div className="flex items-start justify-between gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-2xl border border-[#ff674f]/18 bg-[#ff3b1f]/9 text-[#ff806c]"><FaShareAlt /></span>
+              <FaArrowRight className="mt-3 text-[10px] text-white/22 transition group-hover:translate-x-0.5 group-hover:text-white/64" />
+            </div>
+            <h3 className="heading-ui mt-5 text-xl font-semibold text-white">Sharing &amp; SEO</h3>
+            <p className="mt-2 text-xs leading-5 text-white/38">Edit the title, description and cover people see when sharing your website on WhatsApp, Messenger and other apps. Preview the result before saving.</p>
+            <span className="mt-5 inline-flex items-center gap-2 text-[11px] font-semibold text-white/48 transition group-hover:text-white">Edit link previews <FaArrowRight className="text-[9px]" /></span>
           </Link>
 
           <Link className={cardClass} href="/admin/v2/navigation">

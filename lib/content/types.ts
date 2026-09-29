@@ -62,6 +62,7 @@ export type HeroContent = {
 };
 
 export type SiteSettings = {
+  sharingMetadata?: import("./site-sharing").SharingMetadata;
   footerContent?: import("./footer").FooterContent;
   portfolioType: PortfolioType;
   navigationConfigVersion: NavigationConfigVersion;
