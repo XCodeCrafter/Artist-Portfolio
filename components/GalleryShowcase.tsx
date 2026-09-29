@@ -625,6 +625,7 @@ function GalleryInterlude({
   posterFraming,
   title,
   videoSrc,
+  contained = false,
   flushTop = false,
   staticPreview = false,
   label,
@@ -638,6 +639,7 @@ function GalleryInterlude({
   posterFraming?: HeroFraming | null;
   title: string;
   videoSrc: string;
+  contained?: boolean;
   flushTop?: boolean;
   staticPreview?: boolean;
   label?: string;
@@ -689,7 +691,10 @@ function GalleryInterlude({
   return (
     <section
       className={cx(
-        "home-interlude-panel relative left-1/2 h-[72svh] min-h-[560px] w-screen max-w-[1800px] -translate-x-1/2 overflow-hidden border-y border-white/10 bg-black lg:h-[78svh] lg:max-h-[860px] lg:min-h-[620px]",
+        "home-interlude-panel relative h-[72svh] min-h-[560px] overflow-hidden border-y border-white/10 bg-black lg:h-[78svh] lg:max-h-[860px] lg:min-h-[620px]",
+        // Home already provides a full-width container. Do not emit breakout
+        // translation utilities and rely on a CSS reset surviving optimization.
+        contained ? "w-full max-w-none" : "left-1/2 w-screen max-w-[1800px] -translate-x-1/2",
         flushTop ? "mt-0" : "mt-24 sm:mt-32"
       )}
       ref={sectionRef}
@@ -971,6 +976,7 @@ export default function GalleryShowcase({
           <>
             {narrativeSection !== "stories" ? <GalleryInterlude
               body={interludeBody ?? presentation.interludeEyebrow}
+              contained={narrativeSection === "feature"}
               ctaHref={interludeCtaHref}
               ctaLabel={interludeCtaLabel}
               flushTop

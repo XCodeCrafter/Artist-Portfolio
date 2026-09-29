@@ -61,9 +61,6 @@
   /* Parallax overscan must be clipped without creating an inner scrollport:
      focusing the player controls would otherwise move the fixed overlays. */
   overflow: clip;
-  left: auto;
-  translate: none;
-  transform: none;
   border-color: #ffffff12;
   background: var(--home-surface);
 }

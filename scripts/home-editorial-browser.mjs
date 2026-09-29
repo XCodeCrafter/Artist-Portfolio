@@ -56,7 +56,9 @@ export async function buildHomeFixture() {
   const chunks = outputs.filter(item => item.type === "chunk");
   if (chunks.length !== 1 || !Object.keys(chunks[0].modules).some(id => id.replaceAll("\\", "/").endsWith("/tests/fixtures/home-editorial-actions.ts"))) throw new Error("Missing isolated Home action stub");
   const filename = path.join(root, "styles/globals.css");
-  const { css } = await postcss([tailwind({ base: root, optimize: false })]).process(await readFile(filename, "utf8"), { from: filename, map: false });
+  // Match production CSS optimization: unoptimized CSS can hide layout changes
+  // caused by folding independent transforms into the transform shorthand.
+  const { css } = await postcss([tailwind({ base: root, optimize: true })]).process(await readFile(filename, "utf8"), { from: filename, map: false });
   const privacyCss = await readFile(path.join(root, "styles/privacy.css"), "utf8");
   const componentCss = outputs.filter(item => item.type === "asset" && item.fileName.endsWith(".css")).map(item => item.source).join("\n");
   const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Home editorial · isolated QA</title><link rel="stylesheet" href="/fixture.css"></head><body><div id="fixture-root"></div><script defer src="/fixture.js"></script></body></html>';

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import HomePageView from "@/components/home/HomePageView";
+import GalleryShowcase from "@/components/GalleryShowcase";
 import { createHomeDraftFromContent } from "@/lib/admin/home-editor";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 
@@ -51,5 +52,26 @@ describe("Home visual integration", () => {
     const html = renderToStaticMarkup(<HomePageView data={data} mode="public" programs={[]} />);
     expect(html).toContain("home-interlude-shade pointer-events-none absolute inset-0");
     expect(html).toContain('aria-label="Pause interlude"');
+  });
+
+  it.each(["public", "preview"] as const)("keeps %s Home Interlude in its container without viewport breakout offsets", mode => {
+    const data = createHomeDraftFromContent(FALLBACK_CONTENT);
+    data.layout = data.layout.map(row => ({ ...row, enabled: row.id === "feature" }));
+    const html = renderToStaticMarkup(<HomePageView data={data} mode={mode} programs={[]} />);
+    const panelClasses = html.match(/class="(home-interlude-panel[^"]*)"/)?.[1].split(/\s+/);
+    expect(panelClasses).toContain("w-full");
+    expect(panelClasses).toContain("max-w-none");
+    for (const breakout of ["left-1/2", "-translate-x-1/2", "w-screen", "max-w-[1800px]"]) {
+      expect(panelClasses).not.toContain(breakout);
+    }
+  });
+
+  it("preserves viewport breakout for the legacy narrative outside the dedicated Home feature", () => {
+    const html = renderToStaticMarkup(<GalleryShowcase images={[]} mode="narrative" presentation={FALLBACK_CONTENT.galleryPresentation} />);
+    const panelClasses = html.match(/class="(home-interlude-panel[^"]*)"/)?.[1].split(/\s+/);
+    for (const breakout of ["left-1/2", "-translate-x-1/2", "w-screen", "max-w-[1800px]"]) {
+      expect(panelClasses).toContain(breakout);
+    }
+    expect(panelClasses).not.toContain("w-full");
   });
 });

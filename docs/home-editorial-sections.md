@@ -11,6 +11,10 @@ Implemented 2026-09-29. This replaces the public Home `stories` / “Artist free
 
 Do not run migration 0055 before old code has been replaced: the old application's strict parser does not understand the expanded Home draft. Do not use `supabase db push` to replay owner-confirmed migrations. No hosted migration or GitHub push is performed merely by implementing these files.
 
+Owner rollout update (2026-09-29): all nine 0055 checks were confirmed true by
+screenshot. Do not reapply it for the subsequent CSS fix. Hosted save/reload
+acceptance remains separate from those database checks.
+
 ## Admin use
 
 - **Latest release:** heading, copy, background, cover, title/artist, note, primary/secondary links and one selected playback source. The player and outbound listening links are independent.
@@ -74,6 +78,27 @@ The CSP expansion is limited to `media-src https:` for admin-authored audio URLs
 `public/images/home-editorial/{studio,guitar,press,live}.webp` are AI-generated illustrative photographs from the approved preview, not documentary images of the owner. Existing generated PNGs were copied/encoded to WebP (about 292 KB combined) without cropping or altering the originals. They are checked into the project so deployment never depends on a local Codex asset directory. Replace them through the admin when actual photographs are ready.
 
 ## Verification tools
+
+### Production Interlude alignment fix
+
+The optimized production CSS removed a `translate: none` reset while Tailwind's
+legacy `-translate-x-1/2` utility remained active. Together with `left: auto`, this
+shifted the whole Home panel (including text and controls) half its width left.
+The unoptimized browser fixture did not expose the failure.
+
+Home's dedicated feature panel now uses container width directly and never emits
+the viewport-breakout positioning utilities. Legacy narrative layout retains its
+existing centering. The fixture now compiles optimized CSS, with regression tests
+for this pipeline and both public/admin-preview Home markup.
+
+Verification: 5,453 tests / 195 files, typecheck, lint and production build pass.
+Optimized browser QA at 390, 768, 1280 and 1850px confirms matching panel/parent
+edges, full video coverage, no horizontal overflow, and no inner scroll on focus.
+The overlay still aligns with the panel's inner border edges. No migration or
+authored media/content change is needed.
+The actual `next build` / `next start` output was also checked at 390, 1280 and
+1850px: no translation, matching parent edges, aligned shade, and no horizontal
+overflow. This is independent of the isolated component fixture.
 
 ### Additional hardening after the initial push
 

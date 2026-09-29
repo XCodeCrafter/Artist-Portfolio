@@ -24,6 +24,10 @@ function request(url = "/", method = "GET", headers: Record<string, string | und
 }
 
 describe("isolated Home editorial browser fixture", () => {
+  it("runs the production CSS optimizer so browser QA catches transform folding", () => {
+    const builder = readFileSync(new URL("../scripts/home-editorial-browser.mjs", import.meta.url), "utf8");
+    expect(builder).toMatch(/tailwind\(\{\s*base:\s*root,\s*optimize:\s*true\s*\}\)/);
+  });
   it("keeps Home and footer direct siblings under the production Home styling boundary", () => {
     const fixture = readFileSync(new URL("./fixtures/home-editorial-browser.tsx", import.meta.url), "utf8");
     // .home-page > footer must apply just as it does to the production route.

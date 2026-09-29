@@ -38,10 +38,15 @@ Home “Artist freelancer life” placement; do not delete shared media or Galle
       warnings, and safer Press dialog/navigation gestures. 5,449 tests / 195 files,
       typecheck, lint, production build, PGlite and local browser checks passed.
       No new SQL migration or provider keys required.
-- [ ] Deploy new code **before** applying 0055. Pre-migration editor is read-only;
-      old deployed code cannot parse the new layout. No hosted SQL executed here.
-- [ ] Owner: apply 0055 and its checks, then add real release and attributed press
-      content in Home. Release/Press stay hidden until ready; no fake endorsements.
+- [x] Owner confirmed **0055** with all nine checks true by screenshot on
+      2026-09-29. No hosted SQL executed by the agent; do not replay old migrations.
+- [x] Fix production-only Interlude half-width offset: Home no longer emits the
+      legacy viewport breakout utilities. Optimized fixture CSS now matches the
+      production pipeline; public/preview/legacy regression tests added. 5,453
+      tests, typecheck, lint and production build pass; 390/768/1280/1850px browser
+      checks confirm panel bounds, video coverage and retained clipping.
+- [ ] Add real release and attributed press content in Home.
+      Release/Press stay hidden until ready; no fake endorsements.
       Verify one hosted save/reload and playback with the actual chosen source.
 - [ ] Return to the parked ImageKit owner-key/account-verification checkpoint
       below, plus pending live Events acceptance. Do not activate ImageKit flags.
