@@ -698,9 +698,12 @@ async function readSupabaseContent(
   const heroRows = heroes.data ?? [];
 
   if (!allowFallback) {
+    // A deliberately empty hero heading is valid; the owner identity lives in
+    // site_settings. Still require the published hero row and a string title.
+    const homeHero = heroRows.find((row) => row.page_slug === "home");
     const identityMissing =
       !settingsRow?.artist_name.trim() ||
-      !heroRows.find((row) => row.page_slug === "home")?.title.trim();
+      !homeHero || typeof homeHero.title !== "string";
     const requiredProfileMissing =
       !about.data?.[0] ||
       !bioProfile.data?.[0];

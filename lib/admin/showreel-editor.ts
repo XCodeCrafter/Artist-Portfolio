@@ -225,7 +225,7 @@ const optionalHref = text(2_048).refine(
 
 const heroFieldsSchema = z
   .object({
-    title: requiredText(220),
+    title: text(220),
     subtitle: text(220),
     ctaLabel: text(220),
     ctaHref: optionalHref,
@@ -356,7 +356,7 @@ const worksVersionsSchema = z.object({ items: versionMap }).strict();
 // source and current-copy validation remains on every save boundary above.
 const snapshotHeroSchema = z
   .object({
-    title: requiredText(220),
+    title: text(220),
     subtitle: text(220),
     ctaLabel: text(220),
     ctaHref: text(2_048),

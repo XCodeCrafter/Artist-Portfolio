@@ -81,7 +81,7 @@ const schemas = {
   press: homePressSchema,
   layout: layoutSchema,
   hero: z.object({
-    title: text(220).min(1), subtitle: text(500), ctaLabel: text(220), ctaHref: href,
+    title: text(220), subtitle: text(500), ctaLabel: text(220), ctaHref: href,
     backgroundSrc: media.refine(Boolean, "Choose a hero image or video."), posterSrc: media,
     framing: heroFramingSchema.nullable().optional(), mediaType: z.enum(["image", "video"]),
   }).strict().superRefine(requireCtaDestination),

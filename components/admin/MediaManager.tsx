@@ -1618,7 +1618,7 @@ function StudioHero({
               required
             />
             <div className="grid content-start gap-4 sm:grid-cols-2">
-              <Field label="Title" wide><TextInput defaultValue={hero.title} name="title" required /></Field>
+              <Field label="Title (optional)" wide><TextInput aria-describedby="gallery-hero-title-hint" defaultValue={hero.title} name="title" /><span className="mt-2 block text-xs text-white/45" id="gallery-hero-title-hint">Leave blank to hide the heading.</span></Field>
               <Field label="Subtitle"><TextInput defaultValue={hero.subtitle} name="subtitle" /></Field>
               <Field label="Button"><TextInput defaultValue={hero.ctaLabel} name="ctaLabel" /></Field>
               <Field label="Button link"><TextInput defaultValue={hero.ctaHref} name="ctaHref" /></Field>
@@ -1748,7 +1748,7 @@ function ShowreelHeroEditor({
               required
             />
             <div className="grid content-start gap-4 sm:grid-cols-2">
-              <Field label="Title" wide><TextInput defaultValue={hero.title} name="title" required /></Field>
+              <Field label="Title (optional)" wide><TextInput aria-describedby="showreel-hero-title-hint" defaultValue={hero.title} name="title" /><span className="mt-2 block text-xs text-white/45" id="showreel-hero-title-hint">Leave blank to hide the heading.</span></Field>
               <Field label="Subtitle"><TextInput defaultValue={hero.subtitle} name="subtitle" /></Field>
               <Field label="Button"><TextInput defaultValue={hero.ctaLabel} name="ctaLabel" /></Field>
               <Field label="Button link"><TextInput defaultValue={hero.ctaHref} name="ctaHref" /></Field>

@@ -220,14 +220,16 @@ function HeroInspector(props: InspectorProps) {
   const hero = props.draft.hero;
   return (
     <div className="grid gap-5">
-      <Field error={fieldMessage(props.errors, "title")} label="Main title" required>
+      <Field error={fieldMessage(props.errors, "title")} label="Main title (optional)">
         <input
+          aria-describedby={`${props.instance}-showreel-hero-title-hint`}
           className={inputClass}
           maxLength={220}
           onChange={(event) => props.onHeroChange({ title: event.target.value })}
           value={hero.title}
         />
       </Field>
+      <p className="-mt-3 text-xs text-white/45" id={`${props.instance}-showreel-hero-title-hint`}>Leave blank to hide the heading.</p>
       <Field error={fieldMessage(props.errors, "subtitle")} label="Subtitle">
         <textarea
           className={`${inputClass} min-h-24 resize-y`}

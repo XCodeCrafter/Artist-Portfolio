@@ -197,7 +197,7 @@ const optionalHref = text(2_048).refine(
 
 const bioHeroDraftSchema = z
   .object({
-    title: requiredText(220),
+    title: text(220),
     subtitle: text(220),
     ctaLabel: text(220),
     ctaHref: optionalHref,

@@ -87,6 +87,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Contact optional copy controls", () => {
+  it("keeps an empty hero heading editable, previewable and ready to save", () => {
+    expect(field("Main title").props.required).not.toBe(true);
+    expect(text(render())).toContain("Leave blank to hide the heading.");
+    change("Main title", "");
+    expect(field("Main title").props.value).toBe("");
+    expect(payload().title).toBe("");
+    expect(preview().hero.title).toBe("");
+    expect(button("Save Hero").props.disabled).toBe(false);
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
   it("labels both fields optional without HTML required constraints", () => {
     select(); expect(text(render())).toContain("Both fields are optional. Leave a field blank to hide that detail.");
     expect(field("Based in").props.required).not.toBe(true); expect(field("Collaboration introduction").props.required).not.toBe(true);

@@ -44,6 +44,7 @@ export default function PageHero({
   imageSrc,
   imageAlt,
 }: Props) {
+  const hasTitle = title.trim().length > 0;
   const bodyText = subtitle ?? text;
   const buttonText = ctaText ?? ctaLabel;
 
@@ -52,12 +53,12 @@ export default function PageHero({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         {/* Left / copy */}
         <div className="lg:col-span-7 max-w-[900px]">
-          <h1
+          {hasTitle && <h1
             className="text-6xl sm:text-8xl font-semibold tracking-tight accent"
             data-reveal="up"
           >
             {title}
-          </h1>
+          </h1>}
 
           {bodyText ? (
             <p
@@ -98,7 +99,7 @@ export default function PageHero({
             >
               <Image
                 src={imageSrc}
-                alt={imageAlt || `${title} image`}
+                alt={imageAlt || (hasTitle ? `${title} image` : "")}
                 fill
                 priority
                 sizes="(max-width: 1024px) 100vw, 40vw"

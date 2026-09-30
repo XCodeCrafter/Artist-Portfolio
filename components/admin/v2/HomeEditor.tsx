@@ -33,16 +33,18 @@ type Props = {
   mediaLoadError?: string;
 };
 
-function TextField({ id, label, value, onChange, multiline = false, errors, path, maxLength = 2000 }: {
+function TextField({ id, label, value, onChange, multiline = false, errors, path, maxLength = 2000, hint }: {
   id: string; label: string; value: string; onChange: (value: string) => void;
-  multiline?: boolean; errors: FieldErrors; path: string; maxLength?: number;
+  multiline?: boolean; errors: FieldErrors; path: string; maxLength?: number; hint?: string;
 }) {
   const error = errors[path]?.join(" ");
-  const props = { id, value, maxLength, className: inputClass, "aria-invalid": Boolean(error), "aria-describedby": error ? `${id}-error` : undefined };
+  const describedBy = [hint ? `${id}-hint` : undefined, error ? `${id}-error` : undefined].filter(Boolean).join(" ") || undefined;
+  const props = { id, value, maxLength, className: inputClass, "aria-invalid": Boolean(error), "aria-describedby": describedBy };
   return <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55" htmlFor={id}>
     {label}
     {multiline ? <textarea {...props} rows={4} onChange={(event) => onChange(event.target.value)} />
       : <input {...props} onChange={(event) => onChange(event.target.value)} />}
+    {hint ? <span id={`${id}-hint`} className="mt-2 block text-xs font-normal normal-case tracking-normal text-white/45">{hint}</span> : null}
     {error ? <span id={`${id}-error`} className="mt-2 block text-xs normal-case tracking-normal text-red-200">{error}</span> : null}
   </label>;
 }
@@ -58,10 +60,10 @@ function ContentInspector({ section, draft, assets, errors, instance, onChange, 
   }
   const value = draft[section];
   const patch = (fields: Record<string, unknown>) => onChange({ ...draft, [section]: { ...value, ...fields } });
-  const field = (key: string, label: string, multiline = false, maxLength = 2000) => <TextField
+  const field = (key: string, label: string, multiline = false, maxLength = 2000, hint?: string) => <TextField
     key={key} id={`${instance}-home-${section}-${key}`} path={key} errors={errors} label={label}
     value={String((value as unknown as Record<string, unknown>)[key] ?? "")} multiline={multiline} maxLength={maxLength}
-    onChange={(next) => patch({ [key]: next })} />;
+    onChange={(next) => patch({ [key]: next })} hint={hint} />;
   const media = (key: string, label: string, kind: "image" | "video" | "media") => <MediaAssetPicker
     key={`${instance}-${section}-${key}`} name={`${instance}-home-${section}-${key}`} assets={assets} kind={kind}
     label={label} error={errors[key]?.join(" ")} value={String((value as unknown as Record<string, unknown>)[key] ?? "")}
@@ -75,7 +77,7 @@ function ContentInspector({ section, draft, assets, errors, instance, onChange, 
   </div>;
 
   if (section === "hero") return <div className="grid gap-5">
-    {field("title", "Main title", false, 220)}{field("subtitle", "Subtitle", true, 220)}
+    {field("title", "Main title (optional)", false, 220, "Leave blank to hide the heading.")}{field("subtitle", "Subtitle", true, 220)}
     {media("backgroundSrc", "Background image or video", "media")}
     {draft.hero.mediaType === "video" ? media("posterSrc", "Video poster", "image") : null}{cta}
   </div>;

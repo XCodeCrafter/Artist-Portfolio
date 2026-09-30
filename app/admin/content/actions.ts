@@ -191,7 +191,7 @@ const navigationSettingsSchema = z.object({
 const heroSchema = z
   .object({
     pageSlug: z.enum(PAGE_SLUGS as [PageSlug, ...PageSlug[]]),
-    title: shortText.min(1),
+    title: shortText,
     subtitle: shortText,
     ctaLabel: shortText,
     ctaHref: safeHref,

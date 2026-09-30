@@ -116,7 +116,7 @@ const optionalHref = text(2_048).refine(
 
 const contactHeroDraftSchema = z
   .object({
-    title: requiredText(220),
+    title: text(220),
     subtitle: text(220),
     ctaLabel: text(220),
     ctaHref: optionalHref,
@@ -149,7 +149,7 @@ const singletonVersionsSchema = z.object({ updatedAt: timestamp }).strict();
 // deliberately stricter.
 const snapshotHeroSchema = z
   .object({
-    title: requiredText(1_000),
+    title: text(1_000),
     subtitle: text(1_000),
     ctaLabel: text(1_000),
     ctaHref: text(4_096),

@@ -298,7 +298,7 @@ function HeroSnapshot({
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/35" />
       <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.26em] text-white/60">{hero.subtitle}</p>
-        <h2 className="heading-ui mt-3 text-4xl font-semibold text-white sm:text-6xl">{hero.title}</h2>
+        {hero.title.trim() ? <h2 className="heading-ui mt-3 text-4xl font-semibold text-white sm:text-6xl">{hero.title}</h2> : null}
         {hero.ctaLabel ? <span className="mt-5 rounded-xl border border-white/25 px-4 py-2 text-xs font-semibold uppercase text-white">{hero.ctaLabel}</span> : null}
       </div>
     </div>
@@ -1727,8 +1727,9 @@ function HeroForms({
                 value={returnSection}
               />
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Title">
-                  <TextInput defaultValue={hero.title} name="title" required />
+                <Field label="Title (optional)">
+                  <TextInput aria-describedby={`${hero.pageSlug}-hero-title-hint`} defaultValue={hero.title} name="title" />
+                  <span className="mt-2 block text-xs text-white/45" id={`${hero.pageSlug}-hero-title-hint`}>Leave blank to hide the heading.</span>
                 </Field>
                 <Field label="Subtitle">
                   <TextInput defaultValue={hero.subtitle} name="subtitle" />

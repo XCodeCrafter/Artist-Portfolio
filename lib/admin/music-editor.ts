@@ -208,7 +208,7 @@ const heading = requiredText(220);
 
 const musicHeroDraftSchema = z
   .object({
-    title: requiredText(220),
+    title: text(220),
     subtitle: text(220),
     ctaLabel: text(220),
     ctaHref: optionalHref,
@@ -317,7 +317,7 @@ const soundcloudVersionsSchema = z
 
 const snapshotHeroDraftSchema = z
   .object({
-    title: requiredText(220),
+    title: text(220),
     subtitle: text(220),
     ctaLabel: text(220),
     ctaHref: optionalHref,

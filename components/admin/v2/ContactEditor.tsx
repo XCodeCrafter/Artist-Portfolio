@@ -198,18 +198,18 @@ function HeroInspector({
   const ctaHrefError = fieldMessage(errors, "ctaHref");
   return (
     <div className="grid gap-5">
-      <Field controlId={titleId} error={titleError} label="Main title" required>
+      <Field controlId={titleId} error={titleError} label="Main title (optional)">
         <input
-          aria-describedby={titleError ? `${titleId}-error` : undefined}
+          aria-describedby={`${titleId}-hint${titleError ? ` ${titleId}-error` : ""}`}
           aria-invalid={titleError ? true : undefined}
           className={inputClass}
           id={titleId}
           maxLength={220}
           onChange={(event) => onChange({ title: event.target.value })}
-          required
           value={draft.title}
         />
       </Field>
+      <p className="-mt-3 text-xs text-white/45" id={`${titleId}-hint`}>Leave blank to hide the heading.</p>
       <Field controlId={subtitleId} error={subtitleError} label="Subtitle">
         <textarea
           aria-describedby={subtitleError ? `${subtitleId}-error` : undefined}

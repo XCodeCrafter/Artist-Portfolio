@@ -42,6 +42,7 @@ export default function VideoHero({
   videoPosMobile = "50% 20%",
   videoPosDesktop = "50% 50%",
 }: Props) {
+  const hasTitle = title.trim().length > 0;
   const customFraming = normalizeHeroFraming(framing);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState<number | null>(null);
@@ -186,7 +187,7 @@ export default function VideoHero({
           ) : null}
 
           {/* Title: wrap only between words */}
-          <h1 className="select-none font-semibold tracking-tight leading-[0.95] text-[clamp(2.4rem,10vw,3.6rem)] sm:text-7xl md:text-8xl">
+          {hasTitle && <h1 className="select-none font-semibold tracking-tight leading-[0.95] text-[clamp(2.4rem,10vw,3.6rem)] sm:text-7xl md:text-8xl">
             <span className="inline-flex flex-wrap justify-center gap-x-3 gap-y-2">
               {wordLetters.map(({ letters, wIdx }) => (
                 <span key={`word-${wIdx}`} className="inline-flex whitespace-nowrap">
@@ -221,7 +222,7 @@ export default function VideoHero({
                 </span>
               ))}
             </span>
-          </h1>
+          </h1>}
 
           {/* CTA */}
           {ctaLabel && ctaHref ? (

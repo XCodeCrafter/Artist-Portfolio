@@ -1,8 +1,34 @@
 # Artist Portfolio V2 Roadmap
 
-Updated: 2026-09-29
+Updated: 2026-09-30
 
-## Current focus — optional Home transitions only
+## Current focus — optional Hero headings across all pages
+
+- [x] Allow an empty main Hero title in Home, Bio, Gallery, Music, Showreel and
+      Live & Contact, including legacy editors. Empty/whitespace input normalizes
+      to an empty string; saved snapshots preserve it without default copy.
+- [x] Hide only the main heading when blank. Keep the existing Hero height,
+      image/video, framing, subtitle and CTA; profile identity and search/share
+      metadata remain independent. Existing saved headings are not erased.
+- [x] Preserve the production required-content guard while accepting a blank
+      Home heading: require a real Home hero row, string title and owner identity.
+- [x] Prepare **0058_optional_hero_titles.sql** and eight matching read-only checks.
+      Change only six known database validators; retain type/length validation,
+      CAS, roles, media guards, framing and all existing content/timestamps.
+- [x] Verification: **5,671 tests / 208 files**, TypeScript, ESLint and production
+      build pass. Isolated PostgreSQL/PGlite passed all six blank/restored-title
+      save paths plus 54 read-only checks, safe reruns and drift/rollback tests.
+      Local browser verified blank-title save/reload and preserved image Hero
+      height on desktop; 390px mobile stays usable without horizontal overflow.
+- [x] Owner confirmed **0058** with all eight matching checks true by screenshot
+      on 2026-09-30 and authorized the GitHub push. No hosted SQL was executed
+      by the agent; do not replay the migration.
+- [ ] After deployment, verify a real blank-title save/reload in the online
+      editor. Migration checks alone do not confirm deployment or hosted saves.
+- [ ] Resume the parked ImageKit account/key checkpoint and live Events
+      acceptance afterwards; do not activate provider flags.
+
+## Previous focus — optional Home transitions only
 
 - [x] Owner clarified: keep the existing mobile AND desktop arrangement, sizes,
       section order, spacing, copy and media. The compact/reordered previews were

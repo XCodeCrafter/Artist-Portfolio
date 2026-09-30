@@ -103,7 +103,7 @@ const galleryPresentationSchema = z.object({
 
 const galleryHeroSchema = z
   .object({
-    title: z.string().trim().min(1).max(220),
+    title: z.string().trim().max(220),
     subtitle: z.string().trim().max(220),
     ctaLabel: z.string().trim().max(220),
     ctaHref: z.string().trim().max(1200).refine(isSafeCtaUrl),
