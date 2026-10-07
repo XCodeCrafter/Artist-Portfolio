@@ -2,7 +2,7 @@ import { z } from "zod";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import { BODY_FONT_KEYS, DISPLAY_FONT_KEYS, UI_FONT_KEYS } from "@/lib/content/fonts";
 import { FOOTER_EFFECTS } from "@/lib/content/types";
-import { DEFAULT_FOOTER_CONTENT, footerContentSchema } from "@/lib/content/footer";
+import { DEFAULT_FOOTER_CONTENT, footerContentSchema, normalizeFooterContent } from "@/lib/content/footer";
 
 export const APPEARANCE_EDITOR_SECTIONS = ["name", "appearance", "homeTransitions", "identity", "footer"] as const;
 export type AppearanceEditorSection = (typeof APPEARANCE_EDITOR_SECTIONS)[number];
@@ -90,7 +90,8 @@ export function parseAppearanceSubmission(section: unknown, payload: unknown, ve
 
 export function parseAppearanceEditorSnapshot(value: unknown): AppearanceEditorSnapshot | null {
   const parsed = z.object({ draft: snapshotDraftSchema, versions: versionsSchema }).strict().safeParse(value);
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) return null;
+  return { ...parsed.data, draft: { ...parsed.data.draft, footer: normalizeFooterContent(parsed.data.draft.footer) } };
 }
 
 export function createFallbackAppearanceEditorSnapshot(): AppearanceEditorSnapshot {

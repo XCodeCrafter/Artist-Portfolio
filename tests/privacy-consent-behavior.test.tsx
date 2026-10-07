@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PrivacyProvider from "@/components/privacy/PrivacyProvider";
 import PrivacyPreferences from "@/components/privacy/PrivacyPreferences";
 import ExternalMediaGate from "@/components/privacy/ExternalMediaGate";
+import GalleryFooter from "@/components/GalleryFooter";
+import { DEFAULT_FOOTER_CONTENT } from "@/lib/content/footer";
 import { ANALYTICS_SESSION_KEY, CONSENT_MAX_AGE_SECONDS, readConsentCookie, serializeConsentCookie } from "@/lib/privacy/consent";
 
 // A deterministic hook/effect store exercises real component callbacks without
@@ -43,7 +45,7 @@ vi.mock("react", async (original) => {
 });
 
 type Node = ReactElement<Record<string, unknown>>;
-type ConsentContext = { ready: boolean; analytics: boolean; externalMedia: boolean; openPreferences: () => void; allowExternalMedia: () => void };
+type ConsentContext = { ready: boolean; analytics: boolean; externalMedia: boolean; openPreferences: () => void; allowExternalMedia: () => void; registerFooterPrivacyControl: (element: HTMLElement) => () => void };
 function nodes(tree: ReactNode): Node[] {
   return Children.toArray(tree).flatMap(node => isValidElement<Record<string, unknown>>(node) ? [node, ...nodes(node.props.children as ReactNode)] : []);
 }
@@ -70,6 +72,22 @@ function preferences(onSave: (value: { analytics: boolean; externalMedia: boolea
   return PrivacyPreferences({ analytics: context().analytics, externalMedia: context().externalMedia, onSave, onClose });
 }
 function gate() { return ExternalMediaGate({ provider: "YouTube", children: <iframe src="https://www.youtube.com/embed/example" title="External clip" /> }); }
+function mountFooter(preview = false) {
+  mocks.active = "footer"; mocks.cursor = 0;
+  const tree = GalleryFooter({ artistName: "Owner", location: "Prague", socialLinks: [], content: DEFAULT_FOOTER_CONTENT, preview });
+  const control = findButton(tree, "Privacy choices");
+  const element = {} as HTMLButtonElement;
+  (control.props.ref as { current: HTMLButtonElement | null }).current = element;
+  flushEffects();
+  return { tree, element };
+}
+function hasFloatingControl(tree = provider()) { return nodes(tree).some(node => node.props.className === "privacy-reopen"); }
+type ObservedControl = { callback: IntersectionObserverCallback; options?: IntersectionObserverInit; observe: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn> };
+function intersect(observer: ObservedControl, element: HTMLElement, ratio: number) {
+  const rect = { x: 0, y: 0, width: 140, height: 44, top: 0, left: 0, right: 140, bottom: 44, toJSON: () => ({}) };
+  observer.callback([{ target: element, isIntersecting: ratio > 0, intersectionRatio: ratio, boundingClientRect: rect,
+    intersectionRect: { ...rect, height: rect.height * ratio, bottom: rect.bottom * ratio }, rootBounds: rect, time: 0 }], observer as unknown as IntersectionObserver);
+}
 
 let cookie = "";
 let cookieMode: "works" | "ignores-writes" | "throws-on-write" | "throws-on-read" = "works";
@@ -80,11 +98,12 @@ let intervals: Map<number, () => void>;
 let session: Map<string, string>;
 let removeSession: ReturnType<typeof vi.fn>;
 let channels: Array<{ onmessage: (() => void) | null; postMessage: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }>;
+let observers: ObservedControl[];
 
 beforeEach(() => {
   vi.clearAllMocks(); mocks.banks.clear(); mocks.effects = []; mocks.context = undefined;
   mocks.pathname = "/"; mocks.now = 1_790_000_000_000; mocks.cursor = 0; mocks.active = "provider";
-  cookie = ""; cookieMode = "works"; cookieWrites = []; windowEvents = new Map(); documentEvents = new Map(); intervals = new Map(); session = new Map(); channels = [];
+  cookie = ""; cookieMode = "works"; cookieWrites = []; windowEvents = new Map(); documentEvents = new Map(); intervals = new Map(); session = new Map(); channels = []; observers = [];
   vi.spyOn(Date, "now").mockImplementation(() => mocks.now);
   const documentStub = {
     body: { style: { overflow: "" } }, activeElement: null,
@@ -116,6 +135,10 @@ beforeEach(() => {
     onmessage: (() => void) | null = null;
     postMessage = vi.fn(); close = vi.fn();
     constructor() { channels.push(this); }
+  });
+  vi.stubGlobal("IntersectionObserver", class {
+    observe = vi.fn(); disconnect = vi.fn();
+    constructor(public callback: IntersectionObserverCallback, public options?: IntersectionObserverInit) { observers.push(this); }
   });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -254,6 +277,67 @@ describe("Privacy provider behavior", () => {
     expect(text(tree)).toContain("Public portfolio");
     expect(nodes(tree).some(node => node.props["aria-label"] === "Privacy choices")).toBe(false);
     expect(context()).toMatchObject({ analytics: false, externalMedia: false });
+  });
+});
+
+describe("Footer privacy control visibility", () => {
+  beforeEach(() => {
+    cookie = serializeConsentCookie({ analytics: false, externalMedia: false }, true, mocks.now).split(";")[0];
+    provider();
+  });
+  it("uses the actual footer control only when fully visible, then restores the floating control offscreen", () => {
+    expect(hasFloatingControl()).toBe(true);
+    const { tree, element } = mountFooter();
+    expect(observers).toHaveLength(1);
+    expect(observers[0].observe).toHaveBeenCalledExactlyOnceWith(element);
+    expect(observers[0].options).toEqual({ threshold: 1 });
+    intersect(observers[0], element, 0.99);
+    expect(hasFloatingControl()).toBe(true);
+    intersect(observers[0], element, 1);
+    expect(hasFloatingControl()).toBe(false);
+    click(tree, "Privacy choices");
+    expect(nodes(provider()).some(node => node.type === PrivacyPreferences)).toBe(true);
+    expect(context()).toMatchObject({ analytics: false, externalMedia: false });
+    expect(cookieWrites).toEqual([]);
+    intersect(observers[0], element, 0);
+    expect(hasFloatingControl()).toBe(true);
+  });
+  it("keeps a focused floating trigger through its dialog and hides it after focus leaves", () => {
+    const { element } = mountFooter();
+    const trigger = findButton(provider(), "Privacy settings");
+    (trigger.props.onFocus as () => void)();
+    intersect(observers[0], element, 1);
+    expect(hasFloatingControl()).toBe(true);
+    click(provider(), "Privacy settings");
+    const dialogTree = provider();
+    (findButton(dialogTree, "Privacy settings").props.onBlur as () => void)();
+    expect(hasFloatingControl()).toBe(true);
+    const dialog = nodes(provider()).find(node => node.type === PrivacyPreferences)!;
+    (dialog.props.onClose as () => void)();
+    expect(hasFloatingControl()).toBe(true);
+    (findButton(provider(), "Privacy settings").props.onBlur as () => void)();
+    expect(hasFloatingControl()).toBe(false);
+  });
+  it("restores the floating control on footer unmount and ignores queued observer callbacks", () => {
+    const { element } = mountFooter();
+    intersect(observers[0], element, 1);
+    expect(hasFloatingControl()).toBe(false);
+    for (const state of mocks.banks.get("footer")!) state.cleanup?.();
+    expect(observers[0].disconnect).toHaveBeenCalledOnce();
+    expect(hasFloatingControl()).toBe(true);
+    intersect(observers[0], element, 1);
+    expect(hasFloatingControl()).toBe(true);
+  });
+  it("does not register inert admin preview controls", () => {
+    mountFooter(true);
+    expect(observers).toHaveLength(0);
+    expect(hasFloatingControl()).toBe(true);
+  });
+  it("keeps the floating control available when visibility observation is unsupported", () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
+    mountFooter();
+    expect(observers).toHaveLength(0);
+    expect(hasFloatingControl()).toBe(true);
   });
 });
 

@@ -271,8 +271,9 @@ export default function NavbarSocialLinksManager({
 
   return (
     <form
+      id="platform-shortcuts"
       action={formAction}
-      className={`${panelClass} overflow-hidden`}
+      className={`${panelClass} scroll-mt-6 overflow-hidden`}
       data-unsaved-guard-bypass="true"
       noValidate
       onSubmit={(event) => {
@@ -298,8 +299,9 @@ export default function NavbarSocialLinksManager({
             </h2>
             <p className="mt-2 text-sm leading-6 text-white/44">
               Paste a profile URL and the matching icon is selected
-              automatically. Visible links appear in the navbar and shared
-              footer.
+              automatically. Published icons appear in the navbar and footer
+              in the same order. Labels appear in tooltips and identify links
+              for screen readers.
             </p>
           </div>
           <button

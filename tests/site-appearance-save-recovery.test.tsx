@@ -257,8 +257,12 @@ describe("Home transitions appearance section", () => {
     expect(button("Save profile & introduction").props.disabled).toBe(false);
     click("Footer content");
     expect(inspector().props.disabled).toBe(false);
-    change("site-footer-heading", "Editable invitation");
+    change("site-footer-primaryLabel", "Editable contact link");
     expect(button("Save footer content").props.disabled).toBe(false);
+    expect(nodes(inspector()).filter(node => ["input", "textarea"].includes(node.type as string)).map(node => node.props.id)).toEqual([
+      "site-footer-primaryLabel", "site-footer-primaryHref",
+    ]);
+    expect(JSON.parse(hidden("payload"))).toEqual({ ...snapshot.draft.footer, primaryLabel: "Editable contact link" });
   });
 
   it.each([{ isConfigured: false }, { migrationRequired: true }, { loadError: "Settings failed to load" }])("inherits unavailable settings protection %#", overrides => {

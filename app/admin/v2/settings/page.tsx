@@ -80,8 +80,9 @@ export default function AdminV2SettingsPage() {
             </h3>
             <p className="mt-2 text-xs leading-5 text-white/38">
               Choose fonts and the footer light. Edit your tagline, location,
-              introduction, site description, footer headings and buttons in the
-              same live preview, with a separate save for each section.
+              introduction, site description and footer contact link in the
+              live preview, with a separate save for each section. Manage the
+              shared platform icons in Navbar.
             </p>
             <span className="mt-5 inline-flex items-center gap-2 text-[11px] font-semibold text-white/48 transition group-hover:text-white">
               Edit fonts, profile or footer <FaArrowRight className="text-[9px]" />

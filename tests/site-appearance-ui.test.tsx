@@ -105,11 +105,12 @@ describe("Appearance and navbar name V2 controls", () => {
     expect(appearanceSource).toContain("JSON.stringify(nextSaved) === JSON.stringify(nextDraft)");
     appearance(); expect(mocks.guard).toHaveBeenCalledWith(undefined, true);
   });
-  it("offers live footer regions and no longer sends profile copy to Classic", () => {
+  it("offers live contact and platform regions without obsolete footer editing targets", () => {
     const html = appearance();
-    expect(html).toContain('aria-label="Edit Profile &amp; introduction"');
-    expect(html).toContain('aria-label="Edit Footer invitation &amp; buttons"');
-    expect(html).toContain('aria-label="Edit Footer social headings"');
+    expect(html).toContain('aria-label="Edit Footer contact link"');
+    expect(html).toContain('aria-label="Edit Footer platform links"');
+    expect(html).not.toContain('aria-label="Edit Profile &amp; introduction"');
+    expect(html.match(/data-footer-preview-region=/g)).toHaveLength(2);
     expect(html).toContain("Profile &amp; introduction");
     expect(html).toContain("Footer content");
     expect(read("app/admin/v2/settings/appearance/page.tsx")).not.toContain("/admin/content");
@@ -157,7 +158,9 @@ describe("Appearance and navbar name V2 controls", () => {
       const live = renderToStaticMarkup(<GalleryFooter {...props} />);
       expect(preview).toContain(`data-footer-effect="${footerEffect}"`);
       expect(preview).toContain('inert=""'); expect(live).not.toContain('inert=""');
-      expect(preview.includes("soul-orb__core")).toBe(footerEffect === "soul");
+      expect(preview).toContain("footer-pointer-glow");
+      expect(preview).not.toContain("soul-orb");
+      expect(preview).not.toContain("footer-pointer-entity");
     }
     expect(footerSource).toContain('window.matchMedia("(prefers-reduced-motion: reduce)").matches');
     expect(footerSource).toContain('event.pointerType === "touch"');

@@ -73,7 +73,7 @@
   padding-inline: var(--home-gutter);
   box-sizing: border-box;
 }
-/* A quieter Home outro, not a global footer redesign. */
+/* Keep the shared compact footer aligned with Home content. */
 .home-page > footer[data-footer-effect] { margin-top: 0; padding-inline: 0; background: var(--home-surface); }
 .home-page > footer .footer-content {
   width: 100%;
@@ -81,42 +81,13 @@
   padding-inline: var(--home-gutter);
   box-sizing: border-box;
 }
-.home-page > footer .footer-heading {
-  font-family: var(--font-display), Georgia, serif;
-  font-size: var(--home-heading-size);
-  font-weight: 400;
-  color: var(--home-ink);
-}
-.home-page > footer .footer-pointer-glow,
-.home-page > footer .footer-pointer-entity { opacity: .35; }
-.home-page > footer .footer-cool-wash { display: none; }
-.home-page > footer .footer-action-primary,
-.home-page > footer .footer-action-secondary {
-  min-height: 48px;
-  padding-inline: 20px;
-  border-radius: 2px;
-  font-size: 12px;
-  letter-spacing: .16em;
-  box-shadow: none;
-  transform: none;
-  white-space: normal;
-  text-align: center;
-}
-.home-page > footer .footer-action-primary { border-color: transparent; background: color-mix(in srgb, var(--home-accent) 70%, #000); }
-.home-page > footer .footer-action-primary:hover { background: color-mix(in srgb, var(--home-accent) 80%, #000); }
-.home-page > footer .footer-action-primary > span[aria-hidden] { display: none; }
-.home-page > footer .footer-action-secondary { background: transparent; border-color: #ffffff40; }
-.home-page > footer .footer-action-secondary:hover { background: #ffffff08; border-color: var(--home-ink); }
-.home-page > footer [data-footer-social-card] { border-radius: 4px; background: #ffffff03; box-shadow: none; }
 @media (min-width: 768px) {
   .home-sections .home-about-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 @media (max-width: 639px) {
   .home-sections #home-feature .home-interlude-panel { height: auto; min-height: 600px; }
   .home-sections .home-interlude-inner { min-height: 600px; }
-  .home-page > footer .footer-touch-ambient { opacity: .35; }
 }
 @media (prefers-reduced-motion: reduce) {
   .home-page > footer .footer-pointer-glow { opacity: 0; }
-  .home-page > footer .footer-pointer-entity { display: none; }
 }

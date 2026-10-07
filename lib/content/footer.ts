@@ -4,7 +4,7 @@ import { z } from "zod";
 export const DEFAULT_FOOTER_CONTENT = {
   eyebrow: "Let's make something",
   heading: "Ready for the next story",
-  primaryLabel: "Work together",
+  primaryLabel: "Bookings & enquiries",
   primaryHref: "/booking",
   secondaryLabel: "Showreel",
   secondaryHref: "/video",
@@ -44,7 +44,15 @@ export const footerContentSchema = z.object({
 });
 export type FooterContent = z.infer<typeof footerContentSchema>;
 
+/** Upgrade the old stock CTA without replacing an owner's custom label or link. */
+export function getFooterContactLabel(content: FooterContent) {
+  return content.primaryLabel === "Work together" && content.primaryHref === "/booking"
+    ? DEFAULT_FOOTER_CONTENT.primaryLabel : content.primaryLabel;
+}
+
 export function normalizeFooterContent(value: unknown): FooterContent {
   const parsed = footerContentSchema.safeParse(value);
-  return parsed.success ? parsed.data : { ...DEFAULT_FOOTER_CONTENT };
+  return parsed.success
+    ? { ...parsed.data, primaryLabel: getFooterContactLabel(parsed.data) }
+    : { ...DEFAULT_FOOTER_CONTENT };
 }

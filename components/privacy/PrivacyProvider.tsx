@@ -11,11 +11,13 @@ type PrivacyContextValue = {
   externalMedia: boolean;
   openPreferences: () => void;
   allowExternalMedia: () => void;
+  registerFooterPrivacyControl: (element: HTMLElement) => () => void;
 };
 
 const PrivacyContext = createContext<PrivacyContextValue>({
   ready: false, analytics: false, externalMedia: false,
   openPreferences: () => {}, allowExternalMedia: () => {},
+  registerFooterPrivacyControl: () => () => {},
 });
 
 export function usePrivacyConsent() { return useContext(PrivacyContext); }
@@ -27,8 +29,35 @@ export default function PrivacyProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
   const [storageError, setStorageError] = useState(false);
+  const [footerControlVisible, setFooterControlVisible] = useState(false);
+  const [reopenFocused, setReopenFocused] = useState(false);
+  const visibleFooterControls = useRef(new Set<HTMLElement>());
   const channel = useRef<BroadcastChannel | null>(null);
   const failClosed = useRef(false);
+
+  const registerFooterPrivacyControl = useCallback((element: HTMLElement) => {
+    // Without visibility observation, keep the persistent control available.
+    if (typeof IntersectionObserver === "undefined") return () => {};
+    let active = true;
+    const observer = new IntersectionObserver((entries) => {
+      if (!active) return;
+      for (const entry of entries) {
+        if (entry.target !== element) continue;
+        const fullyVisible = entry.isIntersecting && entry.intersectionRatio >= 1
+          && entry.boundingClientRect.width > 0 && entry.boundingClientRect.height > 0;
+        if (fullyVisible) visibleFooterControls.current.add(element);
+        else visibleFooterControls.current.delete(element);
+      }
+      setFooterControlVisible(visibleFooterControls.current.size > 0);
+    }, { threshold: 1 });
+    observer.observe(element);
+    return () => {
+      active = false;
+      observer.disconnect();
+      visibleFooterControls.current.delete(element);
+      setFooterControlVisible(visibleFooterControls.current.size > 0);
+    };
+  }, []);
 
   useEffect(() => {
     const sync = () => {
@@ -85,7 +114,7 @@ export default function PrivacyProvider({ children }: { children: ReactNode }) {
   const openPreferences = useCallback(() => setOpen(true), []);
 
   return (
-    <PrivacyContext.Provider value={{ ready, analytics, externalMedia, openPreferences, allowExternalMedia: () => save({ analytics, externalMedia: true }) }}>
+    <PrivacyContext.Provider value={{ ready, analytics, externalMedia, openPreferences, registerFooterPrivacyControl, allowExternalMedia: () => save({ analytics, externalMedia: true }) }}>
       {children}
       {!isAdmin && ready ? <>
         {!consent ? (
@@ -102,7 +131,11 @@ export default function PrivacyProvider({ children }: { children: ReactNode }) {
             </div>
           </section>
         ) : null}
-        {consent ? <button className="privacy-reopen" onClick={openPreferences} type="button" aria-label="Privacy settings" data-privacy-ui="true">Privacy choices <span aria-hidden="true">↗</span></button> : null}
+        {consent && (!footerControlVisible || reopenFocused) ? <button className="privacy-reopen" onClick={openPreferences}
+          onFocus={() => setReopenFocused(true)} onBlur={() => {
+            // Keep the dialog's return-focus target until focus leaves it again.
+            if (!open) setReopenFocused(false);
+          }} type="button" aria-label="Privacy settings" data-privacy-ui="true">Privacy choices <span aria-hidden="true">↗</span></button> : null}
         {storageError ? <p className="privacy-storage-error" role="alert">Your browser could not remember this choice. Optional features remain off. Allow this site to store its preference cookie and try again.</p> : null}
         {open ? <PrivacyPreferences analytics={analytics} externalMedia={externalMedia} onClose={() => setOpen(false)} onSave={save} /> : null}
       </> : null}

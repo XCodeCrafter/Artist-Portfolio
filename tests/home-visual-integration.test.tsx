@@ -28,6 +28,10 @@ describe("Home visual integration", () => {
     for (const selector of [".home-section-heading", ".home-interlude-panel", ".home-about-photo", ".cnc-showcase-inner"])
       expect(css).toMatch(new RegExp(`\\.home-sections[^{}]*${selector.replaceAll(".", "\\.")}`));
     expect(css).toContain(".home-page > footer[data-footer-effect]");
+    // Home shares the compact footer instead of reintroducing its previous
+    // large invitation, filled buttons, or social cards through overrides.
+    for (const obsolete of [".footer-heading", ".footer-action-primary", ".footer-action-secondary", "[data-footer-social-card]"])
+      expect(css).not.toContain(obsolete);
     expect(css).toContain(".home-sections #home-feature { padding-inline: 0; }");
     expect(css).toContain(".home-sections #home-feature > .gallery-showcase-inner { max-width: none; }");
     expect(css).not.toMatch(/(?:^|})\s*(?:h[1-6]|body|footer|\.heading-ui)\s*\{/m);

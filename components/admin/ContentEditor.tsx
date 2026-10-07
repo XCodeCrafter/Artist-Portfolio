@@ -42,6 +42,7 @@ import useUnsavedChangesGuard, {
   isGuardedFormResubmission,
 } from "@/components/admin/useUnsavedChangesGuard";
 import SocialPlatformIcon from "@/components/SocialPlatformIcon";
+import GalleryFooter from "@/components/GalleryFooter";
 import {
   getProfilePublicModules,
 } from "@/lib/content/modules";
@@ -852,33 +853,16 @@ function FooterSnapshot({ content }: { content: EditablePortfolioContent }) {
   return (
     <section className={sectionClass}>
       <p className={labelClass}>Shared footer preview</p>
-      <div className="mt-4 rounded-lg border border-white/10 bg-[#09090a] p-6 sm:p-8">
-        <p className="font-display text-4xl text-white">
-          {content.settings.artistName}
-        </p>
-        <p className="mt-3 max-w-md text-sm leading-6 text-white/52">
-          {content.settings.tagline}
-          {content.settings.location
-            ? ` · ${content.settings.location}`
-            : ""}
-        </p>
-        <div className="mt-6 flex flex-wrap gap-2">
-          {visibleLinks.map((link) => (
-            <span
-              className="inline-flex min-h-9 items-center gap-2 rounded-full border border-white/10 px-3 text-xs text-white/62"
-              key={link.id}
-            >
-              <SocialPlatformIcon
-                className="text-sm"
-                href={link.href}
-                iconKey={link.iconKey}
-                label={link.label}
-                platform={link.platform}
-              />
-              {link.label}
-            </span>
-          ))}
-        </div>
+      <p className="mt-2 text-sm leading-6 text-white/52">The saved footer with platform icons. Preview links are disabled.</p>
+      <div className="mt-4 overflow-hidden rounded-lg border border-white/10">
+        <GalleryFooter
+          artistName={content.settings.artistName}
+          location={content.settings.location}
+          footerEffect={content.settings.footerEffect}
+          content={content.settings.footerContent}
+          socialLinks={visibleLinks}
+          preview
+        />
       </div>
     </section>
   );
@@ -1267,8 +1251,8 @@ function FooterEffectPicker({ defaultValue }: { defaultValue: FooterEffect }) {
   }> = [
     {
       value: "soul",
-      title: "Living Soul",
-      description: "Warm, organic orb with a soft delayed movement.",
+      title: "White soul",
+      description: "Soft, warm-white glow following the pointer.",
     },
     {
       value: "red-light",
@@ -1283,8 +1267,8 @@ function FooterEffectPicker({ defaultValue }: { defaultValue: FooterEffect }) {
         Footer interaction
       </p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">
-        Choose the desktop pointer effect. Touch devices receive a subtle
-        static ambient glow instead.
+        Choose the subtle desktop hover glow. Pointer effects are hidden on
+        touch devices and when reduced motion is enabled.
       </p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {options.map((option) => {
@@ -3039,7 +3023,7 @@ function SocialLinksSection({
       badge={<span className="text-xs text-white/42">{items.length} links</span>}
       collapsible={false}
       defaultOpen
-      description="Social destinations shared by the public footer and navigation."
+      description="Platform icons linking to your profiles in the public footer and navigation."
       eyebrow="Public presence"
       id="socials-links"
       title="Footer links"
@@ -3062,8 +3046,9 @@ function SocialLinksSection({
             Logo is selected automatically
           </p>
           <p className="mt-1 text-sm leading-6 text-white/48">
-            Add any profile, set its order, or hide it. Published links appear
-            in both the public footer and social navigation.
+            Add any profile, set its order, or hide it. Published profiles appear
+            as icons in the footer and social navigation. Labels identify links
+            for screen readers and tooltips.
           </p>
         </div>
       </div>

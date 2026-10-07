@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { LIVE_CONTACT_PAGE_LABEL } from "@/lib/content/live-contact";
-import { useActionState, useEffect, useRef, useState, type CSSProperties, type ReactNode, type ChangeEvent } from "react";
+import { useActionState, useState, type CSSProperties, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import GalleryFooter, { type FooterPreviewRegion } from "@/components/GalleryFooter";
 import HomeTransitionsPreview from "@/components/admin/v2/HomeTransitionsPreview";
@@ -28,30 +28,6 @@ const sections: { id: Section; label: string }[] = [
 ];
 const inputClass = "mt-2 min-h-11 w-full rounded-xl border border-white/15 bg-[#08080a] px-3 py-2 text-sm font-normal outline-none focus:border-white/60";
 const buttonClass = "min-h-11 rounded-xl border border-white/15 px-4 text-xs font-semibold text-white/70 disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
-
-/** Scaled real rendering, rather than a duplicated approximation of the footer. */
-function FooterPreview({ children }: { children: ReactNode }) {
-  const host = useRef<HTMLDivElement>(null);
-  const canvas = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 1200, scale: 0.5, height: 420 });
-  useEffect(() => {
-    if (!host.current || !canvas.current) return;
-    const update = () => {
-      if (!host.current || !canvas.current) return;
-      const width = window.innerWidth < 768 ? 390 : 1200;
-      canvas.current.style.width = `${width}px`;
-      const scale = Math.min(1, host.current.clientWidth / width);
-      const height = canvas.current.offsetHeight * scale;
-      setSize((old) => old.width === width && old.scale === scale && old.height === height ? old : { width, scale, height });
-    };
-    const observer = new ResizeObserver(update);
-    observer.observe(host.current); observer.observe(canvas.current); update();
-    return () => observer.disconnect();
-  }, []);
-  return <div ref={host} className="relative min-w-0 overflow-hidden" style={{ height: size.height }} aria-label="Interactive footer preview">
-    <div ref={canvas} style={{ width: size.width, transform: `scale(${size.scale})`, transformOrigin: "top left" }}>{children}</div>
-  </div>;
-}
 
 export default function AppearanceEditor({ data, socialLinks }: { data: AdminAppearanceData; settings: SiteSettings; socialLinks: SocialLink[] }) {
   const router = useRouter();
@@ -132,11 +108,11 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
           <p className="mt-6 max-w-xl text-base leading-8 text-white/65">{draft.identity.description}</p>
           <p className="mt-3 text-sm leading-7 text-white/40">Příběhy, které stojí za pozornost. Žluťoučký kůň · 0123456789.</p>
         </div>}
-        {section !== "homeTransitions" && <><div className="border-t border-white/10 px-5 py-4 text-xs leading-5 text-white/45">The actual portfolio footer, scaled to fit. Click the introduction, invitation or social headings. Links are disabled; the pointer light stays interactive.</div>
-        <FooterPreview><GalleryFooter artistName={draft.name.artistName} {...draft.identity} socialLinks={socialLinks} content={draft.footer} footerEffect={appearance.footerEffect} preview
-          selectedRegion={section === "identity" ? "identity" : section === "footer" ? footerRegion : undefined}
-          onSelectRegion={(region) => { if (pending) return; if (region === "identity") setSection("identity"); else { setFooterRegion(region); setSection("footer"); } }} />
-        </FooterPreview></>}
+        {section !== "homeTransitions" && <><div className="border-t border-white/10 px-5 py-4 text-xs leading-5 text-white/45">The actual portfolio footer, adapted to this preview’s width. Click the contact link or platform icons to edit. Preview links are disabled. <Link href="/admin/v2/navigation#navbar-owner-title" className="underline underline-offset-4">Edit the artist name in Navbar.</Link></div>
+        <div className="min-w-0" aria-label="Interactive footer preview"><GalleryFooter artistName={draft.name.artistName} {...draft.identity} socialLinks={socialLinks} content={draft.footer} footerEffect={appearance.footerEffect} preview
+          selectedRegion={section === "footer" ? footerRegion : undefined}
+          onSelectRegion={(region) => { if (pending) return; setFooterRegion(region); setSection("footer"); }} />
+        </div></>}
         {section === "identity" && <div className="border-t border-white/10 p-5"><p className="text-[10px] uppercase tracking-[0.2em] text-white/40">Search / share description preview</p><p className="mt-3 text-lg text-white">{draft.name.artistName}</p><p className="mt-2 text-sm leading-6 text-white/60">{draft.identity.description || "An automatic portfolio description will be used."}</p></div>}
       </section>
       <fieldset disabled={blocked || pending} className="min-w-0 self-start rounded-[26px] border border-white/10 bg-[#101012] p-5 disabled:opacity-50 sm:p-6">
@@ -161,10 +137,10 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
             </label>)}</div>
           </fieldset>
         </> : section === "identity" ? <div className="mt-6 grid gap-5">
-          <p className="text-xs leading-6 text-white/45">Shared across the footer, {LIVE_CONTACT_PAGE_LABEL} and search previews. Your wording is kept, whether this portfolio is music, acting or both.</p>
-          {textField("identity", "tagline", "Short profile tagline", "Shown in the top strip of every portfolio footer.")}
+          <p className="text-xs leading-6 text-white/45">Profile text for {LIVE_CONTACT_PAGE_LABEL} and search previews. The compact footer shows your artist name, contact link and platform icons.</p>
+          {textField("identity", "tagline", "Short profile tagline", "Your short site-wide profile description.")}
           {textField("identity", "location", "Based in", `Shared with ${LIVE_CONTACT_PAGE_LABEL}.`)}
-          {textField("identity", "contactBlurb", "Collaboration introduction", `Shown below the footer invitation and on ${LIVE_CONTACT_PAGE_LABEL}.`, true)}
+          {textField("identity", "contactBlurb", "Collaboration introduction", `Shown on ${LIVE_CONTACT_PAGE_LABEL}.`, true)}
           {textField("identity", "description", "Site description", "Default introduction for HOME search results and shared links. A custom description in Sharing & SEO takes priority.", true)}
           <Link href="/admin/v2/settings/sharing" className="text-xs underline underline-offset-4">Link title, description & preview cover → Sharing &amp; SEO</Link>
           <Link href="/admin/v2/navigation" className="text-xs underline underline-offset-4">Owner name and platform links → Navbar</Link>
@@ -187,18 +163,13 @@ export default function AppearanceEditor({ data, socialLinks }: { data: AdminApp
           {state.section === "homeTransitions" && state.fieldErrors?.enabled && <p id="home-transitions-error" className="text-xs text-amber-200">{state.fieldErrors.enabled.join(" ")}</p>}
           <p className="text-xs leading-6 text-white/45">Default: OFF. The preview follows this draft; save to publish the setting.</p>
         </div> : <div className="mt-6 grid gap-5">
-          <div className="flex flex-wrap gap-2">{([{ id: "callout", label: "Invitation & buttons" }, { id: "social", label: "Social headings" }] as const).map((region) => <button key={region.id} type="button" className={buttonClass} aria-pressed={footerRegion === region.id} onClick={() => setFooterRegion(region.id)}>{region.label}</button>)}</div>
+          <div className="flex flex-wrap gap-2">{([{ id: "callout", label: "Contact link" }, { id: "social", label: "Platform icons" }] as const).map((region) => <button key={region.id} type="button" className={buttonClass} aria-pressed={footerRegion === region.id} onClick={() => setFooterRegion(region.id)}>{region.label}</button>)}</div>
           {footerRegion === "social" ? <>
-            {textField("footer", "socialEyebrow", "Small social label")}
-            {textField("footer", "socialHeading", "Social heading")}
-            <Link href="/admin/v2/navigation" className="text-xs underline underline-offset-4">Add or change platform links → Navbar</Link>
+            <p className="text-xs leading-6 text-white/55">Your footer and navbar share the same platform links and order. Add, reorder or hide icons in Navbar. Labels appear in tooltips and identify links for screen readers.</p>
+            <Link href="/admin/v2/navigation#platform-shortcuts" className="inline-flex min-h-11 items-center text-xs underline underline-offset-4">Manage platform icons → Navbar</Link>
           </> : <>
-            {textField("footer", "eyebrow", "Small invitation label")}
-            {textField("footer", "heading", "Main footer heading")}
-            {textField("footer", "primaryLabel", "Primary button label", "Clear both label and destination to hide this button.")}
-            {textField("footer", "primaryHref", "Primary button destination", "Example: /booking, /music or https://your-site.com")}
-            {textField("footer", "secondaryLabel", "Secondary button label")}
-            {textField("footer", "secondaryHref", "Secondary button destination")}
+            {textField("footer", "primaryLabel", "Contact link label", "Clear both label and destination to hide this link.")}
+            {textField("footer", "primaryHref", "Contact link destination", "Example: /booking, /music or https://your-site.com")}
           </>}
         </div>}
       </fieldset>
