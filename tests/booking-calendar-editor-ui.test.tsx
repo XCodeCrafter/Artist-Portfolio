@@ -89,7 +89,7 @@ beforeEach(() => {
     snapshot: {
       updatedAt: version,
       draft: {
-        settings: { enabled: true, title: "See you out there.", intro: "Public performances" },
+        settings: { enabled: true, title: "See you out there.", intro: "Public performances", showTicketLinks: true },
         events: [
           { id: "c9fcdab1-2a8c-4b01-9d40-2a1b46cece00", title: "Acoustic evening", description: "Selected work", date: "2026-10-03", time: "19:00", timezone: "Europe/Prague", city: "Prague", venue: "Example room", kind: "Live show", ticketUrl: "https://tickets.example.com/event", status: "scheduled", published: true },
           { id: "d9fcdab1-2a8c-4b01-9d40-2a1b46cece00", title: "Private draft", description: "Not announced", date: "2026-11-12", time: "20:00", timezone: "Europe/Berlin", city: "Berlin", venue: "Example club", kind: "Live show", ticketUrl: "", status: "sold_out", published: false },
@@ -133,7 +133,7 @@ describe("Live & Contact calendar V2 editor", () => {
   it("can hide the complete calendar without deleting events", () => {
     field("booking-calendar-enabled", false); field("booking-calendar-title", "Tour dates");
     field("booking-calendar-intro", "");
-    expect(draft().settings).toEqual({ enabled: false, title: "Tour dates", intro: "" });
+    expect(draft().settings).toEqual({ enabled: false, title: "Tour dates", intro: "", showTicketLinks: true });
     expect(draft().events).toEqual(props.snapshot.draft.events);
     expect(button("Save calendar").props.disabled).toBe(false);
   });
@@ -148,6 +148,60 @@ describe("Live & Contact calendar V2 editor", () => {
     field("booking-event-title", "New show"); field("booking-event-city", "Brno"); field("booking-event-venue", "Example venue");
     expect(button("Save calendar").props.disabled).toBe(false);
     expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it("hides the ticket input when disabled and preserves existing URLs through both modes", () => {
+    props.snapshot.draft.settings.showTicketLinks = false;
+    expect(find(node => node.props.id === "booking-calendar-ticket-links").props.checked).toBe(false);
+    expect(text(render())).toContain("Preview only. Edits are not yet public.");
+    expect(text(render())).not.toContain("Ticket links are disabled and edits are not yet public");
+    select();
+    expect(nodes(render()).some(node => node.props.id === "booking-event-ticketUrl")).toBe(false);
+    expect(draft().events).toEqual(props.snapshot.draft.events);
+    click(button("Open calendar settings")); field("booking-calendar-ticket-links", true); select();
+    expect(find(node => node.props.id === "booking-event-ticketUrl").props.value).toBe("https://tickets.example.com/event");
+    click(button("Calendar settings")); field("booking-calendar-ticket-links", false); select();
+    expect(nodes(render()).some(node => node.props.id === "booking-event-ticketUrl")).toBe(false);
+    expect(draft()).toEqual(props.snapshot.draft);
+    expect(button("Save calendar").props.disabled).toBe(true);
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it("keeps admission event-specific while saving ticket visibility and event edits together", async () => {
+    field("booking-calendar-ticket-links", false); select();
+    field("booking-event-description", "Free entry. Doors open at 19:00.");
+    field("booking-event-city", "Heemskerk"); field("booking-event-venue", "Sample music room");
+    const submitted = draft();
+    expect(submitted.events[1]).toEqual(props.snapshot.draft.events[1]);
+    expect(publicPreview().props.data).toEqual(submitted);
+    expect(text(render())).toContain("Only describe free entry when it applies to this event");
+    mocks.save.mockResolvedValue(result({ draft: submitted, updatedAt: nextVersion }));
+    await mocks.action!(form());
+    expect(JSON.parse(mocks.save.mock.calls[0][1].get("payload"))).toEqual(submitted);
+    expect(draft().settings.showTicketLinks).toBe(false);
+    expect(draft().events[0].ticketUrl).toBe("https://tickets.example.com/event");
+    expect(button("Save calendar").props.disabled).toBe(true);
+    click(button("Calendar settings")); field("booking-calendar-ticket-links", true);
+    select(); field("booking-event-description", "Discard these details");
+    click(button("Discard changes"));
+    expect(draft()).toEqual(submitted);
+    expect(hidden("updatedAt")).toBe(nextVersion);
+  });
+  it("keeps an invalid URL draft recoverable after hiding ticket controls", () => {
+    select(); field("booking-event-ticketUrl", "javascript:alert(1)");
+    click(button("Calendar settings")); field("booking-calendar-ticket-links", false); select();
+    expect(button("Save calendar").props.disabled).toBe(true);
+    expect(text(render())).toContain("A draft URL needs attention before saving");
+    click(button("Open calendar settings")); field("booking-calendar-ticket-links", true); select();
+    expect(find(node => node.props.id === "booking-event-ticketUrl").props.value).toBe("javascript:alert(1)");
+    field("booking-event-ticketUrl", "");
+    expect(button("Save calendar").props.disabled).toBe(false);
+  });
+  it("uses admission-neutral capacity copy without changing the stored event status", () => {
+    field("booking-calendar-ticket-links", false); select(props.snapshot.draft.events[1].id);
+    expect(text(find(node => node.type === "option" && node.props.value === "sold_out"))).toBe("At capacity");
+    expect(find(node => node.props.id === "booking-event-status").props.value).toBe("sold_out");
+    click(button("Calendar settings")); field("booking-calendar-ticket-links", true); select(props.snapshot.draft.events[1].id);
+    expect(text(find(node => node.type === "option" && node.props.value === "sold_out"))).toBe("Sold out");
+    expect(draft().events).toEqual(props.snapshot.draft.events);
   });
   it.each([
     ["booking-event-date", "2026-02-30"], ["booking-event-time", "25:00"],
@@ -282,7 +336,7 @@ describe("Live & Contact calendar V2 editor", () => {
   });
   it("shows the exact pending migration and leaves unavailable data read-only without seeding events", () => {
     props = { ...props, disabled: true, migrationRequired: true, snapshot: { ...props.snapshot, draft: { ...props.snapshot.draft, events: [] } } };
-    expect(text(render())).toContain("migration 0053");
+    expect(text(render())).toContain("migration 0061");
     expect(nodes(render()).find(node => node.type === "fieldset")?.props.disabled).toBe(true);
     click(button("Add event")); field("booking-calendar-title", "Do not write");
     expect(draft().events).toEqual([]); expect(draft().settings.title).toBe("See you out there.");

@@ -7,6 +7,8 @@ export async function proxy(request: NextRequest) {
   const previewRoutes = new Set([
     "/admin/v2-preview/home",
     "/admin/v2-preview/home/",
+    "/admin/v2-preview/press",
+    "/admin/v2-preview/press/",
     "/admin/v2-preview/bio",
     "/admin/v2-preview/bio/",
     "/admin/v2-preview/gallery",

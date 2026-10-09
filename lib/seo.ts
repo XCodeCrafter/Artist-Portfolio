@@ -15,6 +15,7 @@ const PAGE_PATHS: Record<PublicSeoPage, string> = {
   gallery: "/gallery",
   music: "/music",
   video: "/video",
+  press: "/press",
   booking: "/booking",
   privacy: "/privacy",
   terms: "/terms",
@@ -99,6 +100,8 @@ function pageLabel(page: PublicSeoPage) {
       return "Music & Releases";
     case "video":
       return "Showreel & Videos";
+    case "press":
+      return "Press & Reviews";
     case "booking":
       return LIVE_CONTACT_PAGE_LABEL;
     case "privacy":
@@ -116,6 +119,9 @@ function pageDescription(content: PortfolioContent, page: PublicSeoPage) {
     case "home":
       return description;
     case "bio":
+      if (content.settings.bioResumeCreditsEnabled === false) {
+        return `Biography, music, and creative background for ${personName}.${place}`;
+      }
       return `Biography, acting resume, selected credits, music, and creative background for ${personName}.${place}`;
     case "gallery":
       return `Selected headshots, portraits, and visual portfolio work featuring ${personName}.`;
@@ -123,6 +129,8 @@ function pageDescription(content: PortfolioContent, page: PublicSeoPage) {
       return `Official releases, selected tracks, mixes, and listening links from ${personName}.`;
     case "video":
       return `Showreel, selected scenes, self-tapes, music videos, and screen work featuring ${personName}.`;
+    case "press":
+      return `Reviews, interviews, radio appearances, and press coverage featuring ${personName}.`;
     case "booking":
       return `Discover live events and contact ${personName} for music bookings, acting, casting, productions, and creative collaborations.`;
     case "privacy":
@@ -135,7 +143,8 @@ function pageDescription(content: PortfolioContent, page: PublicSeoPage) {
 export function getPageSeo(content: PortfolioContent, page: PublicSeoPage) {
   const identity = getSeoIdentity(content);
   const sharing = resolveSiteSharing(content.settings);
-  const label = pageLabel(page);
+  const label = page === "bio" && content.settings.bioResumeCreditsEnabled === false
+    ? "Biography" : pageLabel(page);
   const legalPage = page === "privacy" || page === "terms";
   const title = legalPage
     ? joinUnique([label, identity.brandName])

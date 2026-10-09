@@ -1,5 +1,27 @@
 # Live & Contact — public-events calendar
 
+## Update: optional ticket links (0061)
+
+The calendar now has a **Show ticket links** setting, initially OFF. With it off,
+the public page shows gig details without ticket buttons, forthcoming-ticket
+messages, or ticket-specific cancellation copy. The stored URLs and event
+statuses remain intact. A capacity-limited event is labelled **At capacity** in
+this mode; it is not silently changed back to scheduled.
+
+Use an event description for explicit admission details such as “Free entry.”
+An absent ticket link does not establish that admission is free. The setting
+only controls external organiser links; no checkout or payment provider is added.
+
+Deploy the compatible application first, then apply
+`supabase/migrations/0061_booking_calendar_ticket_visibility.sql` and run the
+matching file in `supabase/checks/`. Every check must pass. Existing 0053 data
+remains readable before this migration, but the new editor stays read-only until
+its new settings contract is available. Reload open editors after migration.
+
+See [the current rollout guide](musician-site-rollout.md) for the complete
+0059 → 0060 → 0061 sequence. The historical 0053/0054 confirmations below remain
+valid; those migrations should not be replayed on the existing hosted project.
+
 The Events editor lives at `/admin/v2/pages/events`, linked from the V2 sidebar,
 dashboard finder, overview and Live & Contact page editor. It edits the same
 calendar component shown above the existing inquiry form at `/booking#events`.
@@ -64,6 +86,9 @@ upload or media-reference dependencies.
 ## Local verification
 
 - `npm test` / `npm run typecheck` / `npm run lint` / `npm run build`.
+- `node scripts/test-booking-calendar-ticket-visibility-migration.mjs <local-PGlite-dist/index.js>`:
+  isolated 0061 upgrade, event/URL preservation, strict saves, CAS, role permissions,
+  OFF/ON/OFF public projection, safe reruns and all 10 new read-only checks.
 - `node scripts/test-booking-calendar-migration.mjs <local-PGlite-dist/index.js>`:
   disposable SQL deployment, privacy, role permissions, validation, version
   conflict, deterministic ordering, disable/re-enable and rerun checks.

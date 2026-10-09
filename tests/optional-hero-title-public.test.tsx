@@ -11,12 +11,12 @@ import ShowreelPageView from "@/components/video/ShowreelPageView";
 import ContactPageView from "@/components/contact/ContactPageView";
 import { createHomeDraftFromContent, HOME_PREVIEW_UPDATE_MESSAGE, parseHomeEditorSnapshot, parseHomePreviewUpdateMessage } from "@/lib/admin/home-editor";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
-import type { HeroContent, PageSlug } from "@/lib/content/types";
+import type { HeroContent, HeroPageSlug } from "@/lib/content/types";
 import type { HeroFraming } from "@/lib/content/hero-framing";
 import { selectMusicPageViewData } from "@/lib/content/music";
 import { createBioJsonLd, createHomeJsonLd, createPageMetadata } from "@/lib/seo";
 
-const pages: PageSlug[] = ["home", "bio", "gallery", "music", "video", "booking"];
+const pages: HeroPageSlug[] = ["home", "bio", "gallery", "music", "video", "booking"];
 const framing: HeroFraming = {
   desktop: { fit: "contain", x: 22, y: 15, zoom: 1.2 },
   mobile: { fit: "cover", x: 64, y: 8, zoom: 1.5 },
@@ -29,7 +29,7 @@ const hero: HeroContent = {
   ctaHref: "#owner-destination",
 };
 
-function pageView(page: PageSlug, title: string, mode: "public" | "preview"): ReactElement {
+function pageView(page: HeroPageSlug, title: string, mode: "public" | "preview"): ReactElement {
   const content = structuredClone(FALLBACK_CONTENT);
   const currentHero = { ...hero, title };
   content.heroes[page] = currentHero;

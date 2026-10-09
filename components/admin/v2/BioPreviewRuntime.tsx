@@ -60,7 +60,8 @@ export default function BioPreviewRuntime({
     const frame = window.requestAnimationFrame(() => {
       const section = document.querySelector<HTMLElement>(
         `[data-bio-preview-section="${selectedSection}"]`
-      );
+      ) ?? (["resume", "credits"].includes(selectedSection)
+        ? document.querySelector<HTMLElement>('[data-bio-preview-section="visibility"]') : null);
       section?.scrollIntoView({
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
           ? "auto"

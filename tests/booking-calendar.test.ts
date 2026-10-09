@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOOKING_CALENDAR_MAX_PAYLOAD, DEFAULT_BOOKING_CALENDAR_DRAFT, createFallbackBookingCalendarSnapshot, isSafeBookingCalendarTicketUrl, isValidBookingCalendarDate, isValidBookingCalendarTimeZone, parseBookingCalendarDraft, parseBookingCalendarSnapshot, sortBookingCalendarEvents, type BookingCalendarEvent } from "@/lib/booking-calendar";
+import { BOOKING_CALENDAR_MAX_PAYLOAD, DEFAULT_BOOKING_CALENDAR_DRAFT, createFallbackBookingCalendarSnapshot, hasBookingCalendarTicketVisibility, isNewerBookingCalendarVersion, isSafeBookingCalendarTicketUrl, isValidBookingCalendarDate, isValidBookingCalendarTimeZone, parseBookingCalendarDraft, parseBookingCalendarSaveDraft, parseBookingCalendarSnapshot, sortBookingCalendarEvents, type BookingCalendarEvent } from "@/lib/booking-calendar";
 
 const event: BookingCalendarEvent = { id: "11111111-1111-4111-8111-111111111111", title: "Live show", description: "", date: "2026-10-09", time: "19:30", timezone: "Europe/Prague", city: "Prague", venue: "Music room", kind: "Concert", ticketUrl: "https://tickets.example.com/show", status: "scheduled", published: true };
 const draft = () => ({ settings: { ...DEFAULT_BOOKING_CALENDAR_DRAFT.settings, enabled: true }, events: [{ ...event }] });
@@ -7,10 +7,40 @@ describe("Booking calendar strict shared contracts", () => {
   it("starts disabled, empty and without fictional announcements", () => {
     expect(DEFAULT_BOOKING_CALENDAR_DRAFT.events).toEqual([]);
     expect(DEFAULT_BOOKING_CALENDAR_DRAFT.settings.enabled).toBe(false);
+    expect(DEFAULT_BOOKING_CALENDAR_DRAFT.settings.showTicketLinks).toBe(false);
     expect(parseBookingCalendarDraft(DEFAULT_BOOKING_CALENDAR_DRAFT).success).toBe(true);
     const fallback = createFallbackBookingCalendarSnapshot();
     fallback.draft.settings.title = "Changed";
     expect(DEFAULT_BOOKING_CALENDAR_DRAFT.settings.title).not.toBe("Changed");
+  });
+  it("reads legacy calendars with ticket links off but requires an explicit choice for saving", () => {
+    const legacy = draft();
+    delete legacy.settings.showTicketLinks;
+    const parsed = parseBookingCalendarDraft(legacy);
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) throw parsed.error;
+    expect(parsed.data.settings.showTicketLinks).toBe(false);
+    expect(parsed.data.events).toEqual(legacy.events);
+    expect(parseBookingCalendarSaveDraft(legacy).success).toBe(false);
+    expect(hasBookingCalendarTicketVisibility({ draft: legacy })).toBe(false);
+    expect(hasBookingCalendarTicketVisibility({ draft: parsed.data })).toBe(true);
+  });
+  it.each([false, true])("preserves event URLs and statuses when ticket visibility is %s", showTicketLinks => {
+    const payload = { ...draft(), settings: { ...draft().settings, showTicketLinks }, events: [{ ...event, status: "sold_out" }] };
+    expect(parseBookingCalendarSaveDraft(payload)).toMatchObject({ success: true, data: payload });
+  });
+  it.each([null, "false", 0])("rejects invalid ticket visibility %s rather than silently disabling it", showTicketLinks => {
+    const payload = { ...draft(), settings: { ...draft().settings, showTicketLinks } };
+    expect(parseBookingCalendarDraft(payload).success).toBe(false);
+    expect(parseBookingCalendarSaveDraft(payload).success).toBe(false);
+    expect(hasBookingCalendarTicketVisibility({ draft: payload })).toBe(false);
+  });
+  it("confirms strictly newer versions without losing PostgreSQL microseconds", () => {
+    const previous = "2026-09-27T14:01:02.123456+00:00";
+    expect(isNewerBookingCalendarVersion("2026-09-27T14:01:02.123457Z", previous)).toBe(true);
+    expect(isNewerBookingCalendarVersion("2026-09-27T14:01:02.124Z", previous)).toBe(true);
+    expect(isNewerBookingCalendarVersion("2026-09-27T16:01:02.123456+02:00", previous)).toBe(false);
+    expect(isNewerBookingCalendarVersion("2026-09-27T14:01:02.123455Z", previous)).toBe(false);
   });
   it.each(["2026-02-29", "2026-04-31", "2026-13-01", "2026-00-10", "2026-1-01", "1899-12-31", "2200-01-01", "2026-10-09T00:00:00Z"])("rejects impossible/noncanonical date %s", value => expect(isValidBookingCalendarDate(value)).toBe(false));
   it.each(["2028-02-29", "1900-01-01", "2199-12-31"])("accepts %s", value => expect(isValidBookingCalendarDate(value)).toBe(true));

@@ -28,7 +28,7 @@ let draft: BookingCalendarDraft;
 beforeEach(() => {
   hooks.cursor = 0; hooks.refCursor = 0; hooks.values = []; hooks.refs = []; hooks.effect = null;
   const shared = { description: "", time: "19:30", timezone: "Europe/Prague", city: "Prague", venue: "Venue", kind: "Live", ticketUrl: "", status: "scheduled" as const, published: true };
-  draft = { settings: { enabled: true, title: "Live", intro: "" }, events: [
+  draft = { settings: { enabled: true, title: "Live", intro: "", showTicketLinks: false }, events: [
     { ...shared, id: "first", title: "Early set", date: "2026-10-03" },
     { ...shared, id: "second", title: "Late set", date: "2026-10-03", time: "22:30" },
     { ...shared, id: "november", title: "November set", date: "2026-11-14" },
@@ -41,6 +41,25 @@ function render(extra: Partial<Parameters<typeof BookingCalendar>[0]> = {}) {
 }
 
 describe("Public calendar interaction callbacks", () => {
+  it("preserves the selected same-day event and display mode when ticket links change", () => {
+    let tree = render();
+    click(tree, "3 Oct 2026: Late set, Prague");
+    tree = render();
+    click(tree, "List");
+    draft.settings.showTicketLinks = true;
+    tree = render();
+    expect(selected(tree)?.id).toBe("second");
+    expect(button(tree, "List").props["aria-pressed"]).toBe(true);
+    draft.settings.showTicketLinks = false;
+    tree = render();
+    expect(selected(tree)?.id).toBe("second");
+    expect(button(tree, "List").props["aria-pressed"]).toBe(true);
+    click(tree, "Next month");
+    tree = render();
+    expect(selected(tree)?.id).toBe("november");
+    click(tree, "Next event");
+    expect(selected(render())?.id).toBe("first");
+  });
   it("selects each same-day event and notifies the inspector exactly once", () => {
     const onSelectEvent = vi.fn();
     let tree = render({ onSelectEvent });

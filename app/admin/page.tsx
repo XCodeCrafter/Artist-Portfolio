@@ -57,6 +57,7 @@ function getEditorHref(key: string) {
   if (key === "gallery") return "/admin/media?view=studio";
   if (key === "video" || key === "showreel") return "/admin/media?view=showreel";
   if (key === "music") return "/admin/content#music-links";
+  if (key === "press") return "/admin/v2/pages/press";
   if (key === "contact") return "/admin/content#booking";
   return `/admin/content#${key}`;
 }

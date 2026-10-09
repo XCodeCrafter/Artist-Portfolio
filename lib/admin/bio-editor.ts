@@ -14,6 +14,7 @@ import { isSafeManagedMediaSource } from "@/lib/media-source";
 export const BIO_EDITOR_SECTIONS = [
   "hero",
   "biography",
+  "visibility",
   "resume",
   "credits",
 ] as const;
@@ -66,12 +67,14 @@ export type BioCreditsDraft = {
 export type BioEditorDraft = {
   hero: BioHeroDraft;
   biography: BioBiographyDraft;
+  visibility: { resumeCreditsEnabled: boolean };
   resume: BioResumeDraft;
   credits: BioCreditsDraft;
 };
 
 export type BioEditorVersions = {
   hero: { updatedAt: string };
+  visibility: { updatedAt: string };
   biography: {
     profileUpdatedAt: string;
     galleryItems: Record<string, string>;
@@ -92,6 +95,7 @@ export type BioEditorFooter = {
 
 export type BioEditorSnapshot = {
   photoFramingAvailable?: true;
+  visibilityAvailable?: true;
   draft: BioEditorDraft;
   versions: BioEditorVersions;
   footer: BioEditorFooter;
@@ -100,6 +104,7 @@ export type BioEditorSnapshot = {
 
 export type BioSectionVersions = {
   hero: BioEditorVersions["hero"];
+  visibility: BioEditorVersions["visibility"];
   biography: BioEditorVersions["biography"];
   resume: BioEditorVersions["resume"];
   credits: BioEditorVersions["credits"];
@@ -311,6 +316,7 @@ const bioCreditsDraftSchema = z
 
 const versionMap = z.record(recordId, timestamp);
 const heroVersionsSchema = z.object({ updatedAt: timestamp }).strict();
+const bioVisibilityDraftSchema = z.object({ resumeCreditsEnabled: z.boolean() }).strict();
 const biographyVersionsSchema = z
   .object({
     profileUpdatedAt: timestamp,
@@ -395,6 +401,10 @@ export function parseBioResumeDraft(value: unknown) {
   return bioResumeDraftSchema.safeParse(value);
 }
 
+export function parseBioVisibilityDraft(value: unknown) {
+  return bioVisibilityDraftSchema.safeParse(value);
+}
+
 export function parseBioCreditsDraft(value: unknown) {
   return bioCreditsDraftSchema.safeParse(value);
 }
@@ -467,6 +477,7 @@ export function parseBioSectionSubmission(
 
   const sectionParsers = {
     hero: [bioHeroDraftSchema, heroVersionsSchema],
+    visibility: [bioVisibilityDraftSchema, heroVersionsSchema],
     biography: [bioBiographyDraftSchema, biographyVersionsSchema],
     resume: [bioResumeDraftSchema, resumeVersionsSchema],
     credits: [bioCreditsDraftSchema, creditsVersionsSchema],
@@ -572,6 +583,7 @@ export function parseBioEditorSnapshot(value: unknown): BioEditorSnapshot | null
   return {
     ...(snapshot.photoFramingAvailable ? { photoFramingAvailable: true as const } : {}),
     draft: {
+      visibility: { resumeCreditsEnabled: true },
       hero: {
         title: snapshot.hero.title,
         subtitle: snapshot.hero.subtitle,
@@ -628,6 +640,7 @@ export function parseBioEditorSnapshot(value: unknown): BioEditorSnapshot | null
       },
     },
     versions: {
+      visibility: { updatedAt: new Date(0).toISOString() },
       hero: { updatedAt: snapshot.hero.updatedAt },
       biography: {
         profileUpdatedAt: snapshot.biography.profileUpdatedAt,
@@ -654,6 +667,7 @@ export function createFallbackBioEditorSnapshot(): BioEditorSnapshot {
   const fallbackTimestamp = new Date(0).toISOString();
   return {
     draft: {
+      visibility: { resumeCreditsEnabled: true },
       hero: FALLBACK_CONTENT.heroes.bio,
       biography: {
         topLabel: FALLBACK_CONTENT.bio.topLabel,
@@ -677,6 +691,7 @@ export function createFallbackBioEditorSnapshot(): BioEditorSnapshot {
       },
     },
     versions: {
+      visibility: { updatedAt: fallbackTimestamp },
       hero: { updatedAt: fallbackTimestamp },
       biography: {
         profileUpdatedAt: fallbackTimestamp,
@@ -790,6 +805,7 @@ const previewMediaSource = text(2_048).transform((value) =>
 
 const previewDraftSchema = z
   .object({
+    visibility: bioVisibilityDraftSchema.default({ resumeCreditsEnabled: true }),
     hero: z
       .object({
         title: text(220),
@@ -899,6 +915,7 @@ export function createBioPageViewDataFromEditor(
         .filter((item) => item.isPublished)
         .map(({ id, body, revealDelay }) => ({ id, body, revealDelay })),
     },
+    resumeCreditsEnabled: draft.visibility.resumeCreditsEnabled,
     resume: draft.resume,
     hasResumeDetails,
     credits: draft.credits.items

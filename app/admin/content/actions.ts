@@ -16,6 +16,7 @@ import { parseGalleryEditorSnapshot } from "@/lib/admin/gallery-editor";
 import { parseNavbarSocialLinksSnapshot } from "@/lib/admin/navbar-social-links-editor";
 import {
   PAGE_SLUGS,
+  HERO_PAGE_SLUGS,
   getProfilePublicModules,
 } from "@/lib/content/modules";
 import {
@@ -50,6 +51,7 @@ import {
   FOOTER_EFFECTS,
   VIDEO_TYPES,
   type PageSlug,
+  type HeroPageSlug,
   type PortfolioType,
 } from "@/lib/content/types";
 
@@ -59,6 +61,7 @@ const CONTENT_PATHS = [
   "/gallery",
   "/music",
   "/video",
+  "/press",
   "/booking",
   "/admin",
   "/admin/content",
@@ -190,7 +193,7 @@ const navigationSettingsSchema = z.object({
 
 const heroSchema = z
   .object({
-    pageSlug: z.enum(PAGE_SLUGS as [PageSlug, ...PageSlug[]]),
+    pageSlug: z.enum(HERO_PAGE_SLUGS as [HeroPageSlug, ...HeroPageSlug[]]),
     title: shortText,
     subtitle: shortText,
     ctaLabel: shortText,

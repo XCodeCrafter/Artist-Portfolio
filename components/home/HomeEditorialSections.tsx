@@ -369,32 +369,53 @@ function PressReader({ items, initialId, onClose }: { items: HomePressItem[]; in
   </dialog>;
 }
 
-export function PressReviewsSection({ data, staticPreview = false }: { data: HomePress; staticPreview?: boolean }) {
+export function PressReviewsSection({ data, staticPreview = false, standalone = false }: { data: HomePress; staticPreview?: boolean; standalone?: boolean }) {
   const titleId = useId();
-  const [readerOpen, setReaderOpen] = useState(false);
+  const archiveTitleId = useId();
+  const [readerInitialId, setReaderInitialId] = useState<string | null>(null);
   const items = data.items.filter(item => item.visible);
-  if (!items.length) return null;
+  if (!items.length && !standalone) return null;
   const featured = items.find(item => item.id === data.featuredId) || items.find(item => Boolean(item.quote)) || items[0];
   const images = items.filter(item => Boolean(item.image.src)).slice(0, 3);
-  return <section id="home-press" className={`${styles.section} ${styles.press}`} data-collage={Boolean(images.length)} aria-labelledby={titleId} data-home-transition-frame="">
+  const Heading = standalone ? "h1" : "h2";
+  return <section id={standalone ? "press" : "home-press"} className={`${styles.section} ${styles.press}${standalone ? ` ${styles.standalone}` : ""}${!items.length ? ` ${styles.pressEmpty}` : ""}`} data-collage={Boolean(images.length)} aria-labelledby={titleId} data-home-transition-frame={standalone ? undefined : ""}>
     <EditorialBackdrop image={data.background} />
     <div className={styles.inner}>
       <div className={styles.pressCopy}>
         {data.eyebrow ? <p className={styles.eyebrow}>{data.eyebrow}</p> : null}
-        <h2 className={styles.heading} id={titleId}>{data.title}</h2>
+        <Heading className={styles.heading} id={titleId}>{data.title || "Press & reviews"}</Heading>
         {data.body ? <p className={styles.body}>{data.body}</p> : null}
-        <div className={styles.actions}>
-          <button type="button" className={styles.button} disabled={staticPreview} onClick={() => setReaderOpen(true)} aria-haspopup="dialog">{data.buttonLabel || "Explore all press"}<Arrow /></button>
-        </div>
+        {featured ? <div className={styles.actions}>
+          <button type="button" className={styles.button} disabled={staticPreview} onClick={() => setReaderInitialId(featured.id)} aria-haspopup="dialog">{data.buttonLabel || "Explore all press"}<Arrow /></button>
+        </div> : <p className={styles.emptyMessage}>Press features, reviews and interviews will appear here.</p>}
       </div>
       {images.length ? <div className={styles.collage} aria-hidden="true">
         {images.map(item => <EditorialPhoto key={item.id} image={{ ...item.image, alt: "" }} className={styles.clipping} sizes="(max-width: 680px) 65vw, 350px" />)}
       </div> : null}
-      <figure className={styles.quote}>
+      {featured ? <figure className={styles.quote}>
         {featured.quote ? <blockquote>“{featured.quote}”</blockquote> : <blockquote>{featured.title}</blockquote>}
         <figcaption>— {featured.publication}</figcaption>
-      </figure>
+      </figure> : null}
     </div>
-    {readerOpen && !staticPreview ? <PressReader items={items} initialId={featured.id} onClose={() => setReaderOpen(false)} /> : null}
+    {standalone && items.length ? <div className={styles.pressArchive} aria-labelledby={archiveTitleId}>
+      <div className={styles.archiveHeading}>
+        <h2 id={archiveTitleId}>All press</h2>
+        <span>{items.length} {items.length === 1 ? "story" : "stories"}</span>
+      </div>
+      <div className={styles.pressCards}>
+        {items.map(item => <button key={item.id} type="button" className={styles.pressCard} disabled={staticPreview}
+          onClick={() => setReaderInitialId(item.id)} aria-haspopup="dialog" aria-label={`Read ${item.title}`}>
+          {item.image.src ? <span className={styles.pressCardImage}><FramedImage alt="" src={item.image.src} framing={item.image.framing} fill sizes="(max-width: 680px) 90vw, 40vw" /></span> : null}
+          <span className={styles.pressCardCopy}>
+            <span className={styles.pressCardKind}>{PRESS_KIND_LABELS[item.kind]}</span>
+            <span className={styles.pressCardTitle}>{item.title}</span>
+            <span className={styles.pressCardMeta}>{item.publication}{item.date ? <time dateTime={item.date}>{new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${item.date}T00:00:00Z`))}</time> : null}</span>
+            {item.quote ? <span className={styles.pressCardQuote}>{item.quote}</span> : null}
+            <span className={styles.pressCardAction}>Read story<Arrow /></span>
+          </span>
+        </button>)}
+      </div>
+    </div> : null}
+    {readerInitialId && !staticPreview ? <PressReader items={items} initialId={readerInitialId} onClose={() => setReaderInitialId(null)} /> : null}
   </section>;
 }

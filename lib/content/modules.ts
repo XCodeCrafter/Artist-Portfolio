@@ -1,4 +1,4 @@
-import type { PageSlug, PortfolioType } from "./types";
+import type { HeroPageSlug, PageSlug, PortfolioType } from "./types";
 import { LIVE_CONTACT_NAV_LABEL } from "./live-contact";
 
 export type PublicModuleKey =
@@ -7,6 +7,7 @@ export type PublicModuleKey =
   | "gallery"
   | "music"
   | "video"
+  | "press"
   | "showreel"
   | "contact";
 
@@ -31,8 +32,13 @@ export const PAGE_SLUGS: PageSlug[] = [
   "gallery",
   "music",
   "video",
+  "press",
   "booking",
 ];
+
+export const HERO_PAGE_SLUGS: HeroPageSlug[] = PAGE_SLUGS.filter(
+  (slug): slug is HeroPageSlug => slug !== "press"
+);
 
 const PAGE_SLUG_SET = new Set<PageSlug>(PAGE_SLUGS);
 
@@ -90,6 +96,15 @@ export const MODULE_REGISTRY: PortfolioModule[] = [
     profiles: ["actor"],
     publicNav: true,
     description: "Showreel, scenes, self-tapes, and screen work.",
+  },
+  {
+    key: "press",
+    label: "PRESS",
+    href: "/press",
+    pageSlug: "press",
+    profiles: ["musician", "actor"],
+    publicNav: true,
+    description: "Reviews, interviews, and press coverage.",
   },
   {
     key: "contact",

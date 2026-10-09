@@ -56,6 +56,7 @@ import {
   parseBioCreditsDraft,
   parseBioHeroDraft,
   parseBioResumeDraft,
+  parseBioVisibilityDraft,
   parseBioSectionSubmission,
   type BioCreditEditorItem,
   type BioEditorDraft,
@@ -112,6 +113,11 @@ const SECTION_META: Record<
     shortLabel: "Biography",
     description: "Introduction, rotating portraits, and the long-form story",
   },
+  visibility: {
+    label: "Visibility",
+    shortLabel: "Visibility",
+    description: "Show or hide Resume & Credits without deleting saved content",
+  },
   resume: {
     label: "Resume",
     shortLabel: "Resume",
@@ -165,6 +171,8 @@ function validateSection(
       ? parseBioHeroDraft(payload)
       : section === "biography"
         ? parseBioBiographyDraft(payload)
+        : section === "visibility"
+          ? parseBioVisibilityDraft(payload)
         : section === "resume"
           ? parseBioResumeDraft(payload)
           : parseBioCreditsDraft(payload);
@@ -197,6 +205,8 @@ function applyCanonicalSection(
       ? parseBioHeroDraft(value)
       : section === "biography"
         ? parseBioBiographyDraft(value)
+        : section === "visibility"
+          ? parseBioVisibilityDraft(value)
         : section === "resume"
           ? parseBioResumeDraft(value)
           : parseBioCreditsDraft(value);
@@ -382,6 +392,8 @@ type InspectorProps = {
   savedCreditIds: ReadonlySet<string>;
   savedParagraphIds: ReadonlySet<string>;
   savedPortraitIds: ReadonlySet<string>;
+  savedResumeCreditsEnabled: boolean;
+  visibilityAvailable: boolean;
   onHeroChange: (patch: Partial<BioHeroDraft>) => void;
   onBiographyChange: (
     patch: Partial<
@@ -398,6 +410,7 @@ type InspectorProps = {
   ) => void;
   onCreditChange: (index: number, patch: Partial<BioCreditEditorItem>) => void;
   onResumeChange: (patch: Partial<BioEditorDraft["resume"]>) => void;
+  onVisibilityChange: (resumeCreditsEnabled: boolean) => void;
   onAddPortrait: () => void;
   onAddParagraph: () => void;
   onAddCredit: () => void;
@@ -782,11 +795,85 @@ function BiographyInspector(props: InspectorProps) {
   );
 }
 
+function ResumeCreditsStatus({
+  draft,
+  savedResumeCreditsEnabled,
+  visibilityAvailable,
+}: Pick<InspectorProps, "draft" | "savedResumeCreditsEnabled" | "visibilityAvailable">) {
+  const pendingChange = draft.visibility.resumeCreditsEnabled !== savedResumeCreditsEnabled;
+  if (!visibilityAvailable) {
+    return <p className="rounded-2xl border border-white/8 bg-white/[0.025] px-4 py-3 text-xs leading-5 text-white/52">Saved website visibility is unavailable. Your saved Resume &amp; Credits content is kept.</p>;
+  }
+  return (
+    <div aria-live="polite" className="rounded-2xl border border-white/8 bg-white/[0.025] px-4 py-3 text-xs leading-5 text-white/52">
+      <p className="flex items-start gap-2">
+        {savedResumeCreditsEnabled ? <FaEye aria-hidden="true" className="mt-1 shrink-0" /> : <FaEyeSlash aria-hidden="true" className="mt-1 shrink-0" />}
+        <span>{savedResumeCreditsEnabled ? "Resume & Credits are visible on the website." : "Hidden on the website. Saved content is kept."}</span>
+      </p>
+      {pendingChange ? (
+        <p className="mt-2 text-amber-100/75">
+          Preview only: Resume & Credits will be {draft.visibility.resumeCreditsEnabled ? "shown" : "hidden"} after saving Visibility.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function VisibilityInspector({
+  draft,
+  errors,
+  instance,
+  onVisibilityChange,
+  savedResumeCreditsEnabled,
+  visibilityAvailable,
+}: Pick<InspectorProps, "draft" | "errors" | "instance" | "onVisibilityChange" | "savedResumeCreditsEnabled" | "visibilityAvailable">) {
+  const enabled = draft.visibility.resumeCreditsEnabled;
+  const hintId = `${instance}-bio-visibility-hint`;
+  const error = fieldMessage(errors, "resumeCreditsEnabled");
+  const errorId = `${instance}-bio-visibility-error`;
+  return (
+    <div className="grid gap-5">
+      <p className="text-sm leading-6 text-white/60" id={hintId}>
+        Control the whole Resume & Credits block. Hiding it keeps all saved information, so you can bring it back later.
+      </p>
+      <button
+        aria-checked={enabled}
+        aria-describedby={[hintId, error ? errorId : null, !visibilityAvailable ? `${instance}-bio-visibility-unavailable` : null].filter(Boolean).join(" ")}
+        aria-invalid={Boolean(error) || undefined}
+        aria-label="Show Resume & Credits"
+        className="flex min-h-16 w-full items-center justify-between gap-4 rounded-2xl border border-white/12 bg-black/22 px-4 py-3 text-left outline-none transition hover:border-white/28 focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-45"
+        disabled={!visibilityAvailable}
+        onClick={() => onVisibilityChange(!enabled)}
+        role="switch"
+        type="button"
+      >
+        <span className="text-sm font-semibold text-white/85">Show Resume & Credits</span>
+        <span aria-hidden="true" className={`inline-flex min-w-20 shrink-0 items-center gap-2 rounded-full px-2 py-1.5 text-[10px] font-bold tracking-[0.12em] ${enabled ? "bg-[#ff3b1f] text-white" : "bg-white/12 text-white/65"}`}>
+          <span className={`h-5 w-5 rounded-full bg-white shadow-sm ${enabled ? "order-2" : ""}`} />
+          <span className="flex-1 text-center">{enabled ? "ON" : "OFF"}</span>
+        </span>
+      </button>
+      {error ? <p className="-mt-3 text-xs leading-5 text-red-200" id={errorId} role="alert">{error}</p> : null}
+      {!visibilityAvailable ? (
+        <p className="rounded-2xl border border-amber-300/16 bg-amber-400/[0.055] px-4 py-3 text-xs leading-5 text-amber-100/72" id={`${instance}-bio-visibility-unavailable`}>
+          The saved visibility setting could not be confirmed. Reload the editor. If this database has not been updated, apply migration 0059 first. Other Bio sections remain editable.
+        </p>
+      ) : null}
+      <ResumeCreditsStatus draft={draft} savedResumeCreditsEnabled={savedResumeCreditsEnabled} visibilityAvailable={visibilityAvailable} />
+      <p className="text-xs leading-5 text-white/42">
+        Use the Resume and Credits tabs to edit the content, even while the block is hidden. Save Visibility to publish this setting.
+      </p>
+    </div>
+  );
+}
+
 function ResumeInspector({
   draft,
   errors,
   onResumeChange,
-}: Pick<InspectorProps, "draft" | "errors" | "onResumeChange">) {
+  savedResumeCreditsEnabled,
+  visibilityAvailable,
+}: Pick<InspectorProps, "draft" | "errors" | "onResumeChange" | "savedResumeCreditsEnabled" | "visibilityAvailable">) {
   const resume = draft.resume;
   const shortFields: Array<[keyof typeof resume, string]> = [
     ["headline", "Headline"],
@@ -799,6 +886,9 @@ function ResumeInspector({
   ];
   return (
     <div className="grid gap-5">
+      {!visibilityAvailable || !savedResumeCreditsEnabled || !draft.visibility.resumeCreditsEnabled ? (
+        <ResumeCreditsStatus draft={draft} savedResumeCreditsEnabled={savedResumeCreditsEnabled} visibilityAvailable={visibilityAvailable} />
+      ) : null}
       {shortFields.map(([key, label]) => (
         <Field error={fieldMessage(errors, key)} key={key} label={label}>
           <input
@@ -856,6 +946,9 @@ function CreditsInspector(props: InspectorProps) {
   const items = props.draft.credits.items;
   return (
     <div className="grid gap-4">
+      {!props.visibilityAvailable || !props.savedResumeCreditsEnabled || !props.draft.visibility.resumeCreditsEnabled ? (
+        <ResumeCreditsStatus draft={props.draft} savedResumeCreditsEnabled={props.savedResumeCreditsEnabled} visibilityAvailable={props.visibilityAvailable} />
+      ) : null}
       <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-3.5">
         <CollectionHeader count={items.length} label="Selected work" limit={100} onAdd={props.onAddCredit} />
         <p className="mt-3 text-xs leading-5 text-white/38">
@@ -986,6 +1079,7 @@ function CreditsInspector(props: InspectorProps) {
 function InspectorFields({ activeSection, ...props }: InspectorProps & { activeSection: BioEditorSection }) {
   if (activeSection === "hero") return <HeroInspector {...props} />;
   if (activeSection === "biography") return <BiographyInspector {...props} />;
+  if (activeSection === "visibility") return <VisibilityInspector {...props} />;
   if (activeSection === "resume") return <ResumeInspector {...props} />;
   return <CreditsInspector {...props} />;
 }
@@ -1108,6 +1202,7 @@ export default function BioEditor({
   const clientAction = useCallback(
     async (previousState: BioSaveState, formData: FormData) => {
       if (archiveInFlight.current === "mutation" || archiveReloadRef.current || saveInFlight.current) return previousState;
+      if (formData.get("section") === "visibility" && !snapshot.visibilityAvailable) return previousState;
       saveInFlight.current = true;
       const submittedSection = formData.get("section");
       const section = BIO_EDITOR_SECTIONS.find(
@@ -1123,7 +1218,7 @@ export default function BioEditor({
         setSavingSection(null);
       }
     },
-    [applySaveResult]
+    [applySaveResult, snapshot.visibilityAvailable]
   );
   const [saveState, formAction, pending] = useActionState(clientAction, INITIAL_BIO_SAVE_STATE);
 
@@ -1193,7 +1288,8 @@ export default function BioEditor({
     responseVisible && saveState.section === activeSection ? saveState.fieldErrors || {} : {};
   const errors = mergeErrors(validation.errors, responseErrors);
   const editorDisabled = disabled || migrationRequired || Boolean(loadError) || pending || archivePending || archiveReloadRequired || needsEditorReload(saveState);
-  const canSave = !editorDisabled && activeDirty && validation.ok;
+  const visibilityUnavailable = activeSection === "visibility" && !snapshot.visibilityAvailable;
+  const canSave = !editorDisabled && !visibilityUnavailable && activeDirty && validation.ok;
   const statusIsError = responseVisible && !["idle", "saved"].includes(saveState.status);
 
   function canMutateArchive(collection: BioArchiveCollection) {
@@ -1373,6 +1469,12 @@ export default function BioEditor({
     commitDraft({ ...draftRef.current, resume: { ...draftRef.current.resume, ...patch } });
   }
 
+  function updateVisibility(resumeCreditsEnabled: boolean) {
+    if (!snapshot.visibilityAvailable || editorDisabled) return;
+    commitDraft({ ...draftRef.current, visibility: { resumeCreditsEnabled } });
+    setAnnouncement(`Resume & Credits ${resumeCreditsEnabled ? "shown" : "hidden"} in the preview. Save Visibility to publish this setting.`);
+  }
+
   function updateCredit(index: number, patch: Partial<BioCreditEditorItem>) {
     const items = draftRef.current.credits.items.map((item, itemIndex) =>
       itemIndex === index ? { ...item, ...patch } : item
@@ -1529,12 +1631,15 @@ export default function BioEditor({
     savedCreditIds,
     savedParagraphIds,
     savedPortraitIds,
+    savedResumeCreditsEnabled: baseline.visibility.resumeCreditsEnabled,
+    visibilityAvailable: Boolean(snapshot.visibilityAvailable),
     onHeroChange: updateHero,
     onBiographyChange: updateBiography,
     onPortraitChange: updatePortrait,
     onParagraphChange: updateParagraph,
     onCreditChange: updateCredit,
     onResumeChange: updateResume,
+    onVisibilityChange: updateVisibility,
     onAddPortrait: addPortrait,
     onAddParagraph: addParagraph,
     onAddCredit: addCredit,
@@ -1554,6 +1659,8 @@ export default function BioEditor({
     ? `Saving ${SECTION_META[savingSection || activeSection].label}...`
     : disabled
       ? "Editor is read-only"
+      : visibilityUnavailable
+        ? "Visibility control is unavailable"
       : !validation.ok
         ? `${SECTION_META[activeSection].label} needs attention`
         : activeDirty
@@ -1569,6 +1676,8 @@ export default function BioEditor({
       ? loadError
       : mediaLoadError
         ? mediaLoadError
+        : visibilityUnavailable
+          ? "Saved visibility could not be confirmed. Reload the editor; databases not yet updated need migration 0059. Other sections remain editable."
         : !validation.ok
           ? `${Object.values(validation.errors).flat().length} highlighted ${Object.values(validation.errors).flat().length === 1 ? "field needs" : "fields need"} attention before saving.`
         : activeDirty

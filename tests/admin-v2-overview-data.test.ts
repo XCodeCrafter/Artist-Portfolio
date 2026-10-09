@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getAdminV2OverviewData } from "@/lib/admin/v2-overview";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(), navigation: vi.fn(), home: vi.fn(), bio: vi.fn(), gallery: vi.fn(), showreel: vi.fn(),
+  auth: vi.fn(), navigation: vi.fn(), home: vi.fn(), press: vi.fn(), bio: vi.fn(), gallery: vi.fn(), showreel: vi.fn(),
   music: vi.fn(), contact: vi.fn(), events: vi.fn(), inbox: vi.fn(), appearance: vi.fn(), media: vi.fn(), readiness: vi.fn(),
 }));
 vi.mock("@/lib/admin/auth", () => ({ requireAdmin: mocks.auth }));
 vi.mock("@/lib/admin/navigation", () => ({ getAdminNavigationData: mocks.navigation }));
 vi.mock("@/lib/admin/home", () => ({ getAdminHomeEditorData: mocks.home }));
+vi.mock("@/lib/admin/press", () => ({ getAdminPressEditorData: mocks.press }));
 vi.mock("@/lib/admin/bio", () => ({ getAdminBioEditorData: mocks.bio }));
 vi.mock("@/lib/admin/gallery", () => ({ getAdminGalleryEditorData: mocks.gallery }));
 vi.mock("@/lib/admin/showreel", () => ({ getAdminShowreelEditorData: mocks.showreel }));
@@ -28,7 +29,7 @@ const ready = { isConfigured: true, migrationRequired: false };
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.auth.mockResolvedValue({ id: "admin" });
-  for (const loader of [mocks.home, mocks.bio, mocks.gallery, mocks.showreel, mocks.music, mocks.events]) loader.mockResolvedValue(ready);
+  for (const loader of [mocks.home, mocks.press, mocks.bio, mocks.gallery, mocks.showreel, mocks.music, mocks.events]) loader.mockResolvedValue(ready);
   mocks.navigation.mockResolvedValue({ ...ready, configVersion: 1, navigation: [], availability: {} });
   mocks.contact.mockResolvedValue({ ...ready, delivery: { emailConfigured: true, webhookConfigured: true } });
   mocks.inbox.mockResolvedValue({ isConfigured: true, count: 0 });
@@ -38,13 +39,20 @@ beforeEach(() => {
 });
 
 describe("Overview workspace readiness", () => {
+  it("reports Press readiness independently from unrelated Home content", async () => {
+    mocks.home.mockResolvedValue({ ...ready, loadError: "Home unavailable" });
+    const result = await getAdminV2OverviewData();
+    expect(result.pages.find(page => page.key === "press")?.editorState).toBe("ready");
+    expect(result.pages.find(page => page.key === "home")?.editorState).toBe("unavailable");
+  });
+
   it("includes Appearance and Media reads but returns only presentation-safe status", async () => {
     const result = await getAdminV2OverviewData();
     expect(mocks.appearance).toHaveBeenCalledOnce();
     expect(mocks.media).toHaveBeenCalledOnce();
     expect(mocks.readiness).toHaveBeenCalledExactlyOnceWith({ includeSchema: false });
     expect(result.issues).toEqual([]);
-    expect(result.pages).toHaveLength(7);
+    expect(result.pages).toHaveLength(8);
     expect(JSON.stringify(result)).not.toContain("not-for-client");
     expect(JSON.stringify(result)).not.toContain("private-path");
   });

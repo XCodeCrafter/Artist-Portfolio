@@ -1,6 +1,6 @@
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import {
-  PAGE_SLUGS,
+  HERO_PAGE_SLUGS,
   normalizeHiddenNavPageSlugs,
 } from "@/lib/content/modules";
 import {
@@ -280,7 +280,7 @@ type ActorCreditRow = {
 };
 
 function mapFallbackHeroes(): EditableHeroContent[] {
-  return PAGE_SLUGS.map((pageSlug, index) => ({
+  return HERO_PAGE_SLUGS.map((pageSlug, index) => ({
     pageSlug,
     ...FALLBACK_CONTENT.heroes[pageSlug],
     sortOrder: (index + 1) * 10,
@@ -388,7 +388,7 @@ function mapHeroes(rows: PageHeroRow[]): EditableHeroContent[] {
     });
   }
 
-  return PAGE_SLUGS.map((slug) => fallbackBySlug.get(slug)).filter(
+  return HERO_PAGE_SLUGS.map((slug) => fallbackBySlug.get(slug)).filter(
     Boolean
   ) as EditableHeroContent[];
 }

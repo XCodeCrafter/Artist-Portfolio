@@ -6,7 +6,7 @@ import { normalizeHeroFraming } from "./hero-framing";
 import { applyPublicPhotoFramings } from "./photo-framing";
 import { loadPublicPhotoFramings } from "./photo-framing.server";
 import { loadPublicSiteSharing } from "./site-sharing.server";
-import { PAGE_SLUGS, normalizeHiddenNavPageSlugs } from "./modules";
+import { HERO_PAGE_SLUGS, normalizeHiddenNavPageSlugs } from "./modules";
 import {
   normalizeBodyFont,
   normalizeDisplayFont,
@@ -35,6 +35,7 @@ import type {
   GalleryPresentation,
   FooterEffect,
   HeroContent,
+  HeroPageSlug,
   HomeUpdate,
   HomePresentation,
   MusicPlatformLink,
@@ -51,6 +52,7 @@ import type {
 } from "./types";
 
 type SiteSettingsRow = {
+  bio_resume_credits_enabled?: unknown;
   footer_content?: unknown;
   portfolio_type?: string | null;
   navigation_config_version?: number | null;
@@ -206,7 +208,7 @@ type ActorCreditRow = {
   href: string;
 };
 
-const PAGE_SLUG_SET = new Set<PageSlug>(PAGE_SLUGS);
+const HERO_PAGE_SLUG_SET = new Set<HeroPageSlug>(HERO_PAGE_SLUGS);
 
 function mapSettings(row?: SiteSettingsRow): SiteSettings {
   if (!row) return FALLBACK_CONTENT.settings;
@@ -225,6 +227,7 @@ function mapSettings(row?: SiteSettingsRow): SiteSettings {
     ),
     footerEffect: normalizeFooterEffect(row.footer_effect),
     homeSectionTransitionsEnabled: row.home_section_transitions_enabled === true,
+    bioResumeCreditsEnabled: row.bio_resume_credits_enabled !== false,
     footerContent: normalizeFooterContent(row.footer_content),
     artistName: row.artist_name,
     displayFont: normalizeDisplayFont(row.display_font),
@@ -239,13 +242,13 @@ function mapSettings(row?: SiteSettingsRow): SiteSettings {
   };
 }
 
-function mapHeroes(rows: PageHeroRow[]): Record<PageSlug, HeroContent> {
+function mapHeroes(rows: PageHeroRow[]): Record<HeroPageSlug, HeroContent> {
   const heroes = { ...FALLBACK_CONTENT.heroes };
 
   for (const row of rows) {
-    if (!PAGE_SLUG_SET.has(row.page_slug as PageSlug)) continue;
+    if (!HERO_PAGE_SLUG_SET.has(row.page_slug as HeroPageSlug)) continue;
 
-    heroes[row.page_slug as PageSlug] = {
+    heroes[row.page_slug as HeroPageSlug] = {
       title: row.title,
       subtitle: row.subtitle,
       ctaLabel: row.cta_label,

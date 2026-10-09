@@ -134,7 +134,7 @@ describe("Home V2 server action", () => {
     const response = await saveHomeSectionV2(INITIAL_HOME_SAVE_STATE, form("cnc", draft.cnc));
     expect(response).toMatchObject({ status: "saved", canonicalSection: draft.cnc, versions: nextVersions });
     expect(response.message).toContain("audit log could not be recorded"); expect(response.message).not.toContain("private");
-    expect(rpc).toHaveBeenCalledOnce(); expect(mocks.revalidate).toHaveBeenCalledTimes(4);
+    expect(rpc).toHaveBeenCalledOnce(); expect(mocks.revalidate).toHaveBeenCalledTimes(7);
   });
   it("returns the confirmed write after a two-second audit deadline and clears its timer", async () => {
     vi.useFakeTimers();
@@ -148,7 +148,7 @@ describe("Home V2 server action", () => {
     const response = await pending;
     expect(response).toMatchObject({ status: "saved", canonicalSection: draft.cnc, versions: nextVersions });
     expect(response.message).toContain("Audit confirmation timed out");
-    expect(mocks.revalidate).toHaveBeenCalledTimes(4); expect(vi.getTimerCount()).toBe(0);
+    expect(mocks.revalidate).toHaveBeenCalledTimes(7); expect(vi.getTimerCount()).toBe(0);
     // A late network failure remains handled by the race rather than becoming
     // an unhandled rejection after the successful response has been delivered.
     rejectAudit(new Error("private late audit failure"));
@@ -167,6 +167,6 @@ describe("Home V2 server action", () => {
     const response = await saveHomeSectionV2(INITIAL_HOME_SAVE_STATE, form("cnc", draft.cnc));
     expect(response).toMatchObject({ status: "saved", canonicalSection: draft.cnc, versions: nextVersions });
     expect(response.message).toContain("cache could not be fully refreshed"); expect(response.message).not.toContain("private");
-    expect(mocks.revalidate.mock.calls.map(call => call[0])).toEqual(["/", "/admin/v2/pages/home", "/admin/v2-preview/home", "/admin/v2"]);
+    expect(mocks.revalidate.mock.calls.map(call => call[0])).toEqual(["/", "/admin/v2/pages/home", "/admin/v2-preview/home", "/admin/v2", "/press", "/admin/v2/pages/press", "/admin/v2-preview/press"]);
   });
 });

@@ -18,6 +18,7 @@ export default async function BioPage() {
   const data: BioPageViewData = {
     hero: content.heroes.bio,
     bio: content.bio,
+    resumeCreditsEnabled: content.settings.bioResumeCreditsEnabled !== false,
     resume: content.actorResume,
     hasResumeDetails: content.hasActorResume,
     credits: content.actorCredits,

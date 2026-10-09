@@ -86,7 +86,10 @@ export async function saveHomeSectionV2(_previousState: HomeSaveState, formData:
     if (auditTimer !== undefined) clearTimeout(auditTimer);
   }
   let cacheFailed = false;
-  for (const path of ["/", "/admin/v2/pages/home", "/admin/v2-preview/home", "/admin/v2"]) {
+  // Press still shares this storage and version. Old open Home tabs must also
+  // refresh the dedicated page after a confirmed editorial save.
+  for (const path of ["/", "/admin/v2/pages/home", "/admin/v2-preview/home", "/admin/v2",
+    "/press", "/admin/v2/pages/press", "/admin/v2-preview/press"]) {
     try { revalidatePath(path); }
     catch {
       cacheFailed = true;

@@ -5,7 +5,7 @@ import AboutHome from "@/components/AboutHome";
 import AdaptiveHero from "@/components/AdaptiveHero";
 import CncCodeShowcase from "@/components/CncCodeShowcase";
 import GalleryShowcase from "@/components/GalleryShowcase";
-import { LatestReleaseSection, SelectedWorkSection, PressReviewsSection } from "./HomeEditorialSections";
+import { LatestReleaseSection, SelectedWorkSection } from "./HomeEditorialSections";
 import type { HomeEditorDraft, HomeEditorSection } from "@/lib/admin/home-editor";
 import type { CncProgramDefinition } from "@/lib/cnc-code";
 import type { GalleryPresentation } from "@/lib/content/types";
@@ -136,21 +136,19 @@ export default function HomePageView({
       case "work":
         return <SelectedWorkSection data={data.work} staticPreview={mode === "preview"} />;
       case "press":
-        return <PressReviewsSection data={data.press} staticPreview={mode === "preview"} />;
+        return null;
     }
   }
 
   return (
     <main className="home-sections" data-home-transitions={sectionTransitionsEnabled ? "on" : undefined}>
-      {data.layout.map(({ id, enabled }) => {
+      {data.layout.filter(({ id }) => id !== "press").map(({ id, enabled }) => {
         const placeholder = !enabled
           ? "Hidden on the website"
           : id === "cnc" && !programs.length
             ? "No published CNC programs yet"
             : id === "release" && !data.release.releaseTitle
               ? "Add your release title before showing this section"
-            : id === "press" && !data.press.items.some(item => item.visible)
-              ? "Add a real press item before showing this section"
               : undefined;
 
         if (mode === "public") {

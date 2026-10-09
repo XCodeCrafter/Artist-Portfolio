@@ -54,6 +54,7 @@ insert into public.site_navigation_items (
   ('main', 'gallery', true, 30),
   ('main', 'music', true, 40),
   ('main', 'works', true, 50),
+  ('main', 'press', true, 59),
   ('main', 'contact', true, 60),
   ('main', 'home.about', true, 70),
   ('main', 'home.cnc', true, 80),

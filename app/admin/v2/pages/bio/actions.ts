@@ -19,6 +19,11 @@ import {
   type BioSaveState,
 } from "@/lib/admin/bio-editor";
 import { createAdminServiceClient } from "@/lib/admin/service";
+import {
+  BIO_VISIBILITY_COLUMNS,
+  BIO_VISIBILITY_MIGRATION_MESSAGE,
+  isMissingBioVisibilitySchemaError,
+} from "@/lib/admin/bio-visibility";
 
 const formSchema = z
   .object({
@@ -155,6 +160,71 @@ export async function saveBioSectionV2(
       "Supabase admin access is not configured, so nothing was saved.",
       { section }
     );
+  }
+
+  if (section === "visibility") {
+    const requested = payload as { resumeCreditsEnabled: boolean };
+    const expected = versions as BioEditorVersions["visibility"];
+    try {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .update({ bio_resume_credits_enabled: requested.resumeCreditsEnabled })
+        .eq("id", "main")
+        .eq("updated_at", expected.updatedAt)
+        .select(BIO_VISIBILITY_COLUMNS)
+        .maybeSingle<Record<string, unknown>>();
+      if (error) {
+        if (isMissingBioVisibilitySchemaError(error)) {
+          return result("migration-required", BIO_VISIBILITY_MIGRATION_MESSAGE, { section });
+        }
+        if (error.code === "40001") {
+          return result("conflict", "Site settings changed in another admin session. Your draft was kept. Reload before saving again.", { section });
+        }
+        if (error.code === "22023" || error.code === "23514") {
+          return result("invalid", "The database rejected this visibility setting. Reload and check your selection.", { section });
+        }
+        return result(
+          "error",
+          "Visibility could not be saved. Your local draft was kept. Reload to check the saved setting before retrying.",
+          { section }
+        );
+      }
+      if (!data) {
+        return result(
+          "conflict",
+          "Site settings changed in another admin session or are unavailable. Your draft was kept. Reload before saving again.",
+          { section }
+        );
+      }
+      const confirmed = parseBioSectionSubmission(
+        section,
+        { resumeCreditsEnabled: data.bio_resume_credits_enabled },
+        { updatedAt: data.updated_at }
+      );
+      if (!confirmed.success || data.updated_at === expected.updatedAt) {
+        return result("error", "The visibility save response could not be confirmed. Reload to verify the saved setting.", { section });
+      }
+      await writeAuditLog({
+        actorId: admin.id,
+        action: "bio_v2_visibility_save",
+        tableName: "site_settings",
+        recordId: "main",
+        metadata: { section, fields: ["bio_resume_credits_enabled"] },
+      });
+      revalidatePath("/", "layout");
+      for (const path of [
+        "/bio", "/admin/v2", "/admin/v2/pages/bio", "/admin/v2-preview/bio",
+        "/admin/v2/navigation", "/admin/v2/settings/appearance", "/admin/content", "/admin/settings",
+      ]) revalidatePath(path);
+      return result("saved", "Resume & Credits visibility saved and published.", {
+        section,
+        canonicalSection: confirmed.data.payload,
+        versions: confirmed.data.versions,
+        savedAt: new Date().toISOString(),
+      });
+    } catch {
+      return result("error", "The visibility save could not be confirmed. Your draft was kept. Reload to verify the saved setting before retrying.", { section });
+    }
   }
 
   const saveCall = getPhotoSaveCall("bio", section, payload, versions, getHeroSaveCall("bio", section, rpcName(section), rpcArguments(section, payload, versions)));

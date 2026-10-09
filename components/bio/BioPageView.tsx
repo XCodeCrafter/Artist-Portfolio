@@ -17,6 +17,7 @@ import type { BioContent } from "@/lib/content/types";
 export const BIO_PREVIEW_SECTIONS = [
   "hero",
   "biography",
+  "visibility",
   "resume",
   "credits",
 ] as const;
@@ -26,6 +27,7 @@ export type BioPreviewSection = (typeof BIO_PREVIEW_SECTIONS)[number];
 export type BioPageViewData = {
   hero: HeroContent;
   bio: BioContent;
+  resumeCreditsEnabled?: boolean;
   resume: ActorResume;
   hasResumeDetails: boolean;
   credits: ActorCredit[];
@@ -341,6 +343,7 @@ function ResumeAndCredits({
     <section
       className="public-nav-anchor mx-auto max-w-[1400px] px-5 py-14 sm:px-8 sm:py-18"
       id="resume"
+      data-bio-preview-section={mode === "preview" ? "visibility" : undefined}
     >
       <div className="grid gap-10 lg:grid-cols-[0.9fr_1.4fr]">
         <PreviewSection
@@ -403,6 +406,7 @@ export default function BioPageView({
       data.bio.paragraphs.length
   );
   const hasResumeContent = data.hasResumeDetails || data.credits.length > 0;
+  const resumeCreditsEnabled = data.resumeCreditsEnabled !== false;
 
   return (
     <>
@@ -453,7 +457,7 @@ export default function BioPageView({
           </PreviewSection>
         ) : null}
 
-        {hasResumeContent || mode === "preview" ? (
+        {resumeCreditsEnabled && (hasResumeContent || mode === "preview") ? (
           <ResumeAndCredits
             credits={data.credits}
             hasResumeDetails={data.hasResumeDetails}
@@ -462,6 +466,16 @@ export default function BioPageView({
             resume={data.resume}
             selectedSection={selectedSection}
           />
+        ) : !resumeCreditsEnabled && mode === "preview" ? (
+          <PreviewSection label="Resume & Credits visibility" mode={mode}
+            onSelect={selectSection} section="visibility" selected={selectedSection === "visibility"}>
+            <div className="mx-auto max-w-[1400px] px-5 py-10 sm:px-8">
+              <div className="rounded-2xl border border-dashed border-white/25 bg-white/[0.025] p-6">
+                <p className="font-ui text-sm font-semibold text-white/80">Resume &amp; Credits · hidden in this preview</p>
+                <p className="mt-2 text-sm leading-6 text-white/50">Your saved content is kept. Use Visibility to show this section again.</p>
+              </div>
+            </div>
+          </PreviewSection>
         ) : null}
       </main>
 

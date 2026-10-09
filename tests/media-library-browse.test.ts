@@ -143,7 +143,7 @@ describe("Media V2 placement explanations", () => {
     const labels = [...registry.matchAll(/\('[^']+', '([^']+)'/g)].map((match) => match[1]);
     expect(labels).toHaveLength(15);
     const destinations = new Set(["/admin/v2", "/admin/v2/pages/bio", "/admin/v2/pages/gallery",
-      "/admin/v2/pages/home", "/admin/v2/pages/music", "/admin/v2/pages/showreel",
+      "/admin/v2/pages/home", "/admin/v2/pages/music", "/admin/v2/pages/showreel", "/admin/v2/pages/press",
       "/admin/v2/navigation", "/admin/v2/settings/appearance"]);
     for (const label of labels) {
       const placement = getMediaPlacementInfo(label);

@@ -26,6 +26,7 @@ type Handler = (event?: unknown) => void | Promise<void>;
 let release: ReturnType<typeof createHomeEditorialDefaults>["release"];
 let press: ReturnType<typeof createHomeEditorialDefaults>["press"];
 let mode: "audio" | "press";
+let standalone: boolean;
 let audio: ReturnType<typeof createAudio>;
 const focus = vi.fn();
 const dialog = {
@@ -61,7 +62,7 @@ function nodes(tree: ReactNode): Node[] {
 }
 function render() {
   hooks.cursor = 0;
-  const result = nodes(mode === "audio" ? LatestReleaseSection({ data: release }) : PressReviewsSection({ data: press }));
+  const result = nodes(mode === "audio" ? LatestReleaseSection({ data: release }) : PressReviewsSection({ data: press, standalone }));
   for (const effect of hooks.effects.splice(0)) { const cleanup = effect(); if (cleanup) hooks.cleanups.push(cleanup); }
   return result;
 }
@@ -84,7 +85,7 @@ beforeEach(() => {
   ({ release, press } = createHomeEditorialDefaults());
   release.releaseTitle = "Test release"; release.playback = { kind: "audio", url: "https://audio.example.com/release.mp3" };
   press.items = [pressItem("first"), pressItem("second"), pressItem("third")];
-  mode = "audio"; audio = createAudio(); dialog.open = false;
+  mode = "audio"; standalone = false; audio = createAudio(); dialog.open = false;
   vi.stubGlobal("Element", FakeElement); vi.stubGlobal("HTMLElement", FakeElement);
   vi.stubGlobal("document", { body: { style: { overflow: "auto" } }, activeElement: null });
 });
@@ -155,6 +156,25 @@ describe("Home audio playback resilience", () => {
 });
 
 describe("Home press reader resilience", () => {
+  it("opens the chosen featured article from the standalone introduction", () => {
+    standalone = true;
+    press.featuredId = "third";
+    openReader();
+    expect(status()).toContain("3 / 3 — Review third");
+    expect(button("Next press item").props.disabled).toBe(true);
+  });
+  it("opens a specific standalone card and navigates only visible articles in saved order", () => {
+    mode = "press"; standalone = true;
+    press.items = [pressItem("first"), { ...pressItem("private"), visible: false }, pressItem("second"), pressItem("third")];
+    handle(button("Read Review second"), "onClick");
+    expect(status()).toContain("2 / 3 — Review second");
+    handle(button("Next press item"), "onClick");
+    expect(status()).toContain("3 / 3 — Review third");
+    handle(button("Previous press item"), "onClick");
+    handle(button("Previous press item"), "onClick");
+    expect(status()).toContain("1 / 3 — Review first");
+    expect(button("Previous press item").props.disabled).toBe(true);
+  });
   it("keeps the selected item when entries are reordered and clamps controls when it disappears", () => {
     openReader(); handle(button("Next press item"), "onClick");
     expect(status()).toContain("2 / 3 — Review second");

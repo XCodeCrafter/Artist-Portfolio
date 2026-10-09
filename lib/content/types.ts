@@ -4,7 +4,11 @@ export type PageSlug =
   | "gallery"
   | "music"
   | "video"
+  | "press"
   | "booking";
+
+/** Press uses its editorial opening, not a separate page_heroes record. */
+export type HeroPageSlug = Exclude<PageSlug, "press">;
 
 export type PortfolioType = "musician" | "actor";
 
@@ -62,6 +66,8 @@ export type HeroContent = {
 };
 
 export type SiteSettings = {
+  /** Absent on legacy schemas; preserve existing visibility until configured. */
+  bioResumeCreditsEnabled?: boolean;
   sharingMetadata?: import("./site-sharing").SharingMetadata;
   footerContent?: import("./footer").FooterContent;
   portfolioType: PortfolioType;
@@ -259,7 +265,7 @@ export type PortfolioContent = {
   photoFramings?: import("./photo-framing").PublicPhotoFramings;
   settings: SiteSettings;
   navigation: NavigationConfig;
-  heroes: Record<PageSlug, HeroContent>;
+  heroes: Record<HeroPageSlug, HeroContent>;
   homeUpdates: HomeUpdate[];
   homePresentation: HomePresentation;
   aboutHome: AboutHomeContent;

@@ -7,7 +7,7 @@ vi.mock("@/lib/supabase/proxy", () => ({
 }));
 
 describe("HOME preview framing boundary", () => {
-  it.each(["/admin/v2-preview/home", "/admin/v2-preview/home/"])(
+  it.each(["/admin/v2-preview/home", "/admin/v2-preview/home/", "/admin/v2-preview/press", "/admin/v2-preview/press/"])(
     "permits the authenticated preview at %s in the same-origin editor",
     async (path) => {
       const response = await proxy(new NextRequest(`http://localhost:3000${path}`));
@@ -16,7 +16,7 @@ describe("HOME preview framing boundary", () => {
     }
   );
 
-  it.each(["/admin/v2/pages/home", "/admin/v2-preview/home/extra", "/admin/v2-preview/home-other"])(
+  it.each(["/admin/v2/pages/home", "/admin/v2-preview/home/extra", "/admin/v2-preview/home-other", "/press", "/admin/v2/pages/press", "/admin/v2-preview/press/extra", "/admin/v2-preview/press-other"])(
     "keeps non-preview or lookalike route %s protected from framing",
     async (path) => {
       const response = await proxy(new NextRequest(`http://localhost:3000${path}`));

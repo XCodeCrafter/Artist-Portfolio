@@ -80,7 +80,7 @@ function availabilityLabel(
   if (item.availability === "conditional-resume") {
     return context.hasResumeContent
       ? "Resume content available"
-      : "Needs resume or credits";
+      : "Resume & Credits is hidden or has no published content";
   }
   return item.kind === "page" ? "Public page" : "Page section";
 }

@@ -54,6 +54,13 @@ export const ADMIN_V2_NAVIGATION = [
     group: "Portfolio",
   },
   {
+    key: "press",
+    href: "/admin/v2/pages/press",
+    label: "Press page",
+    description: "Reviews, interviews and coverage",
+    group: "Portfolio",
+  },
+  {
     key: "contact",
     href: "/admin/v2/pages/contact",
     label: LIVE_CONTACT_PAGE_LABEL,

@@ -152,6 +152,16 @@ export const NAVIGATION_DESTINATIONS = [
     defaultOrder: 120,
   },
   {
+    key: "press",
+    defaultLabel: "PRESS",
+    description: "Reviews, interviews, radio, and press coverage.",
+    href: "/press",
+    pageSlug: "press",
+    kind: "page",
+    availability: "available",
+    defaultOrder: 125,
+  },
+  {
     key: "contact",
     defaultLabel: LIVE_CONTACT_NAV_LABEL,
     description: "Live event calendar and contact for bookings, acting, music, and collaboration.",
@@ -177,6 +187,7 @@ export const MIXED_REVIEW_NAVIGATION_KEYS = [
   "gallery",
   "music",
   "works",
+  "press",
   "contact",
   "home.about",
   "home.cnc",
@@ -366,8 +377,8 @@ const LEGACY_PROFILE_KEYS: Record<
   PortfolioType,
   readonly NavigationDestinationKey[]
 > = {
-  actor: ["home", "bio", "gallery", "works", "contact"],
-  musician: ["home", "bio", "music", "works", "contact"],
+  actor: ["home", "bio", "gallery", "works", "press", "contact"],
+  musician: ["home", "bio", "music", "works", "press", "contact"],
 };
 
 function isNavigationDestinationKey(

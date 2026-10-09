@@ -57,7 +57,7 @@ describe("Admin V2 destination finder", () => {
     expect(pageEditor).toContain('href="/admin/v2/pages/events"');
     expect(pageEditor).toContain("manage the calendar in Events");
     expect(calendarEditor).toContain('href="/admin/v2/pages/contact"');
-    expect(calendarEditor).toContain("not a separate public page");
+    expect(calendarEditor).toContain("Manage concerts and performances on {LIVE_CONTACT_PAGE_LABEL}");
     expect(overviewPage).not.toContain("Inside Bookings");
   });
 
@@ -213,7 +213,9 @@ describe("Admin V2 Settings information architecture", () => {
 
   it("groups brand, access, security, audit, and technical health", () => {
     expect(settingsPage).toContain("Appearance, profile &amp; footer");
-    expect(settingsPage).toContain("footer headings and buttons");
+    expect(settingsPage).toContain("footer contact link");
+    expect(settingsPage).toContain("shared platform icons in Navbar");
+    expect(settingsPage).not.toContain("footer headings and buttons");
     expect(settingsPage).toContain("Owner name &amp; navigation");
     expect(settingsPage).toContain('href="/admin/v2/navigation"');
     expect(settingsPage).toContain('href="/admin/v2/settings/appearance"');

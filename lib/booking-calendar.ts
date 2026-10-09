@@ -13,7 +13,11 @@ export type BookingCalendarEvent = {
   timezone: string; city: string; venue: string; kind: string; ticketUrl: string;
   status: "scheduled" | "sold_out" | "cancelled"; published: boolean;
 };
-export type BookingCalendarSettings = { enabled: boolean; title: string; intro: string };
+export type BookingCalendarSettings = {
+  enabled: boolean; title: string; intro: string;
+  /** Legacy public responses omit this field; absence never enables ticket links. */
+  showTicketLinks?: boolean;
+};
 export type BookingCalendarDraft = { settings: BookingCalendarSettings; events: BookingCalendarEvent[] };
 export type BookingCalendarSnapshot = { draft: BookingCalendarDraft; updatedAt: string };
 export type BookingCalendarSaveState = {
@@ -24,6 +28,7 @@ export const INITIAL_BOOKING_CALENDAR_SAVE_STATE: BookingCalendarSaveState = { s
 export const DEFAULT_BOOKING_CALENDAR_DRAFT: BookingCalendarDraft = {
   settings: {
     enabled: false,
+    showTicketLinks: false,
     title: "See you out there.",
     intro: "Live shows, festivals, and special appearances. Find the next one near you.",
   },
@@ -71,10 +76,14 @@ export const bookingCalendarEventSchema = z.object({
   ticketUrl: text(2_048).refine(isSafeBookingCalendarTicketUrl, "Use a public https:// ticket URL without credentials, or leave it empty."),
   status: z.enum(["scheduled", "sold_out", "cancelled"]), published: z.boolean(),
 }).strict();
-export const bookingCalendarDraftSchema = z.object({
-  settings: z.object({ enabled: z.boolean(), title: text(160, true), intro: text(600) }).strict(),
+const bookingCalendarSettingsSchema = z.object({
+  enabled: z.boolean(), title: text(160, true), intro: text(600), showTicketLinks: z.boolean(),
+}).strict();
+const bookingCalendarDraftBaseSchema = z.object({
+  settings: bookingCalendarSettingsSchema,
   events: z.array(bookingCalendarEventSchema).max(BOOKING_CALENDAR_MAX_EVENTS),
-}).strict().superRefine((draft, context) => {
+}).strict();
+function validateCalendarCollection(draft: BookingCalendarDraft, context: z.RefinementCtx) {
   if (new TextEncoder().encode(JSON.stringify(draft)).byteLength > BOOKING_CALENDAR_MAX_PAYLOAD) {
     context.addIssue({ code: "custom", path: ["events"], message: "This calendar is too large. Shorten event descriptions or remove old events before saving." });
   }
@@ -84,7 +93,13 @@ export const bookingCalendarDraftSchema = z.object({
     if (seen.has(key)) context.addIssue({ code: "custom", path: ["events", index, "id"], message: "Every event must have its own ID." });
     seen.add(key);
   });
-});
+}
+// Reads support the exact pre-0061 shape during rollout. Saves must carry the
+// explicit setting so an old client cannot silently reset a saved owner choice.
+export const bookingCalendarDraftSchema = bookingCalendarDraftBaseSchema.extend({
+  settings: bookingCalendarSettingsSchema.extend({ showTicketLinks: z.boolean().default(false) }),
+}).superRefine(validateCalendarCollection);
+const bookingCalendarSaveDraftSchema = bookingCalendarDraftBaseSchema.superRefine(validateCalendarCollection);
 export const bookingCalendarTimestampSchema = z.string().max(64)
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/)
   .refine(value => Number.isFinite(Date.parse(value)), "Reload the editor to obtain the saved version.");
@@ -93,6 +108,18 @@ export function sortBookingCalendarEvents(events: readonly BookingCalendarEvent[
   return [...events].sort((a, b) => `${a.date} ${a.time} ${a.id}`.localeCompare(`${b.date} ${b.time} ${b.id}`, "en"));
 }
 export function parseBookingCalendarDraft(value: unknown) { return bookingCalendarDraftSchema.safeParse(value); }
+export function parseBookingCalendarSaveDraft(value: unknown) { return bookingCalendarSaveDraftSchema.safeParse(value); }
+/** Check the raw response before legacy read normalization adds its false default. */
+export function hasBookingCalendarTicketVisibility(value: unknown) {
+  return z.object({ draft: z.object({ settings: z.object({ showTicketLinks: z.boolean() }) }) }).safeParse(value).success;
+}
+export function isNewerBookingCalendarVersion(saved: string, previous: string) {
+  const milliseconds = Date.parse(saved) - Date.parse(previous);
+  if (milliseconds !== 0) return milliseconds > 0;
+  // Preserve PostgreSQL's microseconds and treat equivalent UTC offsets alike.
+  const remainder = (value: string) => Number((value.match(/\.(\d+)/)?.[1] || "").padEnd(6, "0").slice(3));
+  return remainder(saved) > remainder(previous);
+}
 export function parseBookingCalendarSnapshot(value: unknown): BookingCalendarSnapshot | null {
   const parsed = z.object({ draft: bookingCalendarDraftSchema, updatedAt: bookingCalendarTimestampSchema }).strict().safeParse(value);
   return parsed.success ? { ...parsed.data, draft: { ...parsed.data.draft, events: sortBookingCalendarEvents(parsed.data.draft.events) } } : null;

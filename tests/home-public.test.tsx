@@ -35,7 +35,7 @@ describe("HOME public and preview layout", () => {
     data.hero.backgroundSrc = "/uploads/hidden-hero.mp4";
     data.about.imageSrc = "/uploads/hidden-about.jpg";
     const preview = renderToStaticMarkup(<HomePageView data={data} programs={[]} mode="preview" selectedSection="about" />);
-    expect([...preview.matchAll(/data-home-preview-section="([^"]+)"/g)]).toHaveLength(7);
+    expect([...preview.matchAll(/data-home-preview-section="([^"]+)"/g)]).toHaveLength(6);
     expect(preview).toContain("Hidden on the website");
     expect(preview).toContain('aria-pressed="true"');
     expect(preview).toContain("inert");
@@ -72,7 +72,7 @@ describe("HOME public and preview layout", () => {
     expect(page.match(/id="home-feature"/g)).toHaveLength(1);
   });
 
-  it("omits empty CNC, release and press on the public page but explains them in preview", () => {
+  it("explains empty Home sections in preview and leaves Press to its separate page", () => {
     const data = createHomeDraftFromContent(FALLBACK_CONTENT);
     data.layout = data.layout.map(item => ({ ...item, enabled: true }));
     const page = renderToStaticMarkup(<HomePageView data={data} programs={[]} />);
@@ -83,7 +83,8 @@ describe("HOME public and preview layout", () => {
     expect(page).not.toContain('data-home-section="release"');
     expect(page).not.toContain('data-home-section="press"');
     expect(preview).toContain("Add your release title");
-    expect(preview).toContain("Add a real press item");
+    expect(preview).not.toContain('data-home-preview-section="press"');
+    expect(preview).not.toContain("Add a real press item");
   });
 
   it("uses edited HOME metadata but excludes media for hidden sections", () => {

@@ -136,9 +136,12 @@ const mediaPlacements: Record<string, MediaPlacementInfo> = {
     links: [{ label: "Open Gallery editor", href: "/admin/v2/pages/gallery" }],
   },
   "Home V2 (including hidden sections)": {
-    title: "Home V2",
-    description: "The Home draft references this file. Hidden sections and saved blocks are included; this does not prove it is visible on the public page.",
-    links: [{ label: "Open Home editor", href: "/admin/v2/pages/home" }],
+    title: "Home & Press",
+    description: "Saved Home or Press content references this file. Hidden sections and unpublished press items are included; this does not prove it is visible on the public website.",
+    links: [
+      { label: "Open Home editor", href: "/admin/v2/pages/home" },
+      { label: "Open Press editor", href: "/admin/v2/pages/press" },
+    ],
   },
   "Home update (Classic)": {
     title: "Home update (Classic)",

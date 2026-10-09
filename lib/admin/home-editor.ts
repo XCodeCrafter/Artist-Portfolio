@@ -79,7 +79,10 @@ const schemas = {
   release: homeReleaseSchema,
   work: homeWorkSchema,
   press: homePressSchema,
-  layout: layoutSchema,
+  layout: layoutSchema.refine(
+    rows => rows.some(row => row.id !== "press" && row.enabled),
+    "Keep at least one Home section visible. Press is now a separate page."
+  ),
   hero: z.object({
     title: text(220), subtitle: text(500), ctaLabel: text(220), ctaHref: href,
     backgroundSrc: media.refine(Boolean, "Choose a hero image or video."), posterSrc: media,

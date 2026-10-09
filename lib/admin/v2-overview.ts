@@ -7,6 +7,7 @@ import { getAdminContactEditorData } from "@/lib/admin/contact";
 import { getAdminBookingCalendarData } from "@/lib/admin/booking-calendar";
 import { getAdminGalleryEditorData } from "@/lib/admin/gallery";
 import { getAdminHomeEditorData } from "@/lib/admin/home";
+import { getAdminPressEditorData } from "@/lib/admin/press";
 import { getAdminNewInquiryCount } from "@/lib/admin/inquiries";
 import { getAdminMusicEditorData } from "@/lib/admin/music";
 import { getMediaLibraryV2Data } from "@/lib/admin/media-library";
@@ -28,7 +29,7 @@ export type AdminV2PageEditorState =
 export type AdminV2NavbarState = "shown" | "hidden" | "unknown";
 
 export type AdminV2PageSummary = {
-  key: "home" | "bio" | "gallery" | "showreel" | "music" | "contact" | "events";
+  key: "home" | "bio" | "gallery" | "showreel" | "music" | "press" | "contact" | "events";
   label: string;
   description: string;
   editorHref: string;
@@ -121,10 +122,11 @@ function sortIssues(issues: AdminV2OverviewIssue[]) {
 export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
   await requireAdmin();
 
-  const [navigation, home, bio, gallery, showreel, music, contact, events, inbox, appearance, media, readiness] =
+  const [navigation, home, press, bio, gallery, showreel, music, contact, events, inbox, appearance, media, readiness] =
     await Promise.all([
       getAdminNavigationData(),
       getAdminHomeEditorData(),
+      getAdminPressEditorData(),
       getAdminBioEditorData(),
       getAdminGalleryEditorData(),
       getAdminShowreelEditorData(),
@@ -217,6 +219,16 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
       navigationKey: "music",
     },
     {
+      key: "press",
+      label: "Press",
+      description: "Reviews, interviews, featured coverage, and publication order.",
+      editorHref: "/admin/v2/pages/press",
+      publicHref: "/press",
+      migrationLabel: "The editorial content database migration (0055)",
+      readiness: press,
+      navigationKey: "press",
+    },
+    {
       key: "contact",
       label: LIVE_CONTACT_PAGE_LABEL,
       description: "Page hero, contact form and delivery. Calendar content is managed in Events.",
@@ -229,10 +241,10 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
     {
       key: "events",
       label: "Events",
-      description: `Calendar inside ${LIVE_CONTACT_PAGE_LABEL}, live dates, venues and tickets.`,
+      description: `Calendar inside ${LIVE_CONTACT_PAGE_LABEL}, live dates, venues and event details.`,
       editorHref: "/admin/v2/pages/events",
       publicHref: "/booking#events",
-      migrationLabel: "The Events calendar database migration (0053)",
+      migrationLabel: "The Events calendar migrations (0053 and 0061)",
       readiness: events,
       navigationKey: "contact",
     },

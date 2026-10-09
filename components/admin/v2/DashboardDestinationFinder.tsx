@@ -12,6 +12,7 @@ import {
   FaInbox,
   FaListUl,
   FaMusic,
+  FaNewspaper,
   FaPalette,
   FaSearch,
   FaShieldAlt,
@@ -44,6 +45,8 @@ function destinationIcon(id: string) {
       return <FaVideo />;
     case "music":
       return <FaMusic />;
+    case "press":
+      return <FaNewspaper />;
     case "contact":
       return <FaEnvelope />;
     case "inbox":

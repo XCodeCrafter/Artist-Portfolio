@@ -8,6 +8,7 @@ vi.mock("@/lib/admin/service", () => ({ createAdminServiceClient: mocks.service 
 vi.mock("@/lib/content/supabase", () => ({ createPublicContentClient: mocks.publicClient }));
 vi.mock("react", () => ({ cache: <T,>(fn: T) => fn }));
 const snapshot = { draft: DEFAULT_BOOKING_CALENDAR_DRAFT, updatedAt: "2026-09-27T10:00:00.123456+00:00" };
+const event = { id: "11111111-1111-4111-8111-111111111111", title: "Upcoming show", description: "", date: "2026-10-09", time: "19:30", timezone: "UTC", city: "City", venue: "Venue", kind: "Show", ticketUrl: "https://tickets.example.com/show", status: "scheduled", published: true };
 beforeEach(() => {
   vi.clearAllMocks(); mocks.requireAdmin.mockResolvedValue({ id: "admin" });
   mocks.rpc.mockReturnValue({ abortSignal: mocks.abort }); mocks.abort.mockResolvedValue({ data: snapshot, error: null });
@@ -20,6 +21,16 @@ describe("Booking calendar readers", () => {
   it("returns configured and parsed private snapshot", async () => {
     expect(await getAdminBookingCalendarData()).toEqual({ snapshot, isConfigured: true, migrationRequired: false });
     expect(mocks.rpc).toHaveBeenCalledWith("get_booking_calendar_v2_snapshot"); expect(mocks.abort).toHaveBeenCalledWith(expect.any(AbortSignal));
+  });
+  it("keeps the pre-0061 admin snapshot readable but disables saving until migration", async () => {
+    const legacy = structuredClone(DEFAULT_BOOKING_CALENDAR_DRAFT);
+    delete legacy.settings.showTicketLinks;
+    const raw = { draft: { ...legacy, events: [event] }, updatedAt: snapshot.updatedAt };
+    mocks.abort.mockResolvedValue({ data: raw, error: null });
+    expect(await getAdminBookingCalendarData()).toEqual({
+      snapshot: { ...raw, draft: { ...raw.draft, settings: { ...legacy.settings, showTicketLinks: false } } },
+      isConfigured: true, migrationRequired: true,
+    });
   });
   it("returns disabled read-only fallback when service is missing", async () => {
     mocks.service.mockReturnValue(null); expect(await getAdminBookingCalendarData()).toMatchObject({ isConfigured: false, migrationRequired: false, snapshot: { draft: { settings: { enabled: false }, events: [] } } });
@@ -40,6 +51,16 @@ describe("Booking calendar readers", () => {
     const draft = { ...DEFAULT_BOOKING_CALENDAR_DRAFT, settings: { ...DEFAULT_BOOKING_CALENDAR_DRAFT.settings, enabled: true } };
     mocks.abort.mockResolvedValue({ data: draft, error: null }); expect(await getPublicBookingCalendar()).toEqual(draft);
     expect(mocks.rpc).toHaveBeenCalledWith("get_public_booking_calendar_v1"); expect(mocks.service).not.toHaveBeenCalled(); expect(mocks.requireAdmin).not.toHaveBeenCalled();
+  });
+  it.each([undefined, false, true])("public ticket projection is enabled only by explicit true: %s", async showTicketLinks => {
+    const settings = { ...DEFAULT_BOOKING_CALENDAR_DRAFT.settings, enabled: true, showTicketLinks };
+    if (showTicketLinks === undefined) delete settings.showTicketLinks;
+    mocks.abort.mockResolvedValue({ data: { settings, events: [event] }, error: null });
+    expect(await getPublicBookingCalendar()).toEqual({
+      settings: { ...settings, showTicketLinks: showTicketLinks === true },
+      events: [{ ...event, ticketUrl: showTicketLinks ? event.ticketUrl : "" }],
+    });
+    expect(event.ticketUrl).toBe("https://tickets.example.com/show");
   });
   it.each([null, {}, DEFAULT_BOOKING_CALENDAR_DRAFT])("public reader hides missing, malformed or disabled calendar", async data => {
     mocks.abort.mockResolvedValue({ data, error: null }); expect(await getPublicBookingCalendar()).toBeNull();

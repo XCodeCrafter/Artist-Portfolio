@@ -35,9 +35,10 @@ export default async function AdminV2BioPage() {
           Bio page
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-white/46">
-          Edit the page in the same order visitors see it. Choose Hero,
-          Biography, Resume, or Credits in the real preview, then publish only
-          that section. Existing portraits, paragraphs, and credits stay
+          Edit Hero, Biography, Resume, or Credits in the real preview, then
+          publish only that section. Use Visibility to hide the whole Resume
+          &amp; Credits block without deleting its content. You can still edit
+          it while hidden. Existing portraits, paragraphs, and credits stay
           recoverable when hidden or archived.
         </p>
       </header>

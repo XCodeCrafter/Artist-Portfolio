@@ -9,11 +9,11 @@ const event: BookingCalendarEvent = {
   date: "2026-10-03", time: "19:30", timezone: "Europe/Prague", city: "Prague", venue: "Test venue", kind: "Live show",
   ticketUrl: "https://tickets.example.com/show", status: "scheduled", published: true,
 };
-function data(events: BookingCalendarEvent[] = [event]): BookingCalendarDraft {
-  return { settings: { enabled: true, title: "See you out there.", intro: "Live shows and special appearances." }, events };
+function data(events: BookingCalendarEvent[] = [event], showTicketLinks = false): BookingCalendarDraft {
+  return { settings: { enabled: true, title: "See you out there.", intro: "Live shows and special appearances.", showTicketLinks }, events };
 }
-function markup(events = [event], preview = false) {
-  return renderToStaticMarkup(<BookingCalendar data={data(events)} preview={preview} today="2026-09-27" />);
+function markup(events = [event], preview = false, showTicketLinks = false) {
+  return renderToStaticMarkup(<BookingCalendar data={data(events, showTicketLinks)} preview={preview} today="2026-09-27" />);
 }
 
 describe("Public booking calendar date presentation", () => {
@@ -51,8 +51,8 @@ describe("Public booking calendar date presentation", () => {
 });
 
 describe("Public booking calendar rendering", () => {
-  it("renders the real title, local date/time, timezone and external tickets", () => {
-    const html = markup();
+  it("renders the real title, local date/time, timezone and explicitly enabled external tickets", () => {
+    const html = markup([event], false, true);
     expect(html).toContain("See you out there.");
     expect(html).toContain("October 2026");
     expect(html).toContain("19:30");
@@ -79,13 +79,13 @@ describe("Public booking calendar rendering", () => {
     expect(html).not.toContain('href="#form"');
   });
   it.each(["sold_out", "cancelled"] as const)("keeps %s events visible but disables ticket sales", status => {
-    const html = markup([{ ...event, status }]);
+    const html = markup([{ ...event, status }], false, true);
     expect(html).toContain(status === "sold_out" ? "Sold out" : "Cancelled");
     expect(html).toContain("Evening in Prague");
     expect(html).not.toContain('href="https://tickets');
   });
   it.each(["", "javascript:alert(1)", "http://tickets.example.com", "https://user:password@tickets.example.com", "https://localhost/tickets"])("does not expose a ticket link for unsafe or absent URL %s", ticketUrl => {
-    const html = markup([{ ...event, ticketUrl }]);
+    const html = markup([{ ...event, ticketUrl }], false, true);
     expect(html).not.toContain('target="_blank"');
     expect(html).toContain("Ticket information will be announced");
   });
@@ -118,5 +118,77 @@ describe("Public booking calendar rendering", () => {
     expect(css).toContain('.section[data-view="auto"] .listPanel { display: block; }');
     expect(css).toContain("var(--font-display)");
     expect(css).toContain("var(--font-ui)");
+  });
+});
+
+describe("Calendar without ticket links", () => {
+  it.each([false, true])("hides all generated ticket controls and notes in preview=%s while preserving details", preview => {
+    const html = markup([event], preview);
+    expect(html).toContain("Evening in Prague");
+    expect(html).toContain("19:30");
+    expect(html).toContain("Test venue");
+    expect(html).toContain("Acoustic performance.");
+    expect(html).not.toContain('href="https://tickets.example.com/show"');
+    expect(html).not.toContain("Ticket information will be announced");
+    expect(html).not.toContain("external ticket links");
+    expect(html).not.toContain(">Tickets ");
+    expect(html).not.toMatch(/free entry/i);
+  });
+
+  it("defaults missing legacy visibility settings to OFF", () => {
+    const draft = data();
+    delete (draft.settings as Partial<BookingCalendarDraft["settings"]>).showTicketLinks;
+    const html = renderToStaticMarkup(<BookingCalendar data={draft} today="2026-09-27" />);
+    expect(html).not.toContain('href="https://tickets.example.com/show"');
+    expect(html).not.toContain("Ticket information");
+  });
+
+  it("uses neutral cancellation copy when ticket links are off", () => {
+    const html = markup([{ ...event, status: "cancelled" }]);
+    expect(html).toContain("This event has been cancelled.");
+    expect(html).toContain(", Cancelled");
+    expect(html).not.toContain("ticket enquiries");
+    expect(html).not.toContain('href="https://tickets');
+  });
+
+  it("keeps capacity information in visual and accessible labels without implying ticket sales", () => {
+    const html = markup([{ ...event, status: "sold_out" }]);
+    expect(html).toContain('data-status="sold_out"');
+    expect(html).toContain('aria-label="3 Oct 2026: Evening in Prague, Prague, At capacity"');
+    expect(html).toContain("Selected event: Evening in Prague, 3 Oct 2026, At capacity.");
+    expect(html).toContain("This event is at capacity.");
+    expect(html).not.toMatch(/sold out/i);
+    expect(html).not.toContain('href="https://tickets');
+  });
+
+  it.each(["", "javascript:alert(1)"])("does not invent ticket or free-entry information for URL %s", ticketUrl => {
+    const html = markup([{ ...event, ticketUrl }]);
+    expect(html).not.toContain("Ticket information");
+    expect(html).not.toMatch(/free entry/i);
+    expect(html).not.toContain("javascript:");
+  });
+
+  it("preserves explicit owner-authored entry details", () => {
+    const html = markup([{ ...event, description: "Free entry. Doors open at 19:00." }]);
+    expect(html).toContain("Free entry. Doors open at 19:00.");
+  });
+
+  it("keeps saved URLs and event data intact when toggling ticket links off and on", () => {
+    const draft = data();
+    const before = structuredClone(draft.events);
+    const render = () => renderToStaticMarkup(<BookingCalendar data={draft} today="2026-09-27" />);
+    expect(render()).not.toContain('href="https://tickets.example.com/show"');
+    draft.settings.showTicketLinks = true;
+    expect(render()).toContain('href="https://tickets.example.com/show"');
+    draft.settings.showTicketLinks = false;
+    expect(render()).not.toContain('href="https://tickets.example.com/show"');
+    expect(draft.events).toEqual(before);
+  });
+
+  it("shows the inert ticket preview only when the setting is enabled", () => {
+    const html = markup([event], true, true);
+    expect(html).toContain("external link disabled in editor preview");
+    expect(html).toContain("Editor preview · external ticket links are disabled here.");
+    expect(html).not.toContain('href="https://tickets.example.com/show"');
   });
 });

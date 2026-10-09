@@ -25,6 +25,7 @@ type Props = {
   onChange: (next: HomeEditorDraft) => void;
   device: HomePreviewDevice;
   onDeviceChange: (device: HomePreviewDevice) => void;
+  pressPage?: boolean;
 };
 const playbackLabels: Record<HomePlayback["kind"], string> = {
   none: "No player", audio: "Direct audio file", spotify: "Spotify", youtube: "YouTube",
@@ -70,7 +71,7 @@ function ImageField({ id, path, label, value, onChange, assets, errors, device, 
 }
 
 /** Every picture belongs to this exact placement, never to a global Media Library crop. */
-export default function HomeEditorialInspector({ section, draft, assets, errors, instance, onChange, device, onDeviceChange }: Props) {
+export default function HomeEditorialInspector({ section, draft, assets, errors, instance, onChange, device, onDeviceChange, pressPage = false }: Props) {
   const [selectedPressId, setSelectedPressId] = useState("");
   const [removeId, setRemoveId] = useState("");
   const baseId = `${instance}-home-${section}`;
@@ -170,8 +171,8 @@ export default function HomeEditorialInspector({ section, draft, assets, errors,
     <details className={boxClass}><summary className="cursor-pointer text-xs font-semibold text-white/75">Background photo</summary>
       {image("background", "Press background", press.background, background => patch({ background }))}
     </details>
-    <p className="rounded-2xl border border-amber-300/15 bg-amber-300/5 p-4 text-xs leading-5 text-amber-100/75">Use real, attributed quotes only. Hidden content remains in the public Home configuration — it is not private. Do not enter confidential drafts here. Empty Press stays off the website.</p>
-    <label htmlFor={`${baseId}-featured`} className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">Featured item on Home
+    <p className="rounded-2xl border border-amber-300/15 bg-amber-300/5 p-4 text-xs leading-5 text-amber-100/75">Use real, attributed quotes only. Hidden content remains in the public website configuration — it is not private. Do not enter confidential drafts here. {pressPage ? "Only visible items appear on the Press page." : "Empty Press stays off the website."}</p>
+    <label htmlFor={`${baseId}-featured`} className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">{pressPage ? "Featured press item" : "Featured item on Home"}
       <select id={`${baseId}-featured`} className={inputClass} value={press.featuredId} aria-invalid={Boolean(errors.featuredId)} aria-describedby={errors.featuredId ? `${baseId}-featured-error` : undefined}
         onChange={event => patch({ featuredId: event.target.value })}>
         <option value="">Automatic — first visible quotation, then first item</option>
@@ -214,7 +215,7 @@ export default function HomeEditorialInspector({ section, draft, assets, errors,
           <input id={`${baseId}-item-visible`} type="checkbox" checked={selected.visible} className="size-4 accent-[#ff3b1f]" onChange={event => updateItem({ visible: event.target.checked })} /> Show this item in Press
         </label>
         {removeId === selected.id ? <div className="grid gap-3 rounded-xl border border-red-300/20 bg-red-300/5 p-3">
-          <p className="text-xs leading-5 text-red-100/80">Remove this item from Home? Removal is published only when you save Press &amp; reviews. Its Media Library file is not deleted.</p>
+          <p className="text-xs leading-5 text-red-100/80">Remove this item from {pressPage ? "Press" : "Home"}? Removal is published only when you save Press &amp; reviews. Its Media Library file is not deleted.</p>
           <div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} onClick={() => {
             patch({ items: press.items.filter(item => item.id !== selected.id), ...(press.featuredId === selected.id ? { featuredId: "" } : {}) });
             setRemoveId(""); setSelectedPressId("");

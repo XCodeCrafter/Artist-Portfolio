@@ -36,6 +36,13 @@ describe("Booking calendar server action", () => {
     expect((await save(form(DEFAULT_BOOKING_CALENDAR_DRAFT, "stale"))).status).toBe("invalid");
     expect(mocks.client).not.toHaveBeenCalled();
   });
+  it("rejects legacy submissions before data access so they cannot reset ticket visibility", async () => {
+    const legacy = structuredClone(DEFAULT_BOOKING_CALENDAR_DRAFT);
+    delete legacy.settings.showTicketLinks;
+    expect((await save(form(legacy))).status).toBe("invalid");
+    expect(mocks.client).not.toHaveBeenCalled();
+    expect(mocks.origin).not.toHaveBeenCalled();
+  });
   it("checks origin before using the service client", async () => {
     mocks.origin.mockResolvedValue(false); expect((await save()).status).toBe("security-error");
     expect(mocks.origin).toHaveBeenCalledWith("admin-1", "booking-calendar-v2:save"); expect(mocks.client).not.toHaveBeenCalled();
@@ -57,11 +64,34 @@ describe("Booking calendar server action", () => {
     mocks.abort.mockResolvedValueOnce({ data: {}, error: null }); expect((await save()).status).toBe("error");
     expect(mocks.audit).not.toHaveBeenCalled();
   });
+  it("requires the saved flag to be explicit and match the submitted choice", async () => {
+    const legacy = structuredClone(DEFAULT_BOOKING_CALENDAR_DRAFT);
+    delete legacy.settings.showTicketLinks;
+    mocks.abort.mockResolvedValueOnce({ data: { draft: legacy, updatedAt: nextVersion }, error: null });
+    expect((await save()).status).toBe("error");
+    mocks.abort.mockResolvedValueOnce({ data: { draft: { ...legacy, settings: { ...legacy.settings, showTicketLinks: true } }, updatedAt: nextVersion }, error: null });
+    expect((await save()).status).toBe("error");
+    expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+  it.each([version, "2026-09-27T10:00:00.123456Z", "2026-09-27T10:00:00.123455Z"])("rejects unadvanced canonical version %s", async updatedAt => {
+    mocks.abort.mockResolvedValueOnce({ data: { draft: DEFAULT_BOOKING_CALENDAR_DRAFT, updatedAt }, error: null });
+    expect((await save()).status).toBe("error");
+    expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+  it.each([false, true])("saves ticket visibility %s without changing the stored event", async showTicketLinks => {
+    const event = { id: "11111111-1111-4111-8111-111111111111", title: "Upcoming show", description: "Free entry", date: "2026-10-09", time: "19:30", timezone: "UTC", city: "City", venue: "Venue", kind: "Show", ticketUrl: "https://tickets.example.com/show", status: "sold_out", published: true };
+    const payload = { settings: { ...DEFAULT_BOOKING_CALENDAR_DRAFT.settings, enabled: true, showTicketLinks }, events: [event] };
+    mocks.abort.mockResolvedValueOnce({ data: { draft: payload, updatedAt: nextVersion }, error: null });
+    const result = await save(form(payload));
+    expect(result.status).toBe("saved");
+    expect(result.snapshot?.draft).toEqual(payload);
+    expect(mocks.rpc).toHaveBeenCalledWith("save_booking_calendar_v2", { p_expected_updated_at: version, p_payload: payload });
+  });
   it("sends exact CAS, accepts canonical snapshot, audits counts only and revalidates", async () => {
     const result = await save(); expect(result.status).toBe("saved"); expect(result.snapshot?.updatedAt).toBe(nextVersion);
     expect(mocks.rpc).toHaveBeenCalledWith("save_booking_calendar_v2", { p_expected_updated_at: version, p_payload: DEFAULT_BOOKING_CALENDAR_DRAFT });
     expect(mocks.abort).toHaveBeenCalledWith(expect.any(AbortSignal));
-    expect(mocks.audit).toHaveBeenCalledWith({ actorId: "admin-1", action: "booking_calendar_v2_save", tableName: "booking_calendar", recordId: "main", metadata: { enabled: false, eventCount: 0, publishedCount: 0 } });
+    expect(mocks.audit).toHaveBeenCalledWith({ actorId: "admin-1", action: "booking_calendar_v2_save", tableName: "booking_calendar", recordId: "main", metadata: { enabled: false, showTicketLinks: false, eventCount: 0, publishedCount: 0 } });
     expect(mocks.revalidate).toHaveBeenCalledWith("/booking"); expect(mocks.revalidate).toHaveBeenCalledWith("/admin/v2/pages/events");
     expect(mocks.revalidate).toHaveBeenCalledWith("/admin/v2-preview/contact"); expect(mocks.revalidate).toHaveBeenCalledWith("/admin/v2");
   });

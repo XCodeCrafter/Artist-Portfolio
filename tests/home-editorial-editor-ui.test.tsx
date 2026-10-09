@@ -5,7 +5,6 @@ import HomePreviewFrame from "@/components/admin/v2/HomePreviewFrame";
 import MediaAssetPicker from "@/components/admin/MediaAssetPicker";
 import PhotoFramingControls from "@/components/admin/v2/PhotoFramingControls";
 import { createFallbackHomeEditorSnapshot, INITIAL_HOME_SAVE_STATE, type HomeEditorDraft, type HomeEditorSection, type HomeSaveState } from "@/lib/admin/home-editor";
-import { MAX_HOME_PRESS_ITEMS, type HomePressItem } from "@/lib/admin/home-editorial";
 import type { HeroFraming } from "@/lib/content/hero-framing";
 
 const mocks = vi.hoisted(() => ({
@@ -83,9 +82,6 @@ function form() { const result = new FormData(); for (const name of ["section", 
 function result(section: HomeEditorSection, payload: unknown): HomeSaveState {
   return { status: "saved", eventId: crypto.randomUUID(), message: "Home saved", section, canonicalSection: payload, versions: { updatedAt: nextVersion } } as HomeSaveState;
 }
-function pressItem(overrides: Partial<HomePressItem> = {}): HomePressItem {
-  return { id: crypto.randomUUID(), kind: "review", title: "First review", publication: "Example publication", quote: "An attributed test quotation.", date: "2026-09-29", href: "https://example.com/review", image: { src: "", alt: "", framing: null }, visible: true, ...overrides };
-}
 function content() { return render().filter(node => node.type === "p").map(node => text(node.props.children as ReactNode)).join("\n"); }
 
 beforeEach(() => {
@@ -97,29 +93,22 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Home editorial section inspector", () => {
-  it("exposes three new sections and no obsolete Artist freelancer life editor", () => {
-    expect(button("Latest release")).toBeDefined(); expect(button("Selected work")).toBeDefined(); expect(button("Press & reviews")).toBeDefined();
+  it("keeps release and work on Home and links to the standalone Press editor", () => {
+    expect(button("Latest release")).toBeDefined(); expect(button("Selected work")).toBeDefined();
+    expect(render().some(node => node.type === "button" && text(node.props.children as ReactNode) === "Press & reviews")).toBe(false);
+    expect(find(node => node.props.href === "/admin/v2/pages/press")).toBeDefined();
     expect(render().some(node => node.type === "button" && text(node.props.children as ReactNode) === "Stories")).toBe(false);
     expect(draft().layout.map(item => item.id)).not.toContain("stories");
     expect(draft().layout.find(item => item.id === "release")?.enabled).toBe(false);
     expect(draft().layout.find(item => item.id === "press")?.enabled).toBe(false);
     expect(mocks.save).not.toHaveBeenCalled();
   });
-  it.each(["Latest release", "Selected work", "Press & reviews"])("omits temporary photo setup copy from %s", label => {
+  it.each(["Latest release", "Selected work"])("omits temporary photo setup copy from %s", label => {
     select(label);
     const copy = content();
     expect(copy).not.toContain("The supplied photos are AI-generated placeholders.");
     expect(copy).not.toContain("Replace them here whenever your own photos are ready.");
     expect(copy).not.toContain("Position and zoom are saved separately for every image, on desktop and mobile.");
-  });
-  it("keeps the empty Press guidance and privacy warning without a sample-review announcement", () => {
-    select("Press & reviews");
-    expect(draft().press.items).toEqual([]);
-    const copy = content();
-    expect(copy).toContain("No press items yet.");
-    expect(copy).not.toContain("No sample reviews will be published.");
-    expect(copy).toContain("Hidden content remains in the public Home configuration — it is not private.");
-    expect(copy).toContain("Do not enter confidential drafts here.");
   });
   it("edits direct audio and listening links separately, with no player when unset", () => {
     select("Latest release");
@@ -175,46 +164,16 @@ describe("Home editorial section inspector", () => {
     expect(draft().work.cards[0].href).toBe("/gallery");
     expect(button("Save Selected work").props.disabled).toBe(false);
   });
-  it("creates only blank hidden press items and requires real content before saving", () => {
-    select("Press & reviews");
-    expect(text(find(node => node.props.id === "desktop-home-press-featured").props.children as ReactNode)).toContain("Automatic — first visible quotation, then first item");
-    expect(content()).toContain("not private"); expect(draft().press.items).toEqual([]);
-    click(button("Add press item"));
-    expect(draft().press.items[0]).toMatchObject({ title: "", publication: "", quote: "", visible: false, image: { framing: null, src: "" } });
-    expect(button("Save Press & reviews").props.disabled).toBe(true);
-    field("desktop-home-press-item-title", "A real review"); field("desktop-home-press-item-publication", "A real publication"); field("desktop-home-press-item-quote", "The actual quotation.");
-    expect(button("Save Press & reviews").props.disabled).toBe(false);
-    expect(draft().press.items[0].visible).toBe(false);
-    expect(mocks.save).not.toHaveBeenCalled();
-  });
-  it("manages type, publication, source, visibility and feature selection without losing other items", () => {
-    const first = pressItem(); const second = pressItem({ title: "Second review" }); props.snapshot.draft.press.items = [first, second];
-    select("Press & reviews");
-    field("desktop-home-press-item-kind", "interview"); field("desktop-home-press-item-date", "2026-08-15"); field("desktop-home-press-item-href", "https://example.com/interview");
-    field("desktop-home-press-featured", first.id);
-    expect(draft().press.featuredId).toBe(first.id);
-    field("desktop-home-press-item-visible", false);
-    expect(draft().press.featuredId).toBe("");
-    expect(draft().press.items[0]).toMatchObject({ kind: "interview", date: "2026-08-15", href: "https://example.com/interview", visible: false });
-    expect(draft().press.items[1]).toEqual(second);
-    click(button("Move selected press item down"));
-    expect(draft().press.items.map(item => item.id)).toEqual([second.id, first.id]);
-    expect(find(node => node.props.id === "desktop-home-press-item-selector").props.value).toBe(first.id);
-  });
-  it("confirms press removal, clears its feature selection, and only mutates the draft", () => {
-    const item = pressItem(); props.snapshot.draft.press.items = [item]; props.snapshot.draft.press.featuredId = item.id;
-    select("Press & reviews"); click(button("Remove press item"));
-    expect(draft().press.items).toHaveLength(1); click(button("Keep item"));
-    expect(draft().press.items).toHaveLength(1);
-    click(button("Remove press item")); click(button("Confirm removal"));
-    expect(draft().press.items).toEqual([]); expect(draft().press.featuredId).toBe("");
-    expect(button("Save Press & reviews").props.disabled).toBe(false);
-    expect(mocks.save).not.toHaveBeenCalled();
-  });
-  it("enforces the press collection limit even when the add handler is called directly", () => {
-    props.snapshot.draft.press.items = Array.from({ length: MAX_HOME_PRESS_ITEMS }, () => pressItem());
-    select("Press & reviews"); expect(button("Add press item").props.disabled).toBe(true);
-    click(button("Add press item")); expect(draft().press.items).toHaveLength(MAX_HOME_PRESS_ITEMS);
+  it("reorders visible Home sections without moving or overwriting the retained Press entry", () => {
+    const layout = props.snapshot.draft.layout;
+    const press = layout.find(row => row.id === "press")!;
+    props.snapshot.draft.layout = [layout[0], press, ...layout.filter(row => row.id !== "press" && row.id !== layout[0].id)];
+    const before = structuredClone(props.snapshot.draft.press);
+    expect(render().filter(node => node.type === "input" && node.props.type === "checkbox")).toHaveLength(6);
+    click(button("Move Hero down"));
+    expect(draft().layout.slice(0, 3).map(row => row.id)).toEqual(["about", "press", "hero"]);
+    expect(draft().layout[1]).toEqual(press); expect(draft().press).toEqual(before);
+    expect(button("Move Selected work down").props.disabled).toBe(true);
   });
 });
 

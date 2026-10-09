@@ -48,7 +48,8 @@ export default async function RootLayout({
     {
       hasPublishedCncPrograms: hasCncPrograms,
       hasResumeContent:
-        content.hasActorResume || content.actorCredits.length > 0,
+        content.settings.bioResumeCreditsEnabled !== false &&
+        (content.hasActorResume || content.actorCredits.length > 0),
     }
   );
   const typographyStyle: TypographyStyle = {

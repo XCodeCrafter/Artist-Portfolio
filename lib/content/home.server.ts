@@ -12,7 +12,7 @@ function isMissingHomeSchema(error: { code?: string; message?: string }) {
     Boolean(error.message?.includes("home_page_config"));
 }
 
-/** Read only on HOME, keeping this page's editable content out of every other page payload. */
+/** Shared editorial store for Home and Press. Each route projects its own public content. */
 export const getPublishedHomeDraft = cache(async (content: PortfolioContent): Promise<HomeEditorDraft> => {
   const supabase = createPublicContentClient();
   if (!supabase) return createHomeDraftFromContent(content);

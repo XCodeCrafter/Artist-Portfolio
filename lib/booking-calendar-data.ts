@@ -13,6 +13,12 @@ export const getPublicBookingCalendar = cache(async (): Promise<BookingCalendarD
     if (error || data === null) return null;
     const parsed = parseBookingCalendarDraft(data);
     if (!parsed.success || !parsed.data.settings.enabled || parsed.data.events.some(event => !event.published)) return null;
-    return { settings: parsed.data.settings, events: sortBookingCalendarEvents(parsed.data.events) };
+    return {
+      settings: parsed.data.settings,
+      // Also protect new code reading the pre-0061 public RPC during rollout.
+      events: sortBookingCalendarEvents(parsed.data.events).map(event =>
+        parsed.data.settings.showTicketLinks ? event : { ...event, ticketUrl: "" }
+      ),
+    };
   } catch { return null; }
 });

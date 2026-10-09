@@ -217,7 +217,7 @@ export async function getAdminNavigationData(): Promise<AdminNavigationData> {
     });
   }
 
-  const [snapshotResult, cncResult, resumeResult, creditsResult] =
+  const [snapshotResult, cncResult, resumeResult, creditsResult, bioVisibilityResult] =
     await Promise.all([
       supabase.rpc("get_site_navigation_v2_snapshot", { p_site_id: "main" }),
       supabase
@@ -232,12 +232,15 @@ export async function getAdminNavigationData(): Promise<AdminNavigationData> {
         .from("actor_credits")
         .select("id", { count: "exact", head: true })
         .eq("is_published", true),
+      // Select * so pre-0059 schemas can retain legacy visibility.
+      supabase.from("site_settings").select("*").eq("id", "main").maybeSingle(),
     ]);
 
   const availability: NavigationAvailabilityContext = {
     hasPublishedCncPrograms: (cncResult.count ?? 0) > 0,
     hasResumeContent:
-      (resumeResult.count ?? 0) > 0 || (creditsResult.count ?? 0) > 0,
+      !bioVisibilityResult.error && bioVisibilityResult.data?.bio_resume_credits_enabled !== false &&
+      ((resumeResult.count ?? 0) > 0 || (creditsResult.count ?? 0) > 0),
   };
 
   let migrationRequired = false;

@@ -39,7 +39,7 @@ export const ADMIN_V2_DESTINATIONS = [
   {
     id: "home",
     label: "Home page",
-    description: "Home sections, latest release playback, selected work and press with a live preview.",
+    description: "Home sections, latest release playback and selected work with a live preview.",
     href: "/admin/v2/pages/home",
     group: "Portfolio pages",
     badge: "1:1",
@@ -50,7 +50,7 @@ export const ADMIN_V2_DESTINATIONS = [
       "landing",
       "about",
       "stories",
-      "latest release", "audio", "playback", "selected work", "press", "reviews", "recenze",
+      "latest release", "audio", "playback", "selected work",
       "cnc",
       "section order",
       "visibility",
@@ -135,6 +135,15 @@ export const ADMIN_V2_DESTINATIONS = [
     ],
   },
   {
+    id: "press",
+    label: "Press page",
+    description: "Reviews, interviews, press clippings, featured article and publication order.",
+    href: "/admin/v2/pages/press",
+    group: "Portfolio pages",
+    badge: "1:1",
+    keywords: ["press", "reviews", "review", "interview", "radio", "article", "clipping", "coverage", "recenze", "clanky", "rozhovory"],
+  },
+  {
     id: "contact",
     label: LIVE_CONTACT_PAGE_LABEL,
     description: "Page hero, contact form, location and delivery setup. Manage its calendar in Events.",
@@ -157,11 +166,11 @@ export const ADMIN_V2_DESTINATIONS = [
   {
     id: "events",
     label: "Events calendar",
-    description: `Calendar inside ${LIVE_CONTACT_PAGE_LABEL}: live dates, venues, tickets and publication.`,
+    description: `Calendar inside ${LIVE_CONTACT_PAGE_LABEL}: live dates, venues, event details and publication.`,
     href: "/admin/v2/pages/events",
     group: "Portfolio pages",
     badge: "1:1",
-    keywords: ["events", "live", "contact", "calendar", "concert", "concerts", "tour", "tickets", "booking", "kalendar", "udalosti", "akce", "koncerty", "vstupenky"],
+    keywords: ["events", "live", "contact", "calendar", "concert", "concerts", "tour", "tickets", "free entry", "admission", "booking", "kalendar", "udalosti", "akce", "koncerty", "vstupenky", "vstup zdarma"],
   },
   {
     id: "inbox",

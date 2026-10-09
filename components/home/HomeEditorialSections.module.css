@@ -96,6 +96,27 @@
 .quote blockquote { font: italic 400 clamp(1.5rem, 2.3cqi, 2.4rem)/1.22 var(--font-display), Georgia, serif; letter-spacing: -.02em; margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 .quote figcaption { color: var(--editorial-muted); font: 400 .75rem/1.8 var(--font-ui), sans-serif; letter-spacing: .12em; text-transform: uppercase; margin-top: 1.3rem; overflow-wrap: anywhere; }
 .press[data-collage="false"] .inner { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 12%; }
+.standalone { padding-top: clamp(6rem, 10vw, 8rem); border-top: 0; }
+.standalone > .inner { min-height: clamp(420px, 58svh, 650px); }
+.press.pressEmpty .inner { grid-template-columns: minmax(0, 1fr); }
+.emptyMessage { color: var(--editorial-muted); font: 400 1rem/1.8 var(--font-body), sans-serif; margin: 2rem 0 0; }
+.pressArchive { position: relative; width: 100%; max-width: var(--home-content-width, 1400px); margin: 0 auto; padding: 0 var(--home-gutter, 20px) var(--home-section-space, 56px); }
+.archiveHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 1.5rem 0; border-top: 1px solid #ffffff30; }
+.archiveHeading h2 { margin: 0; font: 500 .875rem/1.5 var(--font-ui), sans-serif; text-transform: uppercase; letter-spacing: .13em; }
+.archiveHeading > span { color: var(--editorial-muted); font: 400 .8125rem/1.5 var(--font-ui), sans-serif; }
+.pressCards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.pressCard { display: flex; flex-direction: column; min-width: 0; padding: 0; text-align: left; background: #ffffff03; border: 1px solid #ffffff20; color: inherit; font: inherit; transition: border-color .2s, background .2s; }
+.pressCard:hover:not(:disabled) { border-color: #ffffff65; background: #ffffff07; }
+.section .pressCard:disabled { opacity: 1; }
+.pressCardImage { position: relative; display: block; width: 100%; aspect-ratio: 16 / 8; overflow: hidden; background: #151515; }
+.pressCardImage > img { object-fit: cover; }
+.pressCardCopy { display: flex; flex: 1; flex-direction: column; padding: clamp(1.25rem, 2.5vw, 2rem); min-width: 0; }
+.pressCardKind { color: var(--editorial-red); font: 500 .6875rem/1.6 var(--font-ui), sans-serif; letter-spacing: .15em; text-transform: uppercase; margin-bottom: .85rem; }
+.pressCardTitle { font: 400 clamp(1.65rem, 2.5vw, 2.5rem)/1.15 var(--font-display), Georgia, serif; overflow-wrap: anywhere; }
+.pressCardMeta { display: flex; flex-wrap: wrap; gap: .4rem 1rem; color: var(--editorial-muted); font: 400 .75rem/1.7 var(--font-ui), sans-serif; text-transform: uppercase; letter-spacing: .08em; margin-top: 1rem; overflow-wrap: anywhere; }
+.pressCardQuote { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--editorial-muted); font: 400 1rem/1.75 var(--font-body), sans-serif; white-space: pre-line; margin-top: 1rem; overflow-wrap: anywhere; }
+.pressCardAction { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1.75rem; margin-top: auto; font: 500 .6875rem/1.5 var(--font-ui), sans-serif; letter-spacing: .13em; text-transform: uppercase; }
+.pressCardAction svg { width: 20px; height: 20px; flex-shrink: 0; }
 .dialog { color: var(--editorial-paper); background: #101010; border: 1px solid #ffffff2a; width: min(1160px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; margin: auto; overflow: auto; box-shadow: 0 20px 90px #0009; }
 .dialog::backdrop { background: #050505db; backdrop-filter: blur(7px); }
 .dialog[open] { display: block; }
@@ -153,6 +174,8 @@
   .pressCopy, .press .quote, .press[data-collage="false"] .quote, .collage { grid-column: 1; grid-row: auto; }
   .collage { width: min(100%, 390px); min-height: 310px; margin: 0 auto; }
   .press .quote { max-width: 31rem; }
+  .standalone > .inner { min-height: 400px; }
+  .pressCards { grid-template-columns: minmax(0, 1fr); }
   .dialog { width: calc(100% - 1rem); max-height: calc(100dvh - 1rem); }
   .pressEntry { grid-template-columns: 1fr; padding: 1.35rem; }
   .entryText { grid-row: 1; }

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import ContactPageView from "@/components/contact/ContactPageView";
 import { FALLBACK_CONTENT } from "@/lib/content/fallback";
 import { INITIAL_CALENDAR_FIXTURE } from "./fixtures/booking-calendar-actions";
+import { filterAdminV2Destinations } from "@/lib/admin/v2-destinations";
 
 const data = {
   hero: { ...FALLBACK_CONTENT.heroes.booking, mediaType: "image" as const },
@@ -12,6 +13,26 @@ const data = {
 };
 
 describe("Live & Contact calendar integration", () => {
+  it("keeps gig details and inquiries usable with ticket links switched off", () => {
+    const calendar = structuredClone(INITIAL_CALENDAR_FIXTURE.draft);
+    calendar.settings.showTicketLinks = false;
+    calendar.events = [{ ...calendar.events[0], date: "2026-10-09", status: "scheduled", published: true,
+      description: "Free entry. Doors open at 19:00.", ticketUrl: "https://tickets.example.com/saved-for-later" }];
+    const before = structuredClone(calendar);
+    const html = renderToStaticMarkup(<ContactPageView data={{ ...data, calendar }} />);
+    expect(html).toContain("Free entry. Doors open at 19:00.");
+    expect(html).toContain(calendar.events[0].venue);
+    expect(html).toContain('href="#events"');
+    expect(html).toContain('id="contact-form"');
+    expect(html).not.toContain("https://tickets.example.com/saved-for-later");
+    expect(html).not.toContain("Ticket information will be announced");
+    expect(calendar).toEqual(before);
+  });
+
+  it.each(["free entry", "vstup zdarma", "tickets"])("finds the same event editor for %s", query => {
+    expect(filterAdminV2Destinations(query)[0]).toMatchObject({ id: "events", href: "/admin/v2/pages/events" });
+  });
+
   it("renders real calendar before the unchanged inquiry form and hides drafts", () => {
     const html = renderToStaticMarkup(<ContactPageView data={{ ...data, calendar: INITIAL_CALENDAR_FIXTURE.draft }} />);
     expect(html).toContain('id="events"');

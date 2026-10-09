@@ -12,6 +12,7 @@ export const RECOMMENDED_VISIBLE_NAVIGATION_KEYS = [
   "gallery",
   "music",
   "works",
+  "press",
   "contact",
 ] as const satisfies readonly NavigationDestinationKey[];
 

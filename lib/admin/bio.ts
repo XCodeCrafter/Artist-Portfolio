@@ -1,5 +1,6 @@
 import "server-only";
 import { loadPhotoEditorSnapshot } from "@/lib/admin/photo-framing";
+import { loadBioVisibility } from "@/lib/admin/bio-visibility";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/admin/auth";
@@ -230,6 +231,7 @@ async function loadLegacyBioSnapshot(
   return {
     snapshot: {
       draft: {
+        visibility: fallback.draft.visibility,
         hero: heroRow
           ? {
               title: heroRow.title,
@@ -300,6 +302,7 @@ async function loadLegacyBioSnapshot(
         },
       },
       versions: {
+        visibility: fallback.versions.visibility,
         hero: { updatedAt: heroRow?.updated_at || epoch },
         biography: {
           profileUpdatedAt: profileRow?.updated_at || epoch,
@@ -408,8 +411,16 @@ export async function getAdminBioEditorData(): Promise<AdminBioEditorData> {
     };
   }
 
+  const visibility = await loadBioVisibility(supabase);
   return {
-    snapshot,
+    snapshot: visibility
+      ? {
+          ...snapshot,
+          visibilityAvailable: true,
+          draft: { ...snapshot.draft, visibility: visibility.draft },
+          versions: { ...snapshot.versions, visibility: visibility.versions },
+        }
+      : snapshot,
     isConfigured: true,
     migrationRequired: false,
   };

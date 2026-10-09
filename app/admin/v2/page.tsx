@@ -14,6 +14,7 @@ import {
   FaInbox,
   FaListUl,
   FaMusic,
+  FaNewspaper,
   FaPalette,
   FaShieldAlt,
   FaUserAlt,
@@ -42,6 +43,8 @@ function pageIcon(key: AdminV2PageSummary["key"]) {
       return <FaVideo />;
     case "music":
       return <FaMusic />;
+    case "press":
+      return <FaNewspaper />;
     case "contact":
       return <FaEnvelope />;
     case "events":

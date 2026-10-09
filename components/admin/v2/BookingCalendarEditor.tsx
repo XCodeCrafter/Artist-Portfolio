@@ -184,7 +184,7 @@ export default function BookingCalendarEditor({ snapshot, disabled, migrationReq
   }} onReset={event => event.preventDefault()} data-unsaved-guard-bypass="true" className="min-w-0">
     <input type="hidden" name="payload" value={JSON.stringify(draft)} readOnly />
     <input type="hidden" name="updatedAt" value={saved.updatedAt} readOnly />
-    {migrationRequired ? <p role="status" className="mb-4 rounded-2xl border border-amber-300/20 bg-amber-300/5 p-4 text-sm leading-6 text-amber-100">Apply migration 0053 in Supabase, verify its checks, then reload this page. Calendar saving stays disabled until the database is ready.</p> : null}
+    {migrationRequired ? <p role="status" className="mb-4 rounded-2xl border border-amber-300/20 bg-amber-300/5 p-4 text-sm leading-6 text-amber-100">Apply migration 0061 and its prerequisites, then reload this page to enable the updated calendar editor. Saved events and links are kept; saving stays disabled until the database is ready.</p> : null}
     {loadError ? <p role="alert" className="mb-4 rounded-2xl border border-red-300/20 bg-red-300/5 p-4 text-sm leading-6 text-red-100">{loadError}</p> : null}
     {disabled && !migrationRequired && !loadError ? <p role="status" className="mb-4 rounded-2xl border border-amber-300/20 p-4 text-sm text-amber-100">Calendar data is unavailable. This editor is read-only; no fallback data can overwrite the saved calendar.</p> : null}
     <section className={`${panelClass} mb-4 p-4 sm:p-5`} aria-label="Calendar workspace controls">
@@ -207,7 +207,7 @@ export default function BookingCalendarEditor({ snapshot, disabled, migrationReq
 
     <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,390px)] xl:items-start">
       <section className={`${panelClass} overflow-hidden`} aria-label="Live calendar preview">
-        <header className="border-b border-white/10 px-4 py-3"><p className="flex items-center gap-2 text-xs font-semibold text-white/75"><FaCalendarAlt aria-hidden="true" /> {LIVE_CONTACT_PAGE_LABEL} · public calendar preview</p><p className="mt-1 text-xs text-white/45">Preview only. Ticket links are disabled and edits are not yet public.</p></header>
+        <header className="border-b border-white/10 px-4 py-3"><p className="flex items-center gap-2 text-xs font-semibold text-white/75"><FaCalendarAlt aria-hidden="true" /> {LIVE_CONTACT_PAGE_LABEL} · public calendar preview</p><p className="mt-1 text-xs text-white/45">{draft.settings.showTicketLinks ? "Preview only. Ticket links are disabled and edits are not yet public." : "Preview only. Edits are not yet public."}</p></header>
         <BookingCalendar data={draft} preview onSelectEvent={select} selectedEventId={selectedId || undefined} />
       </section>
       <section ref={inspectorRef} className={`${panelClass} scroll-mt-4 p-4 sm:p-5`} aria-labelledby="booking-calendar-inspector-title">
@@ -216,6 +216,7 @@ export default function BookingCalendarEditor({ snapshot, disabled, migrationReq
           <legend className="sr-only">{selected ? "Selected event fields" : "Calendar display settings"}</legend>
           {!selected ? <>
             <label htmlFor="booking-calendar-enabled" className="flex min-h-12 items-start gap-3 rounded-xl border border-white/10 p-3 text-sm text-white/80"><input id="booking-calendar-enabled" type="checkbox" className="mt-1 accent-[#ff674f]" checked={draft.settings.enabled} onChange={event => change({ ...draft, settings: { ...draft.settings, enabled: event.target.checked } })} /><span>Show calendar on {LIVE_CONTACT_PAGE_LABEL}<span className="mt-1 block text-xs leading-5 text-white/45">Switching this off hides the entire public calendar without deleting events. Save to apply.</span></span></label>
+            <label htmlFor="booking-calendar-ticket-links" className="flex min-h-12 items-start gap-3 rounded-xl border border-white/10 p-3 text-sm text-white/80"><input id="booking-calendar-ticket-links" type="checkbox" role="switch" aria-label="Show ticket links" className="mt-1 accent-[#ff674f]" checked={Boolean(draft.settings.showTicketLinks)} onChange={event => change({ ...draft, settings: { ...draft.settings, showTicketLinks: event.target.checked } })} /><span>Show ticket links<span className="mt-1 block text-xs leading-5 text-white/45">Turn this on to show ticket information and edit event links. Switching it off keeps every saved URL for later. Save to apply.</span></span></label>
             <Field id="booking-calendar-title" label="Section title" required error={errorFor("settings.title")}>
               <input id="booking-calendar-title" className={inputClass} required maxLength={160} value={draft.settings.title} aria-invalid={Boolean(errorFor("settings.title"))} aria-describedby={errorFor("settings.title") ? "booking-calendar-title-error" : undefined} onChange={event => change({ ...draft, settings: { ...draft.settings, title: event.target.value } })} />
             </Field>
@@ -234,13 +235,17 @@ export default function BookingCalendarEditor({ snapshot, disabled, migrationReq
             {textField("city", "City", 120, { required: true })}
             {textField("venue", "Venue", 180, { required: true })}
             {textField("kind", "Event type", 80, { required: true, placeholder: "Concert, festival, theatre…" })}
-            {textField("description", "Description", 2000, { multiline: true })}
+            {textField("description", "Event details / admission", 2000, { multiline: true, help: "Add any details visitors need, for example: Free entry. Doors open at 19:00. Only describe free entry when it applies to this event." })}
             <Field id="booking-event-status" label="Event status" error={errorFor(`events.${selectedIndex}.status`)}>
               <select id="booking-event-status" className={inputClass} value={selected.status} onChange={event => patchEvent({ status: event.target.value as BookingCalendarEvent["status"] })}>
-                <option value="scheduled">Scheduled</option><option value="sold_out">Sold out</option><option value="cancelled">Cancelled</option>
+                <option value="scheduled">Scheduled</option><option value="sold_out">{draft.settings.showTicketLinks ? "Sold out" : "At capacity"}</option><option value="cancelled">Cancelled</option>
               </select>
             </Field>
-            {textField("ticketUrl", "Ticket / event link (optional)", 2048, { type: "url", placeholder: "https://…", help: selected.status === "scheduled" ? "An HTTPS link to the organiser or ticket seller. Leave empty if there is no booking link yet." : "The ticket button is hidden for sold-out and cancelled events. The saved link is kept in case the status changes." })}
+            {draft.settings.showTicketLinks ? textField("ticketUrl", "Ticket / event link (optional)", 2048, { type: "url", placeholder: "https://…", help: selected.status === "scheduled" ? "An HTTPS link to the organiser or ticket seller. Leave empty if there is no booking link yet." : "The ticket button is hidden for sold-out and cancelled events. The saved link is kept in case the status changes." }) : <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-xs leading-5 text-white/50">
+              <p>Ticket links are hidden. Any saved URL is kept. Enable Show ticket links in Calendar settings to edit or display it later.</p>
+              {errorFor(`events.${selectedIndex}.ticketUrl`) ? <p className="mt-2 text-amber-100">A draft URL needs attention before saving. Enable Show ticket links to correct it.</p> : null}
+              <button type="button" className="mt-2 min-h-11 font-semibold text-white/70 underline underline-offset-4" onClick={() => select("")}>Open calendar settings</button>
+            </div>}
             <div className="border-t border-white/10 pt-4"><button type="button" className={buttonClass + " text-red-200"} onClick={() => setRemoveId(selected.id)}><FaTrash aria-hidden="true" /> Remove event</button>
               {removeId === selected.id ? <div role="group" aria-label="Confirm event removal" className="mt-3 rounded-2xl border border-red-300/25 bg-red-300/5 p-4 text-xs leading-5 text-red-100"><p>Remove “{selected.title || "Untitled event"}” from the draft? It is removed from the saved calendar only when you save all changes. To keep its record, unpublish it instead.</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" className={buttonClass} onClick={remove}>Confirm removal</button><button type="button" className={buttonClass} onClick={() => setRemoveId("")}>Keep event</button></div></div> : null}
             </div>
@@ -259,7 +264,7 @@ export default function BookingCalendarEditor({ snapshot, disabled, migrationReq
       <div className="col-span-2 min-w-0 sm:flex-1"><p aria-live="polite" className="text-sm font-semibold text-white">{pending ? "Saving calendar…" : blocked ? "Calendar is read-only" : dirty ? "Calendar has unsaved changes" : "All calendar changes are saved"}</p><p className="mt-1 hidden text-xs leading-5 text-white/50 sm:block">Saving applies the entire calendar, including visibility and removals. Hidden drafts remain private.</p></div>
       {recoveryRequired ? <button type="button" className={`${buttonClass} col-span-2`} disabled={pending} onClick={() => confirmDiscard(() => window.location.reload())}>Reload saved calendar</button> : null}
       <button type="button" className={buttonClass} disabled={blocked || !dirty} onClick={discard}>Discard changes</button>
-      <button type="submit" className={`${buttonClass} !bg-white !text-black`} disabled={blocked || !dirty || !validation.success} aria-busy={pending}>{pending ? <FaSpinner className="animate-spin" aria-hidden="true" /> : <FaCheck aria-hidden="true" />}{pending ? "Saving…" : "Save calendar"}</button>
+      <button type="submit" className={`${buttonClass} whitespace-nowrap !bg-white !text-black`} disabled={blocked || !dirty || !validation.success} aria-busy={pending}>{pending ? <FaSpinner className="animate-spin" aria-hidden="true" /> : <FaCheck className="hidden sm:block" aria-hidden="true" />}{pending ? "Saving…" : "Save calendar"}</button>
     </footer>
   </form>;
 }

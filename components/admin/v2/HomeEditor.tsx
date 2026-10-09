@@ -128,7 +128,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
     if (disabled || migrationRequired || loadError || !snapshot.editorialAvailable || savingRef.current ||
       previous.status === "migration-required" || previous.status === "security-error" || previous.status === "missing-service") return previous;
     const section = formData.get("section");
-    if (typeof section !== "string" || !HOME_EDITOR_SECTIONS.includes(section as HomeEditorSection)) return previous;
+    if (typeof section !== "string" || section === "press" || !HOME_EDITOR_SECTIONS.includes(section as HomeEditorSection)) return previous;
     const key = section as HomeEditorSection;
     // Do not let a double-submit send a stale section or CAS version.
     if (formData.get("payload") !== JSON.stringify(draftRef.current[key]) ||
@@ -160,6 +160,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
   }, [clearDirty, disabled, migrationRequired, loadError, snapshot.editorialAvailable]);
   const [saveState, formAction, pending] = useActionState(clientAction, INITIAL_HOME_SAVE_STATE);
   const dirty = getDirtyHomeSections(baseline, draft);
+  const homeLayout = draft.layout.filter((row) => row.id !== "press");
   const validation = parseHomeSectionSubmission(activeSection, draft[activeSection], versions);
   const visibleResponse = needsEditorReload(saveState) || Boolean(saveState.eventId && saveState.eventId !== dismissedEvent);
   const errors: FieldErrors = { ...(!validation.success ? validation.fieldErrors : {}), ...(visibleResponse && saveState.section === activeSection ? saveState.fieldErrors : {}) };
@@ -190,7 +191,7 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
     if (getDirtyHomeSections(baselineRef.current, next).length) markDirty(); else clearDirty();
   }
   const select = useCallback((section: HomeEditorSection) => {
-    if (pending) return;
+    if (pending || section === "press") return;
     setActiveSection(section); setFocusRequestId((value) => value + 1);
     if (window.matchMedia("(min-width: 1280px)").matches) setInspectorOpen(true); else setMobileOpen(true);
   }, [pending]);
@@ -200,27 +201,30 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
   }
   function move(index: number, direction: -1 | 1) {
     const next = [...draft.layout];
+    const homeIndexes = next.flatMap((row, rowIndex) => row.id === "press" ? [] : [rowIndex]);
     const target = index + direction;
-    if (target < 0 || target >= next.length) return;
-    [next[index], next[target]] = [next[target], next[index]];
+    if (target < 0 || target >= homeIndexes.length) return;
+    const sourceIndex = homeIndexes[index];
+    const targetIndex = homeIndexes[target];
+    [next[sourceIndex], next[targetIndex]] = [next[targetIndex], next[sourceIndex]];
     change({ ...draft, layout: next });
-    setAnnouncement(`${HOME_SECTION_LABELS[next[target].id]} moved to position ${target + 1}. Save Page sections to publish.`);
+    setAnnouncement(`${HOME_SECTION_LABELS[next[targetIndex].id]} moved to position ${target + 1}. Save Page sections to publish.`);
   }
 
   const inspector = (instance: string) => <fieldset disabled={locked} className="min-w-0 space-y-5 disabled:opacity-60">
     {activeSection === "layout" ? <>
       <p className="text-sm leading-6 text-white/55">Choose what belongs on Home. Use the arrows to set the order. Hidden sections keep all their content.</p>
-      <ol className="grid gap-3">{draft.layout.map((item, index) => <li key={item.id} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <ol className="grid gap-3">{homeLayout.map((item, index) => <li key={item.id} className="rounded-2xl border border-white/10 bg-black/20 p-3">
         <div className="flex items-center gap-3">
           <span className="text-xs tabular-nums text-white/30">{String(index + 1).padStart(2, "0")}</span>
           <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm text-white/85">
             <input type="checkbox" className="size-4 accent-[#ff3b1f]" checked={item.enabled}
-              disabled={item.enabled && draft.layout.filter((row) => row.enabled).length === 1}
+              disabled={item.enabled && homeLayout.filter((row) => row.enabled).length === 1}
               onChange={(event) => change({ ...draft, layout: draft.layout.map((row) => row.id === item.id ? { ...row, enabled: event.target.checked } : row) })} />
             {HOME_SECTION_LABELS[item.id]}
           </label>
           <button type="button" className={`${buttonClass} px-2.5`} disabled={index === 0} aria-label={`Move ${HOME_SECTION_LABELS[item.id]} up`} onClick={() => move(index, -1)}><FaArrowUp /></button>
-          <button type="button" className={`${buttonClass} px-2.5`} disabled={index === draft.layout.length - 1} aria-label={`Move ${HOME_SECTION_LABELS[item.id]} down`} onClick={() => move(index, 1)}><FaArrowDown /></button>
+          <button type="button" className={`${buttonClass} px-2.5`} disabled={index === homeLayout.length - 1} aria-label={`Move ${HOME_SECTION_LABELS[item.id]} down`} onClick={() => move(index, 1)}><FaArrowDown /></button>
         </div>
         <div className="mt-2 flex items-center justify-between pl-7 text-xs"><span className={item.enabled ? "text-emerald-200/60" : "text-white/35"}>{item.enabled ? "Enabled · shown when content is ready" : "Hidden · content kept"}</span><button type="button" className="min-h-9 px-2 text-white/65 underline underline-offset-4" onClick={() => select(item.id)}>Edit content</button></div>
       </li>)}</ol>
@@ -257,16 +261,17 @@ export default function HomeEditor({ assets, snapshot, disabled, migrationRequir
     {loadError || mediaLoadError ? <p role="alert" className="mb-4 rounded-2xl bg-red-400/5 p-4 text-sm text-red-200">{loadError || mediaLoadError}</p> : null}
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <div className="flex flex-1 flex-wrap gap-2" aria-label="Home editor sections">
-        {HOME_EDITOR_SECTIONS.map((section) => <button type="button" key={section} disabled={pending} aria-pressed={section === activeSection}
+        {HOME_EDITOR_SECTIONS.filter((section) => section !== "press").map((section) => <button type="button" key={section} disabled={pending} aria-pressed={section === activeSection}
           className={`${buttonClass} ${section === activeSection ? "border-[#ff3b1f]/60 bg-[#ff3b1f]/10 text-white" : ""}`}
           onClick={() => select(section)}>{HOME_SECTION_LABELS[section]}{dirty.includes(section) ? <span className="size-1.5 rounded-full bg-amber-300" aria-label="Unsaved changes" /> : null}</button>)}
       </div>
+      <Link className={buttonClass} href="/admin/v2/pages/press">Manage Press &amp; reviews <FaExternalLinkAlt /></Link>
       <Link className={buttonClass} href="/" target="_blank" rel="noopener noreferrer">View website <FaExternalLinkAlt /></Link>
     </div>
     <div className={`grid items-start gap-4 ${inspectorOpen ? "xl:grid-cols-[minmax(0,1fr)_380px]" : ""}`}>
       <section className="min-w-0">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-white/40">{draft.layout.filter((row) => row.enabled).length} of {draft.layout.length} sections enabled · empty sections may not appear</p>
+          <p className="text-xs text-white/40">{homeLayout.filter((row) => row.enabled).length} of {homeLayout.length} sections enabled · empty sections may not appear</p>
           <div className="flex gap-2">
             <button type="button" className={buttonClass} aria-label="Desktop preview" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")}><FaDesktop /></button>
             <button type="button" className={buttonClass} aria-label="Mobile preview" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")}><FaMobileAlt /></button>

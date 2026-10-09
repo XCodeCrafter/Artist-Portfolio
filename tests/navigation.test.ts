@@ -46,6 +46,7 @@ describe("navigation destination registry", () => {
       "music.spotify",
       "music.soundcloud",
       "works",
+      "press",
       "contact",
     ]);
     expect(validateNavigationRegistry()).toEqual([]);
@@ -87,6 +88,7 @@ describe("legacy navigation compatibility", () => {
       { key: "bio", label: "BIO", href: "/bio" },
       { key: "music", label: "MUSIC", href: "/music" },
       { key: "works", label: "VIDEO", href: "/video" },
+      { key: "press", label: "PRESS", href: "/press" },
       { key: "contact", label: "LIVE & CONTACT", href: "/booking" },
     ]);
   });
@@ -117,6 +119,7 @@ describe("legacy navigation compatibility", () => {
       { key: "home", label: "HOME", href: "/" },
       { key: "bio", label: "BIO", href: "/bio" },
       { key: "works", label: "SHOWREEL", href: "/video" },
+      { key: "press", label: "PRESS", href: "/press" },
     ]);
   });
 
@@ -163,7 +166,7 @@ describe("legacy navigation compatibility", () => {
     expect(config.migrationRequired).toBe(true);
     expect(
       config.items.filter((item) => item.isVisible).map((item) => item.key)
-    ).toEqual(["home", "bio", "music", "works", "contact"]);
+    ).toEqual(["home", "bio", "music", "works", "press", "contact"]);
   });
 });
 
@@ -309,6 +312,7 @@ describe("mixed public review navigation", () => {
       "/gallery",
       "/music",
       "/video",
+      "/press",
       "/booking",
     ]);
     expect(PUBLIC_PORTFOLIO_PATHS.every((path) => !path.includes("#"))).toBe(
@@ -328,6 +332,7 @@ describe("mixed public review navigation", () => {
       "gallery",
       "music",
       "works",
+      "press",
       "contact",
     ]);
     expect(primaryItems.every((item) => item.kind === "page")).toBe(true);
@@ -360,7 +365,7 @@ describe("mixed public review navigation", () => {
       "gallery",
       "music",
       "works",
-      "contact",
+      "press",
     ]);
     expect(overflowItems.map((item) => item.key)).toEqual(
       MIXED_REVIEW_NAVIGATION_KEYS.slice(6)
@@ -388,7 +393,8 @@ describe("navigation schema compatibility", () => {
       ...seed.matchAll(/\('main', '([^']+)', (?:true|false), \d+\)/g),
     ].map((match) => match[1]);
 
-    expect(migrationKeys).toEqual(NAVIGATION_DESTINATION_KEYS);
+    // Historical migrations keep their original catalog; 0060 adds Press.
+    expect(migrationKeys).toEqual(NAVIGATION_DESTINATION_KEYS.filter(key => key !== "press"));
     expect(seedKeys).toEqual(MIXED_REVIEW_NAVIGATION_KEYS);
   });
 
