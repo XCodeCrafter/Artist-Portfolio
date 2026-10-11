@@ -66,6 +66,7 @@ import {
 import type { MediaAsset } from "@/lib/admin/media";
 import { detectSocialPlatformFromUrl } from "@/lib/content/social-platforms";
 import { normalizeSpotifyArtistUrl } from "@/lib/spotify";
+import { parseMusicTrackUrl, type MusicTrackProvider } from "@/lib/music-embeds";
 
 type MusicEditorProps = {
   snapshot: MusicEditorSnapshot;
@@ -84,6 +85,14 @@ const EMPTY_ARCHIVE: ArchiveData = {
 };
 
 type FieldErrors = Record<string, string[]>;
+type TrackLinkDrafts = Record<string, {
+  provider: MusicTrackProvider;
+  urls: Partial<Record<MusicTrackProvider, string>>;
+}>;
+
+function trackProvider(item: MusicSoundcloudEditorItem, links: TrackLinkDrafts): MusicTrackProvider {
+  return parseMusicTrackUrl(item.embedUrl)?.provider || links[item.id]?.provider || "soundcloud";
+}
 
 const panelClass =
   "rounded-[24px] border border-white/9 bg-[#0f0f11]/94 shadow-[0_22px_80px_rgba(0,0,0,0.3)]";
@@ -112,9 +121,9 @@ const SECTION_META: Record<
     description: "Latest releases heading and player",
   },
   soundcloud: {
-    label: "SoundCloud",
-    shortLabel: "SoundCloud",
-    description: "Latest mixes heading and tracks",
+    label: "Tracks & mixes",
+    shortLabel: "Tracks & mixes",
+    description: "Spotify and SoundCloud collection below the main player",
   },
 };
 
@@ -335,6 +344,7 @@ type InspectorFieldsProps = {
   mediaRevision: number;
   savedPlatformIds: ReadonlySet<string>;
   savedSoundcloudIds: ReadonlySet<string>;
+  trackLinkDrafts: TrackLinkDrafts;
   onAddPlatform: () => void;
   onAddSoundcloud: () => void;
   onHeroChange: (patch: Partial<MusicHeroDraft>) => void;
@@ -348,6 +358,7 @@ type InspectorFieldsProps = {
     index: number,
     patch: Partial<MusicSoundcloudEditorItem>
   ) => void;
+  onTrackProviderChange: (index: number, provider: MusicTrackProvider) => void;
   onRemoveNewPlatform: (id: string) => void;
   onRemoveNewSoundcloud: (id: string) => void;
   onSpotifyChange: (patch: Partial<MusicEditorDraft["spotify"]>) => void;
@@ -740,6 +751,8 @@ function SoundcloudInspector({
   onSoundcloudChange,
   onSoundcloudHeadingChange,
   savedSoundcloudIds,
+  trackLinkDrafts,
+  onTrackProviderChange,
   archiveControl,
   archivePanel,
 }: Pick<
@@ -752,6 +765,8 @@ function SoundcloudInspector({
   | "onSoundcloudChange"
   | "onSoundcloudHeadingChange"
   | "savedSoundcloudIds"
+  | "trackLinkDrafts"
+  | "onTrackProviderChange"
   | "archiveControl"
   | "archivePanel"
 >) {
@@ -773,8 +788,8 @@ function SoundcloudInspector({
       <div className="grid gap-4 border-t border-white/8 pt-5">
         <div className="flex items-start justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.025] p-3.5">
           <p className="max-w-[230px] text-xs leading-5 text-white/42">
-            Hide a saved mix to keep it here, or archive it to free a slot.
-            New unsaved mixes can be discarded.
+            Add Spotify or SoundCloud links below the main Spotify player.
+            Hide a saved item to keep it here, or archive it to free a slot.
           </p>
           <button
             className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-black transition hover:bg-[#ff3b1f] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
@@ -782,7 +797,7 @@ function SoundcloudInspector({
             onClick={onAddSoundcloud}
             title={
               soundcloud.items.length >= 48
-                ? "SoundCloud limit reached"
+                ? "Tracks & mixes limit reached"
                 : undefined
             }
             type="button"
@@ -790,7 +805,9 @@ function SoundcloudInspector({
             <FaPlus /> Add
           </button>
         </div>
-        {soundcloud.items.map((item, index) => (
+        {soundcloud.items.map((item, index) => {
+          const provider = trackProvider(item, trackLinkDrafts);
+          return (
           <section
             className="rounded-[20px] border border-white/9 bg-black/22 p-4"
             key={item.id}
@@ -798,26 +815,26 @@ function SoundcloudInspector({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[#ff715b]">
-                  Mix {String(index + 1).padStart(2, "0")}
+                  Track / mix {String(index + 1).padStart(2, "0")}
                 </p>
                 <p className="mt-1 truncate text-sm font-semibold text-white/78">
-                  {item.title || "Untitled mix"}
+                  {item.title || "Untitled track / mix"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <MoveButtons
                   downDisabled={index === soundcloud.items.length - 1}
-                  label={item.title || `mix ${index + 1}`}
+                  label={item.title || `track ${index + 1}`}
                   onDown={() => onMoveSoundcloud(index, 1)}
                   onUp={() => onMoveSoundcloud(index, -1)}
                   upDisabled={index === 0}
                 />
                 {!savedSoundcloudIds.has(item.id) ? (
                   <button
-                    aria-label={`Discard ${item.title || `new mix ${index + 1}`}`}
+                    aria-label={`Discard ${item.title || `new track ${index + 1}`}`}
                     className="grid h-10 w-10 place-items-center rounded-xl border border-red-200/12 text-red-100/48 transition hover:border-red-200/28 hover:bg-red-300/10 hover:text-red-100"
                     onClick={() => onRemoveNewSoundcloud(item.id)}
-                    title="Discard unsaved mix"
+                    title="Discard unsaved track / mix"
                     type="button"
                   >
                     <FaTrashAlt />
@@ -825,15 +842,26 @@ function SoundcloudInspector({
                 ) : null}
               </div>
             </div>
-            {savedSoundcloudIds.has(item.id) ? archiveControl("soundcloud", item.id, item.title || "Untitled mix") : null}
+            {savedSoundcloudIds.has(item.id) ? archiveControl("soundcloud", item.id, item.title || "Untitled track / mix") : null}
             <div className="mt-4 grid gap-4">
               <VisibilityToggle
                 checked={item.isPublished}
-                label="Mix"
+                label="Track / mix"
                 onChange={(isPublished) =>
                   onSoundcloudChange(index, { isPublished })
                 }
               />
+              <Field label="Platform">
+                <select
+                  aria-label={`Platform for ${item.title || `track ${index + 1}`}`}
+                  className={inputClass}
+                  onChange={event => onTrackProviderChange(index, event.target.value as MusicTrackProvider)}
+                  value={provider}
+                >
+                  <option value="soundcloud">SoundCloud</option>
+                  <option value="spotify">Spotify</option>
+                </select>
+              </Field>
               <Field
                 error={fieldMessage(errors, `items.${index}.title`)}
                 label="Title (optional)"
@@ -849,12 +877,13 @@ function SoundcloudInspector({
               </Field>
               <Field
                 error={fieldMessage(errors, `items.${index}.embedUrl`)}
-                label="SoundCloud track URL"
+                label={provider === "spotify" ? "Spotify track, album or playlist URL" : "SoundCloud track URL"}
               >
                 <input
                   className={inputClass}
                   inputMode="url"
                   maxLength={2048}
+                  placeholder={provider === "spotify" ? "https://open.spotify.com/track/..." : "https://soundcloud.com/artist/track"}
                   onChange={(event) =>
                     onSoundcloudChange(index, {
                       embedUrl: event.target.value,
@@ -863,12 +892,18 @@ function SoundcloudInspector({
                   value={item.embedUrl}
                 />
               </Field>
+              <p className="text-xs leading-5 text-white/45">
+                {provider === "spotify"
+                  ? "Paste a Spotify track, album or playlist link. Existing Spotify player links also work."
+                  : "Paste a SoundCloud track or mix link. Existing SoundCloud track URLs also work."}
+                {" "}Switch back to recover the previous draft link. Saving keeps only the selected platform link.
+              </p>
             </div>
           </section>
-        ))}
+        ); })}
         {!soundcloud.items.length ? (
           <p className="rounded-2xl border border-dashed border-white/12 px-4 py-8 text-center text-sm text-white/38">
-            No SoundCloud mixes yet. Add the first track when you are ready.
+            No tracks or mixes yet. Add a Spotify or SoundCloud link when you are ready.
           </p>
         ) : null}
       </div>
@@ -948,6 +983,10 @@ export default function MusicEditor({
   const baselineRef = useRef(baseline);
   const draftRef = useRef(draft);
   const versionsRef = useRef(versions);
+  // Only the active URL is persisted. Keep alternate drafts by stable item ID
+  // so switching providers or reordering never discards a link mid-edit.
+  const [trackLinkDrafts, setTrackLinkDrafts] = useState<TrackLinkDrafts>({});
+  const trackLinkDraftsRef = useRef<TrackLinkDrafts>({});
 
   const [activeSection, setActiveSection] =
     useState<MusicEditorSection>("hero");
@@ -1034,6 +1073,10 @@ export default function MusicEditor({
       setDraft(nextDraft);
       setBaseline(nextBaseline);
       setVersions(nextVersions);
+      if (result.section === "soundcloud") {
+        trackLinkDraftsRef.current = {};
+        setTrackLinkDrafts({});
+      }
       setMediaRevision((revision) => revision + 1);
       setLastSaved({
         section: result.section,
@@ -1168,6 +1211,10 @@ export default function MusicEditor({
       setDraft(nextDraft);
       setBaseline(nextBaseline);
       setVersions(nextVersions);
+      if (section === "soundcloud") {
+        trackLinkDraftsRef.current = {};
+        setTrackLinkDrafts({});
+      }
       setMediaRevision(revision => revision + 1);
       setArchive(current => ({ ...current, [section]: { available: true, page: confirmedArchive } }));
       setConfirmArchive(null);
@@ -1314,6 +1361,26 @@ export default function MusicEditor({
     index: number,
     patch: Partial<MusicSoundcloudEditorItem>
   ) {
+    if (editorDisabled || saveInFlight.current || archiveInFlight.current === "mutation") return;
+    const current = draftRef.current.soundcloud.items[index];
+    if (!current) return;
+    if (patch.embedUrl !== undefined) {
+      const currentProvider = trackProvider(current, trackLinkDraftsRef.current);
+      const provider = parseMusicTrackUrl(patch.embedUrl)?.provider || currentProvider;
+      const links = {
+        ...trackLinkDraftsRef.current,
+        [current.id]: {
+          provider,
+          urls: {
+            ...trackLinkDraftsRef.current[current.id]?.urls,
+            [currentProvider]: current.embedUrl,
+            [provider]: patch.embedUrl,
+          },
+        },
+      };
+      trackLinkDraftsRef.current = links;
+      setTrackLinkDrafts(links);
+    }
     const items = draftRef.current.soundcloud.items.map((item, itemIndex) =>
       itemIndex === index ? { ...item, ...patch } : item
     );
@@ -1321,6 +1388,24 @@ export default function MusicEditor({
       ...draftRef.current,
       soundcloud: { ...draftRef.current.soundcloud, items },
     });
+  }
+
+  function changeTrackProvider(index: number, provider: MusicTrackProvider) {
+    if (editorDisabled || saveInFlight.current || archiveInFlight.current === "mutation" ||
+      (provider !== "spotify" && provider !== "soundcloud")) return;
+    const item = draftRef.current.soundcloud.items[index];
+    if (!item) return;
+    const currentProvider = trackProvider(item, trackLinkDraftsRef.current);
+    if (provider === currentProvider) return;
+    const urls = { ...trackLinkDraftsRef.current[item.id]?.urls, [currentProvider]: item.embedUrl };
+    const links = { ...trackLinkDraftsRef.current, [item.id]: { provider, urls } };
+    trackLinkDraftsRef.current = links;
+    setTrackLinkDrafts(links);
+    const items = draftRef.current.soundcloud.items.map((current, itemIndex) =>
+      itemIndex === index ? { ...current, embedUrl: urls[provider] ?? "" } : current
+    );
+    commitDraft({ ...draftRef.current, soundcloud: { ...draftRef.current.soundcloud, items } });
+    setAnnouncement(`${provider === "spotify" ? "Spotify" : "SoundCloud"} selected. The previous link is kept in this draft; switch back to restore it.`);
   }
 
   function addSoundcloud() {
@@ -1333,7 +1418,7 @@ export default function MusicEditor({
       soundcloud: { ...draftRef.current.soundcloud, items },
     });
     setAnnouncement(
-      "New SoundCloud draft added. Paste its track URL, then save SoundCloud."
+      "New track draft added. Choose Spotify or SoundCloud, paste its link, then save Tracks & mixes."
     );
   }
 
@@ -1346,7 +1431,11 @@ export default function MusicEditor({
       ...draftRef.current,
       soundcloud: { ...draftRef.current.soundcloud, items },
     });
-    setAnnouncement("Unsaved SoundCloud draft discarded.");
+    const links = { ...trackLinkDraftsRef.current };
+    delete links[id];
+    trackLinkDraftsRef.current = links;
+    setTrackLinkDrafts(links);
+    setAnnouncement("Unsaved track draft discarded.");
   }
 
   function moveSoundcloud(index: number, direction: -1 | 1) {
@@ -1361,7 +1450,7 @@ export default function MusicEditor({
       soundcloud: { ...draftRef.current.soundcloud, items },
     });
     setAnnouncement(
-      `Mix moved to position ${index + direction + 1}. Save SoundCloud to publish the order.`
+      `Track / mix moved to position ${index + direction + 1}. Save Tracks & mixes to publish the order.`
     );
   }
 
@@ -1380,6 +1469,10 @@ export default function MusicEditor({
   );
 
   function discardActiveSection() {
+    if (activeSection === "soundcloud") {
+      trackLinkDraftsRef.current = {};
+      setTrackLinkDrafts({});
+    }
     const next = {
       ...draftRef.current,
       [activeSection]: baselineRef.current[activeSection],
@@ -1412,6 +1505,7 @@ export default function MusicEditor({
     mediaRevision,
     savedPlatformIds,
     savedSoundcloudIds,
+    trackLinkDrafts,
     archiveControl,
     archivePanel,
     onAddPlatform: addPlatform,
@@ -1423,6 +1517,7 @@ export default function MusicEditor({
     onRemoveNewPlatform: removeNewPlatform,
     onRemoveNewSoundcloud: removeNewSoundcloud,
     onSoundcloudChange: updateSoundcloud,
+    onTrackProviderChange: changeTrackProvider,
     onSpotifyChange: updateSpotify,
     onSoundcloudHeadingChange: (mixesHeading) =>
       commitDraft({

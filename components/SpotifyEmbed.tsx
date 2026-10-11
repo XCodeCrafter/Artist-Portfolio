@@ -10,6 +10,7 @@ type Props = {
   title?: string;
   heightDesktop?: number; // px
   heightMobile?: number;  // px
+  loading?: "eager" | "lazy";
 };
 
 function detectIOS(): boolean {
@@ -44,6 +45,7 @@ export default function SpotifyEmbed({
   title = "Spotify",
   heightDesktop = 520,
   heightMobile = 352,
+  loading = "eager",
 }: Props) {
   const normalizedEmbedUrl = deriveSpotifyEmbedUrl(embedUrl);
   const normalizedOpenUrl = getSpotifyOpenUrl(embedUrl, openUrl);
@@ -101,7 +103,7 @@ export default function SpotifyEmbed({
             title={title}
             className="absolute inset-0 h-full w-full"
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="eager"
+            loading={loading}
           /></ExternalMediaGate>
         </div>
       )}

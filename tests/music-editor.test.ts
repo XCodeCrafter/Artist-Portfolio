@@ -272,6 +272,30 @@ describe("Admin V2 Music editor parsers", () => {
     ).toBe(true);
   });
 
+  it("saves a mixed collection without altering SoundCloud links, order or publication", () => {
+    const soundcloud = soundcloudDraft.items[0];
+    const spotify = { ...soundcloud, id: "spotify-release", embedUrl: "https://open.spotify.com/intl-en/track/abc123?si=share", isPublished: false };
+    const input = { mixesHeading: "Tracks & mixes", items: [soundcloud, spotify] };
+    const parsed = parseMusicSoundcloudDraft(input);
+    expect(parsed).toEqual({ success: true, data: { ...input, items: [soundcloud, { ...spotify, embedUrl: "https://open.spotify.com/embed/track/abc123" }] } });
+    expect(input.items[1].embedUrl).toContain("intl-en");
+  });
+
+  it.each(["album", "playlist"])("accepts Spotify %s share links in Tracks & mixes", (kind) => {
+    const parsed = parseMusicSoundcloudDraft({ ...soundcloudDraft, items: [{ ...soundcloudDraft.items[0], embedUrl: `https://open.spotify.com/${kind}/abc123` }] });
+    expect(parsed).toMatchObject({ success: true, data: { items: [{ embedUrl: `https://open.spotify.com/embed/${kind}/abc123` }] } });
+  });
+
+  it("checks normalized track URLs against the stored length limit", () => {
+    const prefix = "https://open.spotify.com/track/";
+    const embedUrl = prefix + "a".repeat(2048 - prefix.length);
+    expect(parseMusicSoundcloudDraft({ ...soundcloudDraft, items: [{ ...soundcloudDraft.items[0], embedUrl }] }).success).toBe(false);
+  });
+
+  it.each(["artist", "episode", "show"])("keeps Spotify %s links out of the music track collection", (kind) => {
+    expect(parseMusicSoundcloudDraft({ ...soundcloudDraft, items: [{ ...soundcloudDraft.items[0], embedUrl: `https://open.spotify.com/${kind}/abc123` }] }).success).toBe(false);
+  });
+
   it("derives a safe platform icon before saving hidden implementation data", () => {
     const payload = getMusicSectionPayload(
       {

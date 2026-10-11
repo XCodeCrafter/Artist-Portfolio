@@ -35,6 +35,7 @@ function result(
 }
 
 function rpcName(section: MusicEditorSection) {
+  if (section === "soundcloud") return "save_music_tracks_v2";
   return `save_music_${section}_v2`;
 }
 
@@ -157,6 +158,10 @@ export async function saveMusicSectionV2(
   const { data, error } = await supabase.rpc(saveCall.name, saveCall.args);
 
   if (error) {
+    if (section === "soundcloud" && ["PGRST202", "42883"].includes(error.code || "") &&
+        /\bsave_music_tracks_v2\b/i.test([error.message, error.details, error.hint].filter(Boolean).join(" "))) {
+      return result("migration-required", "Apply database migration 0062 and reload to save Tracks & mixes from Spotify and SoundCloud. Your draft has been kept.", { section });
+    }
     if (isMissingPhotoFramingSchemaError(error)) return result("migration-required", PHOTO_FRAMING_MIGRATION_MESSAGE, { section });
     if (isMissingHeroFramingSchemaError(error)) {
       return result("migration-required", HERO_FRAMING_MIGRATION_MESSAGE, { section });

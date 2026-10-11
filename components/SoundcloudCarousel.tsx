@@ -4,36 +4,23 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ExternalMediaGate from "@/components/privacy/ExternalMediaGate";
 import { usePrivacyConsent } from "@/components/privacy/PrivacyProvider";
+import SpotifyEmbed from "@/components/SpotifyEmbed";
+import { parseMusicTrackUrl, type MusicTrackEmbed } from "@/lib/music-embeds";
 
 type Mix = {
+  id?: string;
   title?: string;
-  embedUrl: string; // https://api.soundcloud.com/tracks/...
+  embedUrl: string;
 };
 
 type Props = {
   items: Mix[];
   showTitles?: boolean;
+  /** Compatibility prop. These collection players do not start automatically. */
   autoPlay?: boolean;
   className?: string;
   interactionMode?: "public" | "preview";
 };
-
-// --- helpers ---
-function buildSoundcloudPlayerUrl(trackApiUrl: string, autoPlay: boolean) {
-  const base = "https://w.soundcloud.com/player/";
-  const params = new URLSearchParams({
-    url: trackApiUrl,
-    color: "#ff3b1f",
-    auto_play: autoPlay ? "true" : "false",
-    hide_related: "true",
-    show_comments: "false",
-    show_user: "true",
-    show_reposts: "false",
-    show_teaser: "false",
-    visual: "true",
-  });
-  return `${base}?${params.toString()}`;
-}
 
 function getPerView() {
   // Tailwind-ish breakpoints:
@@ -45,19 +32,21 @@ function getPerView() {
   return 4;
 }
 
-function SoundcloudCard({
+function MusicTrackCard({
   mix,
-  src,
+  player,
   showTitles,
   interactionMode,
 }: {
   mix: Mix;
-  src: string;
+  player: MusicTrackEmbed | null;
   showTitles: boolean;
   interactionMode: "public" | "preview";
 }) {
   const [interactive, setInteractive] = useState<boolean>(false);
   const { externalMedia } = usePrivacyConsent();
+  const provider = player?.provider === "spotify" ? "Spotify" : player ? "SoundCloud" : "Music";
+  const locked = interactionMode === "public" && externalMedia && !interactive;
 
   // Auto-lock back after a while (prevents “iframe eats scroll forever”)
   useEffect(() => {
@@ -76,10 +65,16 @@ function SoundcloudCard({
 
       <div className={showTitles && mix.title ? "px-3 pb-3 pt-2" : "p-3"}>
         <div
-          className="relative h-[240px] w-full overflow-hidden rounded-xl"
+          className={`relative w-full overflow-hidden rounded-xl ${player?.provider === "spotify" ? "h-[352px]" : "h-[240px]"}`}
         >
+          {interactionMode === "preview" ? <div className="flex h-full flex-col items-center justify-center gap-3 border border-dashed border-white/15 bg-white/[0.025] px-4 text-center" aria-label={`${provider} player preview`}>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="h-8 w-8 text-white/45"><path d="M9 18V5l12-2v13M9 8l12-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="18" cy="16" rx="3" ry="2" /></svg>
+            <span className="font-ui text-[10px] uppercase tracking-[0.2em] text-[#ff806c]">{provider}</span>
+            {mix.title ? <span className="text-sm text-white/80">{mix.title}</span> : null}
+            <span className="text-xs leading-relaxed text-white/45">{player ? "Player preview. External players stay off while editing." : "Add a Spotify or SoundCloud link to preview this player."}</span>
+          </div> : player ? <>
           {/* Shield */}
-          {interactionMode === "public" && externalMedia && !interactive ? (
+          {locked ? (
             <button
               type="button"
               className={[
@@ -89,7 +84,7 @@ function SoundcloudCard({
                 "transition",
               ].join(" ")}
               onClick={() => setInteractive(true)}
-              aria-label="Activate SoundCloud embed"
+              aria-label={`Activate ${provider} embed${mix.title ? `: ${mix.title}` : ""}`}
               title="Click to interact"
             >
               <span className="rounded-full border border-white/15 bg-black/45 px-4 py-2 text-xs tracking-[0.22em] uppercase">
@@ -98,8 +93,10 @@ function SoundcloudCard({
             </button>
           ) : null}
 
-          <ExternalMediaGate provider="SoundCloud"><iframe
-            src={src}
+          <div className="h-full" inert={locked}>
+          {player.provider === "spotify" ? <SpotifyEmbed embedUrl={player.embedUrl} openUrl={player.openUrl}
+            title={mix.title ? `Spotify: ${mix.title}` : "Spotify track"} heightDesktop={352} heightMobile={352} loading="lazy" /> : <ExternalMediaGate provider="SoundCloud"><iframe
+            src={player.embedUrl}
             title={mix.title ? `SoundCloud: ${mix.title}` : "SoundCloud track"}
             className="absolute inset-0 h-full w-full"
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
@@ -107,10 +104,14 @@ function SoundcloudCard({
             // Key part: while not interactive, iframe can’t steal wheel/touch
             style={{
               pointerEvents:
-                interactionMode === "public" && interactive ? "auto" : "none",
+                interactive ? "auto" : "none",
             }}
-            tabIndex={interactionMode === "preview" ? -1 : undefined}
+            tabIndex={locked ? -1 : undefined}
+            referrerPolicy="strict-origin-when-cross-origin"
           /></ExternalMediaGate>
+          }
+          </div>
+          </> : null}
         </div>
       </div>
     </div>
@@ -120,10 +121,11 @@ function SoundcloudCard({
 export default function SoundcloudCarousel({
   items,
   showTitles = false,
-  autoPlay = false,
   className = "",
   interactionMode = "public",
 }: Props) {
+  const playableItems = useMemo(() => items.map(mix => ({ mix, player: parseMusicTrackUrl(mix.embedUrl) }))
+    .filter(item => interactionMode === "preview" || item.player !== null), [items, interactionMode]);
   const [perView, setPerView] = useState<number>(4);
   const [index, setIndex] = useState<number>(0); // window start index (0..maxIndex)
   const [animating, setAnimating] = useState<boolean>(false);
@@ -139,7 +141,7 @@ export default function SoundcloudCarousel({
     return () => window.removeEventListener("resize", apply);
   }, []);
 
-  const n = items.length;
+  const n = playableItems.length;
 
   // max window start index so we always show a full "window" without wrap-mixing
   const maxIndex = useMemo(() => {
@@ -199,23 +201,6 @@ export default function SoundcloudCarousel({
     setIndex((i) => i - 1);
   };
 
-  // Transition end unlock
-  useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-
-    const onEnd = () => setAnimating(false);
-    el.addEventListener("transitionend", onEnd);
-    return () => el.removeEventListener("transitionend", onEnd);
-  }, []);
-
-  // ensure transition style
-  useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    el.style.transition = `transform ${transitionMs}ms cubic-bezier(0.2, 0.8, 0.2, 1)`;
-  }, []);
-
   // Keyboard (ArrowLeft/Right)
   useEffect(() => {
     if (interactionMode === "preview" || n <= perView) return;
@@ -239,13 +224,12 @@ export default function SoundcloudCarousel({
       <div className={className}>
         <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {items.map((mix, i) => {
-              const src = buildSoundcloudPlayerUrl(mix.embedUrl, autoPlay);
+            {playableItems.map(({ mix, player }, i) => {
               return (
-                <SoundcloudCard
-                  key={i}
+                <MusicTrackCard
+                  key={`${mix.id || i}:${player?.sourceUrl || mix.embedUrl}`}
                   mix={mix}
-                  src={src}
+                  player={player}
                   showTitles={showTitles}
                   interactionMode={interactionMode}
                 />
@@ -264,21 +248,20 @@ export default function SoundcloudCarousel({
         <div
           ref={trackRef}
           className="flex"
-          style={{ transform: `translateX(${translateX})` }}
-          aria-label="SoundCloud carousel"
+          style={{ transform: `translateX(${translateX})`, transition: `transform ${transitionMs}ms cubic-bezier(0.2, 0.8, 0.2, 1)` }}
+          onTransitionEnd={() => setAnimating(false)}
+          aria-label="Music tracks carousel"
         >
-          {items.map((mix, i) => {
-            const src = buildSoundcloudPlayerUrl(mix.embedUrl, autoPlay);
-
+          {playableItems.map(({ mix, player }, i) => {
             return (
               <div
-                key={i}
+                key={`${mix.id || i}:${player?.sourceUrl || mix.embedUrl}`}
                 className="shrink-0 px-2 py-4 sm:px-3 sm:py-5"
                 style={{ width: `${stepPct}%` }}
               >
-                <SoundcloudCard
+                <MusicTrackCard
                   mix={mix}
-                  src={src}
+                  player={player}
                   showTitles={showTitles}
                   interactionMode={interactionMode}
                 />

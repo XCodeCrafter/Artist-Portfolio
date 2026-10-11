@@ -67,7 +67,7 @@ function button(label: string) {
   return node;
 }
 function click(node: Element) { return (node.props.onClick as () => void | Promise<void>)(); }
-function select(section: "Hero" | "Platforms" | "Spotify" | "SoundCloud") { click(button(section)); }
+function select(section: "Hero" | "Platforms" | "Spotify" | "Tracks & mixes") { click(button(section)); }
 function field(label: string, value: string) {
   const node = nodes(render()).find(node => node.type === "label" && text(node.props.children as ReactNode).startsWith(label))!;
   const input = nodes(node.props.children as ReactNode).find(child => child.type === "input")!;
@@ -127,13 +127,13 @@ describe("Music archive inspector", () => {
   });
 
   it("blocks archive and restore while the collection or SoundCloud heading is dirty", () => {
-    select("SoundCloud"); click(button("Archive Late night")); field("Section heading", "Unpublished heading");
+    select("Tracks & mixes"); click(button("Archive Late night")); field("Section heading", "Unpublished heading");
     expect(button("Archive Late night").props.disabled).toBe(true);
     expect(button("Confirm archive").props.disabled).toBe(true);
     click(button("Confirm archive")); expect(mocks.mutate).not.toHaveBeenCalled();
-    expect(text(render())).toContain("Save or discard SoundCloud changes");
+    expect(text(render())).toContain("Save or discard Tracks & mixes changes");
     expect(payload().mixesHeading).toBe("Unpublished heading");
-    click(button("Discard changes in SoundCloud"));
+    click(button("Discard changes in Tracks & mixes"));
     expect(button("Archive Late night").props.disabled).toBe(false);
   });
 
@@ -173,7 +173,7 @@ describe("Music archive canonical adoption", () => {
   });
 
   it("archives SoundCloud without overwriting a Spotify draft or its settings version", async () => {
-    select("Spotify"); field("Section heading", "My Spotify heading"); select("SoundCloud");
+    select("Spotify"); field("Section heading", "My Spotify heading"); select("Tracks & mixes");
     mocks.mutate.mockResolvedValue(success("soundcloud"));
     click(button("Archive Late night")); await click(button("Confirm archive"));
     expect(mocks.mutate).toHaveBeenCalledWith({ section: "soundcloud", operation: "archive", itemId: "late-night", expectedVersions: { presentationUpdatedAt: version, items: { "late-night": version } } });
@@ -204,7 +204,7 @@ describe("Music archive canonical adoption", () => {
     else snapshot.draft.soundcloud.items = entries as typeof track[];
     snapshot.versions[section].items = Object.fromEntries(entries.map(item => [item.id, version]));
     overrides.archiveData = { platforms: empty, soundcloud: empty, [section]: { available: true, page: { items: [archivedPlatform], total: 1, offset: 0 } } };
-    select(section === "platforms" ? "Platforms" : "SoundCloud");
+    select(section === "platforms" ? "Platforms" : "Tracks & mixes");
     expect(button("Restore Spotify as hidden").props.disabled).toBe(true);
     await click(button("Restore Spotify as hidden")); expect(mocks.mutate).not.toHaveBeenCalled();
     expect(button("Archive Item 0").props.disabled).toBe(false);

@@ -90,6 +90,49 @@ beforeEach(() => {
 });
 
 describe("Admin V2 Music section action", () => {
+  const mixedPayload = {
+    mixesHeading: "Tracks & mixes",
+    items: [
+      { id: "soundcloud-one", title: "Live set", embedUrl: "https://soundcloud.com/artist/live-set", isPublished: true },
+      { id: "spotify-two", title: "Single", embedUrl: "https://open.spotify.com/track/abc123?si=share", isPublished: false },
+    ],
+  };
+  const mixedVersions = { presentationUpdatedAt: PRESENTATION_UPDATED_AT, items: { "soundcloud-one": SETTINGS_UPDATED_AT, "spotify-two": SETTINGS_UPDATED_AT } };
+
+  it("saves both providers atomically through the new collection RPC", async () => {
+    const rpc = vi.fn(async () => ({ data: { versions: mixedVersions }, error: null }));
+    actionMocks.createAdminServiceClient.mockReturnValue({ rpc });
+    const state = await saveMusicSectionV2(INITIAL_MUSIC_SAVE_STATE, sectionForm("soundcloud", mixedPayload, mixedVersions));
+    const normalized = { ...mixedPayload, items: [mixedPayload.items[0], { ...mixedPayload.items[1], embedUrl: "https://open.spotify.com/embed/track/abc123" }] };
+    expect(state).toMatchObject({ status: "saved", section: "soundcloud", canonicalSection: normalized, versions: mixedVersions });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("save_music_tracks_v2", {
+      p_site_id: "main", p_expected_presentation_updated_at: PRESENTATION_UPDATED_AT,
+      p_expected_versions: mixedVersions.items, p_payload: normalized,
+    });
+    expect(actionMocks.revalidatePath).toHaveBeenCalledWith("/music");
+  });
+
+  it.each(["PGRST202", "42883"])("reports missing mixed player migration without falling back to the old save: %s", async (code) => {
+    const rpc = vi.fn(async () => ({ data: null, error: { code, message: "Could not find public.save_music_tracks_v2" } }));
+    actionMocks.createAdminServiceClient.mockReturnValue({ rpc });
+    const state = await saveMusicSectionV2(INITIAL_MUSIC_SAVE_STATE, sectionForm("soundcloud", mixedPayload, mixedVersions));
+    expect(state).toMatchObject({ status: "migration-required", section: "soundcloud", message: expect.stringContaining("0062") });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(actionMocks.writeAuditLog).not.toHaveBeenCalled();
+    expect(actionMocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects a foreign music player before opening database access", async () => {
+    const rpc = vi.fn();
+    actionMocks.createAdminServiceClient.mockReturnValue({ rpc });
+    const state = await saveMusicSectionV2(INITIAL_MUSIC_SAVE_STATE, sectionForm("soundcloud", {
+      ...mixedPayload, items: [{ ...mixedPayload.items[0], embedUrl: "https://open.spotify.com.evil.example/track/abc123" }, mixedPayload.items[1]],
+    }, mixedVersions));
+    expect(state).toMatchObject({ status: "invalid", fieldErrors: { "items.0.embedUrl": expect.any(Array) } });
+    expect(actionMocks.createAdminServiceClient).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["https://open.spotify.com/embed/playlist/chosen?theme=0", "https://open.spotify.com/embed/playlist/chosen?theme=0"],
     ["https://open.spotify.com/album/chosen?si=shared", "https://open.spotify.com/embed/album/chosen"],
@@ -208,7 +251,7 @@ describe("Admin V2 Music section action", () => {
     },
     {
       section: "soundcloud",
-      rpcName: "save_music_soundcloud_v2",
+      rpcName: "save_music_tracks_v2",
       payload: {
         mixesHeading: "LATEST MIXES",
         items: [

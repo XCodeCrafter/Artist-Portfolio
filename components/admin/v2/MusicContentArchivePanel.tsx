@@ -18,7 +18,7 @@ export default function MusicContentArchivePanel({
   onRestore: (id: string) => void;
   onPage: (offset: number) => void;
 }) {
-  const label = section === "platforms" ? "Platforms" : "SoundCloud";
+  const label = section === "platforms" ? "Platforms" : "Tracks & mixes";
   const limit = section === "platforms" ? 32 : 48;
   const { page } = archive;
   return (

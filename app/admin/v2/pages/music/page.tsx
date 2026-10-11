@@ -35,7 +35,8 @@ export default async function AdminV2MusicPage() {
         <p className="mt-3 max-w-3xl text-sm leading-6 text-white/46">
           Click a real section in the preview, edit it in the inspector, and
           save only that section. Desktop and mobile use the same presentation
-          as the public page, so you always see what you are changing.
+          as the public page, so you always see what you are changing. Use Tracks
+          &amp; mixes for Spotify and SoundCloud items below the main Spotify player.
         </p>
       </header>
 

@@ -6,6 +6,7 @@ import type {
   SocialLink,
   SoundcloudTrack,
 } from "./types";
+import { parseMusicTrackUrl } from "@/lib/music-embeds";
 
 export type MusicPreviewSection =
   | "hero"
@@ -54,7 +55,7 @@ export function getMusicPublicSectionVisibility(
     spotify: Boolean(
       data.spotify.embedUrl.trim() || data.spotify.artistUrl.trim()
     ),
-    soundcloud: data.soundcloud.tracks.some((track) => track.embedUrl.trim()),
+    soundcloud: data.soundcloud.tracks.some((track) => parseMusicTrackUrl(track.embedUrl) !== null),
   };
 }
 
@@ -109,12 +110,10 @@ export function preparePublicMusicPageViewData(
     },
     soundcloud: {
       ...data.soundcloud,
-      tracks: data.soundcloud.tracks
-        .filter((track) => track.embedUrl.trim())
-        .map((track) => ({
-          ...track,
-          embedUrl: track.embedUrl.trim(),
-        })),
+      tracks: data.soundcloud.tracks.flatMap((track) => {
+        const player = parseMusicTrackUrl(track.embedUrl);
+        return player ? [{ ...track, embedUrl: player.sourceUrl }] : [];
+      }),
     },
   };
   const visibility = getMusicPublicSectionVisibility(publicData);

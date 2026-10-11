@@ -149,7 +149,7 @@ describe("Music visual editor presentation contract", () => {
     expect(musicEditor).toContain("onRemoveNewPlatform");
     expect(musicEditor).toContain("onRemoveNewSoundcloud");
     expect(musicEditor).toContain('title="Discard unsaved platform"');
-    expect(musicEditor).toContain('title="Discard unsaved mix"');
+    expect(musicEditor).toContain('title="Discard unsaved track / mix"');
     expect(musicEditor).toContain(
       'window.matchMedia("(min-width: 1280px)").matches'
     );

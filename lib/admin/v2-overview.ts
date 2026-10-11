@@ -211,7 +211,7 @@ export async function getAdminV2OverviewData(): Promise<AdminV2OverviewData> {
     {
       key: "music",
       label: "Music",
-      description: "Hero, platform cards, Spotify, and SoundCloud.",
+      description: "Hero, platform cards, featured Spotify player, and Tracks & mixes.",
       editorHref: "/admin/v2/pages/music",
       publicHref: "/music",
       migrationLabel: "The Music V2 database migration",

@@ -133,8 +133,8 @@ export const NAVIGATION_DESTINATIONS = [
   },
   {
     key: "music.soundcloud",
-    defaultLabel: "SOUNDCLOUD",
-    description: "Latest mixes available on SoundCloud.",
+    defaultLabel: "TRACKS & MIXES",
+    description: "Selected tracks and mixes from Spotify and SoundCloud.",
     href: "/music#soundcloud-mixes",
     pageSlug: "music",
     kind: "section",

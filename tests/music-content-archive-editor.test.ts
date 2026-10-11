@@ -85,6 +85,13 @@ describe("Music archive mutation parser", () => {
 });
 
 describe("Music archive canonical snapshot parser", () => {
+  it("keeps a restored Spotify item hidden in the same mixed collection", () => {
+    const restored = { ...track, id: "spotify-single", embedUrl: "https://open.spotify.com/embed/track/abc123", isPublished: false };
+    const payload = { mixesHeading: "Tracks & mixes", items: [track, restored] };
+    const versions = { presentationUpdatedAt: archiveVersion, items: { [track.id]: version, [restored.id]: archiveVersion } };
+    expect(parseMusicArchiveSnapshot("soundcloud", payload, versions)).toEqual({ section: "soundcloud", payload, versions });
+    expect(parseMusicSectionSubmission("soundcloud", payload, versions, { requireExactCollectionVersions: true }).success).toBe(true);
+  });
   it("parses both collections with their exact current versions", () => {
     const platforms = { items: [platform] };
     expect(parseMusicArchiveSnapshot("platforms", platforms, archiveInput.expectedVersions)).toEqual({ section: "platforms", payload: platforms, versions: archiveInput.expectedVersions });

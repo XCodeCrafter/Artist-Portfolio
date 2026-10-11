@@ -192,7 +192,7 @@ export default function MusicPageView({
 
         {showSection("soundcloud") ? (
           <PreviewSection
-            label="SoundCloud"
+            label="Tracks & mixes"
             mode={mode}
             onSelect={selectSection}
             section="soundcloud"

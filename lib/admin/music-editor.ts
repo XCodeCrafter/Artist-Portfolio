@@ -10,6 +10,7 @@ import type {
 import { detectSocialPlatform } from "@/lib/content/social-platforms";
 import { isSafeManagedMediaSource } from "@/lib/media-source";
 import { deriveSpotifyEmbedUrl, normalizeSpotifyArtistUrl } from "@/lib/spotify";
+import { parseMusicTrackUrl } from "@/lib/music-embeds";
 export { deriveSpotifyEmbedUrl } from "@/lib/spotify";
 
 export const MUSIC_EDITOR_SECTIONS = [
@@ -171,15 +172,6 @@ function isSafeOptionalHref(value: string) {
   return isHttpsUrl(value);
 }
 
-function isSoundcloudTrackUrl(value: string) {
-  return isHttpsUrl(value, [
-    "api.soundcloud.com",
-    "on.soundcloud.com",
-    "soundcloud.com",
-    "www.soundcloud.com",
-  ]);
-}
-
 const assetSource = requiredText(2_048).refine(
   isSafeAssetSource,
   "Choose a local file or one uploaded to this site's Media Library."
@@ -271,9 +263,9 @@ const musicSoundcloudSaveItemSchema = z
     id: recordId,
     title: text(220),
     embedUrl: requiredText(2_048).refine(
-      isSoundcloudTrackUrl,
-      "Use a supported SoundCloud track URL."
-    ),
+      (value) => Boolean(parseMusicTrackUrl(value)),
+      "Paste a Spotify track, album or playlist link, or a SoundCloud track link."
+    ).transform((value) => parseMusicTrackUrl(value)?.sourceUrl || "").pipe(requiredText(2_048)),
     isPublished: z.boolean(),
   })
   .strict();
@@ -283,7 +275,7 @@ const musicSoundcloudDraftSchema = z
     mixesHeading: heading,
     items: z
       .array(musicSoundcloudSaveItemSchema)
-      .max(48, "Keep the SoundCloud list to 48 tracks or fewer."),
+      .max(48, "Keep Tracks & mixes to 48 items or fewer."),
   })
   .strict()
   .superRefine((value, context) => {
@@ -292,7 +284,7 @@ const musicSoundcloudDraftSchema = z
       if (seen.has(item.id)) {
         context.addIssue({
           code: "custom",
-          message: "Each SoundCloud track can appear only once.",
+          message: "Each track can appear only once.",
           path: ["items", index, "id"],
         });
       }
@@ -433,7 +425,7 @@ const previewDraftSchema = z
             .object({
               id: recordId,
               title: text(220),
-              embedUrl: previewHref,
+              embedUrl: text(2_048).transform((value) => parseMusicTrackUrl(value)?.sourceUrl || ""),
               isPublished: z.boolean(),
             })
             .strict()
@@ -498,7 +490,7 @@ export function getMusicFieldErrors(error: z.ZodError) {
     const field = String(issue.path.at(-1));
     const requiredLabels: Record<string, string> = {
       title: "Add a title.", href: "Paste the destination URL.",
-      embedUrl: "Paste a SoundCloud track URL.", imageSrc: "Choose a platform image from the Media Library.",
+      embedUrl: "Paste a Spotify or SoundCloud link.", imageSrc: "Choose a platform image from the Media Library.",
       backgroundSrc: "Choose a background image or video.",
       releasesHeading: "Add a heading for releases.", mixesHeading: "Add a heading for mixes.",
       iconKey: "Choose a platform icon.",

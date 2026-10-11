@@ -123,6 +123,7 @@ export type MusicPlatformLink = {
   imageSrc: string;
 };
 
+/** Legacy collection name; a track URL may now point to SoundCloud or Spotify. */
 export type SoundcloudTrack = {
   id: string;
   title?: string;
