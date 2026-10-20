@@ -57,7 +57,14 @@ export default function MusicPreviewFrame({
   const message = useMemo<MusicPreviewUpdateMessage>(
     () => ({
       type: MUSIC_PREVIEW_UPDATE_MESSAGE,
-      draft,
+      draft: {
+        ...draft,
+        spotify: {
+          ...draft.spotify,
+          provider: draft.spotify.provider ?? "spotify",
+          soundcloudPlaylistUrl: draft.spotify.soundcloudPlaylistUrl ?? "",
+        },
+      },
       footer,
       focusRequestId,
       selectedSection,

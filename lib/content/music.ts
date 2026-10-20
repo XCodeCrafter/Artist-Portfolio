@@ -6,7 +6,7 @@ import type {
   SocialLink,
   SoundcloudTrack,
 } from "./types";
-import { parseMusicTrackUrl } from "@/lib/music-embeds";
+import { normalizeSoundcloudPlaylistUrl, parseMusicTrackUrl } from "@/lib/music-embeds";
 
 export type MusicPreviewSection =
   | "hero"
@@ -21,6 +21,8 @@ export type MusicPageViewData = {
     heading: string;
     artistUrl: string;
     embedUrl: string;
+    provider?: "spotify" | "soundcloud";
+    soundcloudPlaylistUrl?: string;
   };
   soundcloud: {
     heading: string;
@@ -52,9 +54,9 @@ export function getMusicPublicSectionVisibility(
 ): MusicPublicSectionVisibility {
   return {
     platforms: data.platforms.some((platform) => platform.href.trim()),
-    spotify: Boolean(
-      data.spotify.embedUrl.trim() || data.spotify.artistUrl.trim()
-    ),
+    spotify: data.spotify.provider === "soundcloud"
+      ? Boolean(normalizeSoundcloudPlaylistUrl(data.spotify.soundcloudPlaylistUrl || ""))
+      : Boolean(data.spotify.embedUrl.trim() || data.spotify.artistUrl.trim()),
     soundcloud: data.soundcloud.tracks.some((track) => parseMusicTrackUrl(track.embedUrl) !== null),
   };
 }
@@ -107,6 +109,8 @@ export function preparePublicMusicPageViewData(
       ...data.spotify,
       artistUrl: data.spotify.artistUrl.trim(),
       embedUrl: data.spotify.embedUrl.trim(),
+      provider: data.spotify.provider === "soundcloud" ? "soundcloud" : "spotify",
+      soundcloudPlaylistUrl: normalizeSoundcloudPlaylistUrl(data.spotify.soundcloudPlaylistUrl || ""),
     },
     soundcloud: {
       ...data.soundcloud,
@@ -142,6 +146,8 @@ export function selectMusicPageViewData(
       heading: content.musicPresentation.releasesHeading,
       artistUrl: content.settings.spotifyArtistUrl,
       embedUrl: content.settings.spotifyEmbedUrl,
+      provider: content.musicPresentation.releaseProvider ?? "spotify",
+      soundcloudPlaylistUrl: content.musicPresentation.soundcloudPlaylistUrl ?? "",
     },
     soundcloud: {
       heading: content.musicPresentation.mixesHeading,

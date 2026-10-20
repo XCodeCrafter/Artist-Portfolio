@@ -36,7 +36,8 @@ export default async function AdminV2MusicPage() {
           Click a real section in the preview, edit it in the inspector, and
           save only that section. Desktop and mobile use the same presentation
           as the public page, so you always see what you are changing. Use Tracks
-          &amp; mixes for Spotify and SoundCloud items below the main Spotify player.
+          &amp; mixes for individual items below the main release player.
+          In Releases, choose Spotify or a SoundCloud playlist.
         </p>
       </header>
 

@@ -32,8 +32,8 @@ export function isMissingMusicEditorSchemaError(error?: DatabaseErrorLike | null
     error.code === "PGRST205" ||
     (error.code === "42P01" && /music_presentation/i.test(message)) ||
     (error.code === "23503" && /music_page_snapshot_missing/i.test(message)) ||
-    (error.code === "42883" && /music_page_v2|music_(?:hero|spotify|platforms|soundcloud)_v2/i.test(message)) ||
-    /schema cache.*(?:get_music_page_v2_snapshot|save_music_(?:hero|spotify|platforms|soundcloud)_v2)/i.test(
+    (error.code === "42883" && /music_page_v2|music_(?:hero|spotify|releases|platforms|soundcloud)_v2/i.test(message)) ||
+    /schema cache.*(?:get_music_page_v2_snapshot|save_music_(?:hero|spotify|releases|platforms|soundcloud)_v2)/i.test(
       message
     )
   );
@@ -43,7 +43,7 @@ export function isMusicEditorWriteConflict(error?: DatabaseErrorLike | null) {
   return Boolean(
     error &&
       (error.code === "40001" ||
-        /music_(?:hero|spotify|platforms|soundcloud)_changed/i.test(
+        /music_(?:hero|spotify|releases|platforms|soundcloud)_changed/i.test(
           error.message || ""
         ))
   );

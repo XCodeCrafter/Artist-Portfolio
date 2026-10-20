@@ -233,6 +233,8 @@ export const FALLBACK_CONTENT: PortfolioContent = {
   musicPresentation: {
     releasesHeading: "LATEST RELEASES",
     mixesHeading: "LATEST MIXES",
+    releaseProvider: "spotify",
+    soundcloudPlaylistUrl: "",
   },
   soundcloudTracks: [
     {

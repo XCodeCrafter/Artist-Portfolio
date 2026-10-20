@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { normalizeSoundcloudPlaylistUrl } from "@/lib/music-embeds";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { FALLBACK_CONTENT } from "./fallback";
 import { normalizeFooterContent } from "./footer";
@@ -127,6 +128,8 @@ type SoundcloudTrackRow = {
 type MusicPresentationRow = {
   releases_heading: string;
   mixes_heading: string;
+  release_provider?: string;
+  soundcloud_playlist_url?: string;
 };
 
 type BioGalleryImageRow = {
@@ -335,6 +338,8 @@ function mapMusicPresentation(row?: MusicPresentationRow): MusicPresentation {
       FALLBACK_CONTENT.musicPresentation.releasesHeading,
     mixesHeading:
       row.mixes_heading.trim() || FALLBACK_CONTENT.musicPresentation.mixesHeading,
+    releaseProvider: row.release_provider === "soundcloud" ? "soundcloud" : "spotify",
+    soundcloudPlaylistUrl: normalizeSoundcloudPlaylistUrl(row.soundcloud_playlist_url || ""),
   };
 }
 
@@ -597,7 +602,9 @@ async function readSupabaseContent(
       .returns<SoundcloudTrackRow[]>(),
     supabase
       .from("music_presentation")
-      .select("releases_heading, mixes_heading")
+      // The presentation table contains public fields only. Missing optional
+      // 0063 columns must not discard existing headings on older databases.
+      .select("*")
       .eq("id", "main")
       .limit(1)
       .returns<MusicPresentationRow[]>(),

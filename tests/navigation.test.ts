@@ -32,6 +32,11 @@ function visibleItems(
 }
 
 describe("navigation destination registry", () => {
+  it("keeps the Music release anchor stable with a provider-neutral default label", () => {
+    expect(NAVIGATION_DESTINATIONS.find((item) => item.key === "music.spotify")).toMatchObject({
+      defaultLabel: "RELEASES", href: "/music#spotify-releases",
+    });
+  });
   it("contains the exact curated destination contract", () => {
     expect(NAVIGATION_DESTINATION_KEYS).toEqual([
       "home",

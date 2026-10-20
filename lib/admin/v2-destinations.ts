@@ -118,7 +118,7 @@ export const ADMIN_V2_DESTINATIONS = [
   {
     id: "music",
     label: "Music page",
-    description: "Music hero, platform links, featured Spotify player, and Tracks & mixes from Spotify or SoundCloud.",
+    description: "Music hero, platform links, Spotify or SoundCloud releases player, and Tracks & mixes.",
     href: "/admin/v2/pages/music",
     group: "Portfolio pages",
     keywords: [

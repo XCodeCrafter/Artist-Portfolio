@@ -14,6 +14,7 @@ import {
 } from "@/lib/admin/music";
 import {
   parseMusicSectionSubmission,
+  parseMusicSpotifyDraft,
   type MusicEditorSection,
   type MusicEditorVersions,
   type MusicSaveState,
@@ -35,6 +36,7 @@ function result(
 }
 
 function rpcName(section: MusicEditorSection) {
+  if (section === "spotify") return "save_music_releases_v2";
   if (section === "soundcloud") return "save_music_tracks_v2";
   return `save_music_${section}_v2`;
 }
@@ -158,6 +160,10 @@ export async function saveMusicSectionV2(
   const { data, error } = await supabase.rpc(saveCall.name, saveCall.args);
 
   if (error) {
+    if (section === "spotify" && ["PGRST202", "42883", "42703"].includes(error.code || "") &&
+        /\bsave_music_releases_v2\b|\brelease_provider\b|\bsoundcloud_playlist_url\b/i.test([error.message, error.details, error.hint].filter(Boolean).join(" "))) {
+      return result("migration-required", "Apply database migration 0063 and reload to choose Spotify or SoundCloud for Releases. Your draft has been kept.", { section });
+    }
     if (section === "soundcloud" && ["PGRST202", "42883"].includes(error.code || "") &&
         /\bsave_music_tracks_v2\b/i.test([error.message, error.details, error.hint].filter(Boolean).join(" "))) {
       return result("migration-required", "Apply database migration 0062 and reload to save Tracks & mixes from Spotify and SoundCloud. Your draft has been kept.", { section });
@@ -183,7 +189,7 @@ export async function saveMusicSectionV2(
     if (
       error.code === "22023" ||
       error.code === "23514" ||
-      /invalid_music_(?:hero|spotify|platforms|soundcloud)_payload/i.test(
+      /invalid_music_(?:hero|spotify|releases|platforms|soundcloud)_payload/i.test(
         error.message || ""
       )
     ) {
@@ -220,6 +226,22 @@ export async function saveMusicSectionV2(
       "The save response could not be confirmed. Reload before editing this section again.",
       { section }
     );
+  }
+
+  // Do not report success if a stale/mismatched response omits or changes the
+  // chosen provider. This slot must confirm both its content and dual CAS tokens.
+  if (section === "spotify") {
+    const returned = data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>).section : null;
+    const saved = parseMusicSpotifyDraft(returned);
+    const expected = parseMusicSpotifyDraft(payload);
+    if (!saved.success || !expected.success ||
+        !returned || typeof returned !== "object" ||
+        !Object.hasOwn(returned, "provider") || !Object.hasOwn(returned, "soundcloudPlaylistUrl") ||
+        Object.keys(expected.data).some((key) =>
+          saved.data[key as keyof typeof saved.data] !== expected.data[key as keyof typeof expected.data])) {
+      return result("error", "The saved player could not be confirmed. Your draft was kept; reload the saved section before trying again.", { section });
+    }
   }
 
   const target = auditTarget(section);

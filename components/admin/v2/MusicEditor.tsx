@@ -116,9 +116,9 @@ const SECTION_META: Record<
     description: "Streaming destinations and their order",
   },
   spotify: {
-    label: "Spotify",
-    shortLabel: "Spotify",
-    description: "Latest releases heading and player",
+    label: "Releases",
+    shortLabel: "Releases",
+    description: "Latest releases heading and streaming player",
   },
   soundcloud: {
     label: "Tracks & mixes",
@@ -508,6 +508,7 @@ export function SpotifyInspector({
   onSpotifyChange,
 }: Pick<InspectorFieldsProps, "draft" | "errors" | "onSpotifyChange">) {
   const spotify = draft.spotify;
+  const provider = spotify.provider || "spotify";
   const artistPlayerUrl = deriveSpotifyEmbedUrl(normalizeSpotifyArtistUrl(spotify.artistUrl));
   return (
     <div className="grid gap-5">
@@ -524,45 +525,105 @@ export function SpotifyInspector({
           value={spotify.releasesHeading}
         />
       </Field>
-      <Field error={fieldMessage(errors, "artistUrl")} label="Spotify artist URL">
-        <input
+      <Field error={fieldMessage(errors, "provider")} label="Release player">
+        <select
           className={inputClass}
-          inputMode="url"
-          maxLength={2048}
-          onChange={(event) => onSpotifyChange({ artistUrl: event.target.value })}
-          placeholder="https://open.spotify.com/artist/..."
-          value={spotify.artistUrl}
-        />
-      </Field>
-      <div className="grid gap-3 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
-        <Field error={fieldMessage(errors, "embedUrl")} label="Spotify player link">
-          <input
-            className={inputClass}
-            inputMode="url"
-            maxLength={2048}
-            onChange={(event) => onSpotifyChange({ embedUrl: event.target.value })}
-            placeholder="https://open.spotify.com/playlist/..."
-            value={spotify.embedUrl}
-          />
-        </Field>
-        <p className="text-xs leading-5 text-white/50">
-          Paste the normal Spotify link to a playlist, album, track or artist.
-          We create the player automatically. Existing player links also work.
-        </p>
-        <button
-          className="min-h-11 rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/8 focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
-          disabled={!artistPlayerUrl || artistPlayerUrl === spotify.embedUrl}
-          onClick={() => onSpotifyChange({ embedUrl: artistPlayerUrl })}
-          type="button"
+          onChange={(event) =>
+            onSpotifyChange({ provider: event.target.value as "spotify" | "soundcloud" })
+          }
+          value={provider}
         >
-          Use artist releases
-        </button>
-        <p className="text-xs leading-5 text-white/45">
-          Changing the artist profile or heading will not replace your chosen
-          player. Leave the player link empty for a profile link only; clear both
-          links to hide this section from visitors.
+          <option value="spotify">Spotify</option>
+          <option value="soundcloud">SoundCloud playlist</option>
+        </select>
+      </Field>
+      <p className="-mt-3 text-xs leading-5 text-white/45">
+        Choose the main player visitors see. Links for both services are kept
+        when you switch.
+      </p>
+      {provider === "spotify" && fieldMessage(errors, "soundcloudPlaylistUrl") ? (
+        <p className="text-xs leading-5 text-red-200" role="alert">
+          Your stored SoundCloud link needs attention. Select SoundCloud to fix
+          or clear it, then switch back to Spotify.
         </p>
-      </div>
+      ) : null}
+      {provider === "soundcloud" &&
+      (fieldMessage(errors, "artistUrl") || fieldMessage(errors, "embedUrl")) ? (
+        <p className="text-xs leading-5 text-red-200" role="alert">
+          Your stored Spotify links need attention. Select Spotify to fix or
+          clear them, then switch back to SoundCloud.
+        </p>
+      ) : null}
+      {provider === "soundcloud" ? (
+        <div className="grid gap-3 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
+          <Field
+            error={fieldMessage(errors, "soundcloudPlaylistUrl")}
+            label="SoundCloud playlist URL"
+          >
+            <input
+              className={inputClass}
+              inputMode="url"
+              maxLength={2048}
+              onChange={(event) =>
+                onSpotifyChange({ soundcloudPlaylistUrl: event.target.value })
+              }
+              placeholder="https://soundcloud.com/artist/sets/playlist"
+              value={spotify.soundcloudPlaylistUrl || ""}
+            />
+          </Field>
+          <p className="text-xs leading-5 text-white/50">
+            Paste the public playlist link from SoundCloud, not iframe code or
+            a shortened sharing link. Choose a playlist with embedding enabled.
+          </p>
+          <p className="text-xs leading-5 text-white/45">
+            Full-track playback depends on the owner&apos;s SoundCloud permissions,
+            track availability and regional restrictions; it is not guaranteed.
+            The player never starts automatically.
+          </p>
+        </div>
+      ) : (
+        <>
+          <Field error={fieldMessage(errors, "artistUrl")} label="Spotify artist URL">
+            <input
+              className={inputClass}
+              inputMode="url"
+              maxLength={2048}
+              onChange={(event) => onSpotifyChange({ artistUrl: event.target.value })}
+              placeholder="https://open.spotify.com/artist/..."
+              value={spotify.artistUrl}
+            />
+          </Field>
+          <div className="grid gap-3 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
+            <Field error={fieldMessage(errors, "embedUrl")} label="Spotify player link">
+              <input
+                className={inputClass}
+                inputMode="url"
+                maxLength={2048}
+                onChange={(event) => onSpotifyChange({ embedUrl: event.target.value })}
+                placeholder="https://open.spotify.com/playlist/..."
+                value={spotify.embedUrl}
+              />
+            </Field>
+            <p className="text-xs leading-5 text-white/50">
+              Paste the normal Spotify link to a playlist, album, track or artist.
+              We create the player automatically. Existing player links also work.
+            </p>
+            <button
+              className="min-h-11 rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/8 focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!artistPlayerUrl || artistPlayerUrl === spotify.embedUrl}
+              onClick={() => onSpotifyChange({ embedUrl: artistPlayerUrl })}
+              type="button"
+            >
+              Use artist releases
+            </button>
+            <p className="text-xs leading-5 text-white/45">
+              Changing the artist profile or heading will not replace your chosen
+              player. Leave the player link empty for a profile link only; clear both
+              links to hide this section from visitors.
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

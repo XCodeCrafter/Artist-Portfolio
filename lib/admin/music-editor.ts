@@ -10,7 +10,7 @@ import type {
 import { detectSocialPlatform } from "@/lib/content/social-platforms";
 import { isSafeManagedMediaSource } from "@/lib/media-source";
 import { deriveSpotifyEmbedUrl, normalizeSpotifyArtistUrl } from "@/lib/spotify";
-import { parseMusicTrackUrl } from "@/lib/music-embeds";
+import { normalizeSoundcloudPlaylistUrl, parseMusicTrackUrl } from "@/lib/music-embeds";
 export { deriveSpotifyEmbedUrl } from "@/lib/spotify";
 
 export const MUSIC_EDITOR_SECTIONS = [
@@ -28,6 +28,8 @@ export type MusicSpotifyDraft = {
   releasesHeading: string;
   artistUrl: string;
   embedUrl: string;
+  provider?: "spotify" | "soundcloud";
+  soundcloudPlaylistUrl?: string;
 };
 
 export type MusicPlatformEditorItem = {
@@ -212,6 +214,11 @@ const musicHeroDraftSchema = z
 
 const musicSpotifyDraftSchema = z
   .object({
+    provider: z.enum(["spotify", "soundcloud"]).default("spotify"),
+    soundcloudPlaylistUrl: text(2_048).default("").refine(
+      (value) => !value || Boolean(normalizeSoundcloudPlaylistUrl(value)),
+      "Paste a public SoundCloud playlist URL: https://soundcloud.com/artist/sets/playlist."
+    ).transform(normalizeSoundcloudPlaylistUrl),
     releasesHeading: heading,
     artistUrl: text(2_048).refine(
       (value) => !value || Boolean(normalizeSpotifyArtistUrl(value)),
@@ -222,7 +229,12 @@ const musicSpotifyDraftSchema = z
       "Paste a Spotify artist, playlist, album, track, show or episode link, or leave it empty."
     ).transform(deriveSpotifyEmbedUrl).pipe(text(2_048)),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.provider === "soundcloud" && !value.soundcloudPlaylistUrl) {
+      context.addIssue({ code: "custom", path: ["soundcloudPlaylistUrl"], message: "Add a public SoundCloud playlist before choosing this player." });
+    }
+  });
 
 const musicPlatformSaveItemSchema = z
   .object({
@@ -320,6 +332,11 @@ const snapshotHeroDraftSchema = z
   .strict();
 const snapshotSpotifyDraftSchema = z
   .object({
+    provider: z.enum(["spotify", "soundcloud"]).default("spotify"),
+    soundcloudPlaylistUrl: text(2_048).default("").refine(
+      (value) => !value || Boolean(normalizeSoundcloudPlaylistUrl(value)),
+      "Invalid saved SoundCloud playlist."
+    ).transform(normalizeSoundcloudPlaylistUrl),
     releasesHeading: heading,
     artistUrl: optionalHref,
     embedUrl: optionalHref,
@@ -394,6 +411,8 @@ const previewDraftSchema = z
       .strict(),
     spotify: z
       .object({
+        provider: z.enum(["spotify", "soundcloud"]).default("spotify"),
+        soundcloudPlaylistUrl: text(2_048).default("").transform(normalizeSoundcloudPlaylistUrl),
         releasesHeading: text(220),
         artistUrl: text(2_048).transform(normalizeSpotifyArtistUrl),
         embedUrl: text(2_048).transform(deriveSpotifyEmbedUrl),
@@ -606,6 +625,8 @@ export function parseMusicEditorSnapshot(value: unknown): MusicEditorSnapshot | 
         ...(snapshot.hero.framing !== undefined ? { framing: snapshot.hero.framing } : {}),
       },
       spotify: {
+        provider: snapshot.spotify.provider,
+        soundcloudPlaylistUrl: snapshot.spotify.soundcloudPlaylistUrl,
         releasesHeading: snapshot.spotify.releasesHeading,
         artistUrl: snapshot.spotify.artistUrl,
         embedUrl: snapshot.spotify.embedUrl,
@@ -660,6 +681,8 @@ export function createFallbackMusicEditorSnapshot(): MusicEditorSnapshot {
     draft: {
       hero: FALLBACK_CONTENT.heroes.music,
       spotify: {
+        provider: "spotify",
+        soundcloudPlaylistUrl: "",
         releasesHeading: FALLBACK_CONTENT.musicPresentation.releasesHeading,
         artistUrl: FALLBACK_CONTENT.settings.spotifyArtistUrl,
         embedUrl: FALLBACK_CONTENT.settings.spotifyEmbedUrl,
@@ -828,6 +851,8 @@ export function createMusicPageViewDataFromEditor(
         ),
       })),
     spotify: {
+      provider: draft.spotify.provider ?? "spotify",
+      soundcloudPlaylistUrl: normalizeSoundcloudPlaylistUrl(draft.spotify.soundcloudPlaylistUrl || ""),
       heading: draft.spotify.releasesHeading,
       artistUrl: normalizeSpotifyArtistUrl(draft.spotify.artistUrl),
       embedUrl: deriveSpotifyEmbedUrl(draft.spotify.embedUrl),

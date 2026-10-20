@@ -5,7 +5,7 @@ import AdaptiveHero from "@/components/AdaptiveHero";
 import MusicPlatformsExt from "@/components/MusicPlatforms_ext";
 import NewsletterBlock from "@/components/NewsletterBlock";
 import SoundcloudCarousel from "@/components/SoundcloudCarousel";
-import SpotifyEmbed from "@/components/SpotifyEmbed";
+import MusicReleasePlayer from "@/components/MusicReleasePlayer";
 import type {
   MusicPageViewData,
   MusicPreviewSection,
@@ -160,7 +160,7 @@ export default function MusicPageView({
 
         {showSection("spotify") ? (
           <PreviewSection
-            label="Spotify"
+            label="Releases"
             mode={mode}
             onSelect={selectSection}
             section="spotify"
@@ -178,12 +178,12 @@ export default function MusicPageView({
               </h2>
 
               <div className="mt-8" data-reveal="up" data-reveal-delay="140">
-                <SpotifyEmbed
+                <MusicReleasePlayer
+                  provider={viewData.spotify.provider}
                   embedUrl={viewData.spotify.embedUrl}
-                  openUrl={viewData.spotify.artistUrl}
-                  title="Spotify Releases"
-                  heightMobile={352}
-                  heightDesktop={520}
+                  artistUrl={viewData.spotify.artistUrl}
+                  soundcloudPlaylistUrl={viewData.spotify.soundcloudPlaylistUrl}
+                  interactionMode={mode}
                 />
               </div>
             </section>

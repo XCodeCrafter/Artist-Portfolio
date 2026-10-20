@@ -89,7 +89,7 @@ describe("Tracks & mixes provider editor", () => {
     expect(provider("New release").props.value).toBe("spotify");
     expect(payload().items).toEqual([soundcloud, spotify]);
     expect(button("Save Tracks & mixes").props.disabled).toBe(true);
-    click(button("Spotify")); expect(payload()).toEqual(snapshot.draft.spotify);
+    click(button("Releases")); expect(payload()).toEqual(snapshot.draft.spotify);
     expect(nodes(render()).filter(node => node.type === "form")).toHaveLength(1);
   });
   it("retains each platform URL across switches and reordering by stable item ID", () => {

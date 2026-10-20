@@ -133,6 +133,9 @@ export type SoundcloudTrack = {
 export type MusicPresentation = {
   releasesHeading: string;
   mixesHeading: string;
+  /** Missing on pre-0063 snapshots, which keep the existing Spotify player. */
+  releaseProvider?: "spotify" | "soundcloud";
+  soundcloudPlaylistUrl?: string;
 };
 
 export type BioGalleryImage = {

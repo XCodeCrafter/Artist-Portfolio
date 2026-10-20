@@ -501,6 +501,13 @@ describe("Admin V2 Music editor parsers", () => {
     };
 
     const snapshot = parseMusicEditorSnapshot(rawSnapshot);
+    expect(snapshot?.draft.spotify).toMatchObject({ provider: "spotify", soundcloudPlaylistUrl: "" });
+    expect(parseMusicEditorSnapshot({
+      ...rawSnapshot,
+      spotify: { ...rawSnapshot.spotify, provider: "soundcloud", soundcloudPlaylistUrl: "https://soundcloud.com/artist/sets/album" },
+    })?.draft.spotify).toMatchObject({
+      ...spotifyDraft, provider: "soundcloud", soundcloudPlaylistUrl: "https://soundcloud.com/artist/sets/album",
+    });
 
     expect(snapshot).toMatchObject({
       draft: {
@@ -714,6 +721,8 @@ describe("shared Music page presentation", () => {
       heading: FALLBACK_CONTENT.musicPresentation.releasesHeading,
       artistUrl: FALLBACK_CONTENT.settings.spotifyArtistUrl,
       embedUrl: FALLBACK_CONTENT.settings.spotifyEmbedUrl,
+      provider: "spotify",
+      soundcloudPlaylistUrl: "",
     });
     expect(view.soundcloud).toEqual({
       heading: FALLBACK_CONTENT.musicPresentation.mixesHeading,

@@ -123,8 +123,8 @@ export const NAVIGATION_DESTINATIONS = [
   },
   {
     key: "music.spotify",
-    defaultLabel: "SPOTIFY",
-    description: "Latest releases available on Spotify.",
+    defaultLabel: "RELEASES",
+    description: "Latest releases on the selected Spotify or SoundCloud player.",
     href: "/music#spotify-releases",
     pageSlug: "music",
     kind: "section",

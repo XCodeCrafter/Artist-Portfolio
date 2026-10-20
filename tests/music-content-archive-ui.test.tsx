@@ -67,7 +67,7 @@ function button(label: string) {
   return node;
 }
 function click(node: Element) { return (node.props.onClick as () => void | Promise<void>)(); }
-function select(section: "Hero" | "Platforms" | "Spotify" | "Tracks & mixes") { click(button(section)); }
+function select(section: "Hero" | "Platforms" | "Releases" | "Tracks & mixes") { click(button(section)); }
 function field(label: string, value: string) {
   const node = nodes(render()).find(node => node.type === "label" && text(node.props.children as ReactNode).startsWith(label))!;
   const input = nodes(node.props.children as ReactNode).find(child => child.type === "input")!;
@@ -173,14 +173,14 @@ describe("Music archive canonical adoption", () => {
   });
 
   it("archives SoundCloud without overwriting a Spotify draft or its settings version", async () => {
-    select("Spotify"); field("Section heading", "My Spotify heading"); select("Tracks & mixes");
+    select("Releases"); field("Section heading", "My Spotify heading"); select("Tracks & mixes");
     mocks.mutate.mockResolvedValue(success("soundcloud"));
     click(button("Archive Late night")); await click(button("Confirm archive"));
     expect(mocks.mutate).toHaveBeenCalledWith({ section: "soundcloud", operation: "archive", itemId: "late-night", expectedVersions: { presentationUpdatedAt: version, items: { "late-night": version } } });
     expect(payload().items).toEqual([]);
-    select("Spotify"); expect(payload().releasesHeading).toBe("My Spotify heading");
+    select("Releases"); expect(payload().releasesHeading).toBe("My Spotify heading");
     expect(payload("versions")).toEqual({ settingsUpdatedAt: version, presentationUpdatedAt: version });
-    expect(button("Save Spotify").props.disabled).toBe(false);
+    expect(button("Save Releases").props.disabled).toBe(false);
   });
 
   it("restores a legacy incomplete platform as hidden without making it a dirty draft", async () => {

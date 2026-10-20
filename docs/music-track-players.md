@@ -1,8 +1,10 @@
 # Spotify a SoundCloud v Tracks & mixes
 
-Pod hlavním Spotify přehrávačem na `/music` může být jeden společný seznam
+Pod hlavním přehrávačem Releases na `/music` může být jeden společný seznam
 skladeb, alb, playlistů a mixů ze Spotify a SoundCloudu. Hlavní přehrávač má
-nadále samostatné nastavení. Dosavadní nadpis spodní sekce zůstává uložený
+nadále samostatné nastavení a od migrace 0063 umožňuje
+[volbu Spotify nebo SoundCloud playlistu](music-release-provider.md).
+Dosavadní nadpis spodní sekce zůstává uložený
 a lze jej změnit v administraci.
 
 ## Editace

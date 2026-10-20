@@ -1,8 +1,27 @@
 # Artist Portfolio V2 Roadmap
 
-Updated: 2026-09-30
+Updated: 2026-10-20
 
-## Current focus — optional Hero headings across all pages
+## Latest change — main Music release-provider choice
+
+- [x] Add Spotify / SoundCloud playlist selection to the existing main Releases
+      slot, preserving both provider links, placement and legacy section anchors.
+- [x] Connect the public page, admin preview, validation and service-only save.
+      Keep external-media consent; no autoplay, provider API keys or live
+      third-party iframe inside the editor preview.
+- [x] Prepare 0063 migration/read-only checks and disposable SQL regression.
+      Preserve existing Spotify data and legacy RPC, shared locks and dual CAS.
+- [ ] Deploy and apply 0063, then verify real save/reload and the owner's public
+      SoundCloud playlist. Owner authorized commit/push on 2026-10-20; hosted SQL
+      and live acceptance remain pending. See `docs/music-release-provider.md`.
+
+The unfinished acceptance/contact work remains parked, not completed.
+
+Music verification: **6,059 tests / 226 files**, TypeScript, ESLint, production
+Webpack build (Supabase/Resend disabled) and disposable PGlite migration checks
+pass. No hosted database was changed.
+
+## Previous focus — optional Hero headings across all pages
 
 - [x] Allow an empty main Hero title in Home, Bio, Gallery, Music, Showreel and
       Live & Contact, including legacy editors. Empty/whitespace input normalizes

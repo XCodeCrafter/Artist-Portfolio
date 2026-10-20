@@ -42,6 +42,8 @@ const SETTINGS_UPDATED_AT = "2026-09-02T10:00:00.000Z";
 const PRESENTATION_UPDATED_AT = "2026-09-02T10:01:00.000Z";
 
 const spotifyPayload = {
+  provider: "spotify",
+  soundcloudPlaylistUrl: "",
   releasesHeading: "LATEST RELEASES",
   artistUrl: "https://open.spotify.com/artist/1234567890",
   embedUrl: "https://open.spotify.com/embed/artist/1234567890",
@@ -90,6 +92,37 @@ beforeEach(() => {
 });
 
 describe("Admin V2 Music section action", () => {
+  it("saves a SoundCloud playlist to the release slot without losing Spotify links", async () => {
+    const payload = { ...spotifyPayload, provider: "soundcloud", soundcloudPlaylistUrl: "https://soundcloud.com/artist/sets/release" };
+    const rpc = vi.fn(async () => ({ data: { section: payload, versions: spotifyVersions }, error: null }));
+    actionMocks.createAdminServiceClient.mockReturnValue({ rpc });
+    const state = await saveMusicSectionV2(INITIAL_MUSIC_SAVE_STATE, validSpotifyForm({
+      payload: JSON.stringify({ ...payload, soundcloudPlaylistUrl: `${payload.soundcloudPlaylistUrl}?utm_source=clipboard` }),
+    }));
+    expect(state).toMatchObject({ status: "saved", canonicalSection: payload });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("save_music_releases_v2", expect.objectContaining({ p_payload: payload }));
+  });
+
+  it.each(["PGRST202", "42883"])("requires 0063 without falling back to a Spotify-only save (%s)", async (code) => {
+    const rpc = vi.fn(async () => ({ data: null, error: { code, message: "Could not find public.save_music_releases_v2" } }));
+    actionMocks.createAdminServiceClient.mockReturnValue({ rpc });
+    const state = await saveMusicSectionV2(INITIAL_MUSIC_SAVE_STATE, validSpotifyForm());
+    expect(state).toMatchObject({ status: "migration-required", message: expect.stringContaining("0063") });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(actionMocks.writeAuditLog).not.toHaveBeenCalled();
+    expect(actionMocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, {}, { ...spotifyPayload, provider: "soundcloud", soundcloudPlaylistUrl: "https://soundcloud.com/artist/sets/wrong" },
+    { releasesHeading: spotifyPayload.releasesHeading, artistUrl: spotifyPayload.artistUrl, embedUrl: spotifyPayload.embedUrl },
+  ])("does not confirm a mismatched or missing canonical release response", async (section) => {
+    actionMocks.createAdminServiceClient.mockReturnValue({ rpc: vi.fn(async () => ({ data: { section, versions: spotifyVersions }, error: null })) });
+    const state = await saveMusicSectionV2(INITIAL_MUSIC_SAVE_STATE, validSpotifyForm());
+    expect(state.status).toBe("error");
+    expect(actionMocks.writeAuditLog).not.toHaveBeenCalled();
+    expect(actionMocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
   const mixedPayload = {
     mixesHeading: "Tracks & mixes",
     items: [
@@ -138,13 +171,13 @@ describe("Admin V2 Music section action", () => {
     ["https://open.spotify.com/album/chosen?si=shared", "https://open.spotify.com/embed/album/chosen"],
     ["", ""],
   ])("keeps the selected player through validation, RPC and canonical save response: %s", async (input, expected) => {
-    const rpc = vi.fn(async () => ({ data: { versions: spotifyVersions }, error: null }));
+    const rpc = vi.fn(async () => ({ data: { section: { ...spotifyPayload, releasesHeading: "New heading", embedUrl: expected }, versions: spotifyVersions }, error: null }));
     actionMocks.createAdminServiceClient.mockReturnValue({ rpc });
     const state = await saveMusicSectionV2(INITIAL_MUSIC_SAVE_STATE, validSpotifyForm({
       payload: JSON.stringify({ ...spotifyPayload, releasesHeading: "New heading", embedUrl: input }),
     }));
     expect(state).toMatchObject({ status: "saved", canonicalSection: { releasesHeading: "New heading", embedUrl: expected } });
-    expect(rpc).toHaveBeenCalledWith("save_music_spotify_v2", expect.objectContaining({
+    expect(rpc).toHaveBeenCalledWith("save_music_releases_v2", expect.objectContaining({
       p_expected_settings_updated_at: SETTINGS_UPDATED_AT,
       p_expected_presentation_updated_at: PRESENTATION_UPDATED_AT,
       p_payload: { ...spotifyPayload, releasesHeading: "New heading", embedUrl: expected },
@@ -173,7 +206,7 @@ describe("Admin V2 Music section action", () => {
 
   it("saves only the active section, audits it, and revalidates preview and public output", async () => {
     const rpc = vi.fn(async () => ({
-      data: { versions: spotifyVersions },
+      data: { section: spotifyPayload, versions: spotifyVersions },
       error: null,
     }));
     actionMocks.createAdminServiceClient.mockReturnValue({ rpc });
@@ -189,7 +222,7 @@ describe("Admin V2 Music section action", () => {
       versions: spotifyVersions,
     });
     expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc).toHaveBeenCalledWith("save_music_spotify_v2", {
+    expect(rpc).toHaveBeenCalledWith("save_music_releases_v2", {
       p_site_id: "main",
       p_expected_settings_updated_at: SETTINGS_UPDATED_AT,
       p_expected_presentation_updated_at: PRESENTATION_UPDATED_AT,
