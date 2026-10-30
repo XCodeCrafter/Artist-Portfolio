@@ -80,14 +80,61 @@ function getEmbedUrl(value: string, autoplay: boolean) {
   return value;
 }
 
+type LightboxLayout = {
+  frameClassName: string;
+  frameStyle?: { aspectRatio: string };
+  panelStyle?: { width: string };
+};
+
+/**
+ * Upright phone clips must not be letterboxed into a 16:9 frame: on a 375px
+ * phone that left a 9:16 clip about 107px wide. Once the intrinsic ratio is
+ * known, the frame adopts it and the panel narrows so the whole clip fits in
+ * 72% of the small viewport height. Embeds and unknown ratios stay 16:9.
+ */
+export function getLightboxLayout(ratio: number | undefined): LightboxLayout {
+  if (!ratio || !Number.isFinite(ratio) || ratio < 0.25 || ratio > 4) {
+    return { frameClassName: "aspect-video" };
+  }
+  const value = ratio.toFixed(4);
+  return {
+    frameClassName: "",
+    frameStyle: { aspectRatio: value },
+    panelStyle: { width: `min(100%, calc(72svh * ${value}))` },
+  };
+}
+
+function readVideoRatio(video: HTMLVideoElement) {
+  return video.videoWidth > 0 && video.videoHeight > 0
+    ? video.videoWidth / video.videoHeight
+    : undefined;
+}
+
+/**
+ * How a preview starts depends on the visitor's input: pointer hover, scrolling
+ * into view on touch screens, or not at all under reduced motion. CSS picks the
+ * matching wording so server and client markup stay identical.
+ */
+function PreviewHint() {
+  return (
+    <>
+      <span className="motion-safe:hidden">Watch video</span>
+      <span className="hidden motion-safe:[@media(hover:hover)]:inline">Hover to play</span>
+      <span className="hidden motion-safe:[@media(hover:none)]:inline">Tap to watch</span>
+    </>
+  );
+}
+
 function WorkPreview({
   active,
   interactive,
   item,
+  onVideoRatio,
 }: {
   active: boolean;
   interactive: boolean;
   item: VideoItem;
+  onVideoRatio?: (ratio: number) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const direct = isDirectVideo(item);
@@ -131,8 +178,12 @@ function WorkPreview({
         className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.025]"
         loop
         muted
+        onLoadedMetadata={(event) => {
+          const ratio = readVideoRatio(event.currentTarget);
+          if (ratio) onVideoRatio?.(ratio);
+        }}
         playsInline
-        poster={item.thumbnailSrc}
+        poster={item.thumbnailSrc || undefined}
         preload="metadata"
         ref={videoRef}
         src={item.embedUrl}
@@ -183,12 +234,14 @@ function WorkCard({
   interactive,
   item,
   onOpen,
+  onVideoRatio,
   wide,
 }: {
   index: number;
   interactive: boolean;
   item: VideoItem;
   onOpen: () => void;
+  onVideoRatio?: (ratio: number) => void;
   wide: boolean;
 }) {
   const [active, setActive] = useState(false);
@@ -252,6 +305,7 @@ function WorkCard({
             active={interactive && active}
             interactive={interactive}
             item={item}
+            onVideoRatio={onVideoRatio}
           />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/76 via-transparent to-black/12" />
           <span className="absolute left-4 top-4 text-xs font-semibold tracking-[0.2em] text-white/65">
@@ -269,12 +323,16 @@ function WorkCard({
                 {item.title}
               </h3>
             </div>
-            <span className="hidden text-xs uppercase tracking-[0.18em] text-white/45 sm:block">
-              {interactive
-                ? active
-                  ? "Playing preview"
-                  : "Hover to play"
-                : "Click to edit"}
+            <span className="hidden shrink-0 whitespace-nowrap text-xs uppercase tracking-[0.18em] text-white/45 sm:block">
+              {interactive ? (
+                active ? (
+                  "Playing preview"
+                ) : (
+                  <PreviewHint />
+                )
+              ) : (
+                "Click to edit"
+              )}
             </span>
           </div>
         </motion.div>
@@ -394,12 +452,23 @@ export default function ShowreelWorks({
   );
   const [filter, setFilter] = useState("all");
   const [activeItem, setActiveItem] = useState<VideoItem | null>(null);
+  const [videoRatios, setVideoRatios] = useState<Record<string, number>>({});
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const activeFilter = categories.includes(filter) ? filter : "all";
   const visible =
     activeFilter === "all"
       ? videos
       : videos.filter((item) => item.videoType === activeFilter);
+  const activeIsDirect = activeItem ? isDirectVideo(activeItem) : false;
+  const lightboxLayout = getLightboxLayout(
+    activeItem && activeIsDirect ? videoRatios[activeItem.id] : undefined
+  );
+
+  function recordVideoRatio(id: string, ratio: number) {
+    setVideoRatios((current) =>
+      current[id] === ratio ? current : { ...current, [id]: ratio }
+    );
+  }
 
   useEffect(() => {
     if (!activeItem) return;
@@ -480,6 +549,7 @@ export default function ShowreelWorks({
                 if (mode === "public") setActiveItem(item);
                 else onSelectSection?.("works", item.id);
               }}
+              onVideoRatio={(ratio) => recordVideoRatio(item.id, ratio)}
               wide={index === 0 || index % 5 === 0}
             />
           ))}
@@ -515,16 +585,31 @@ export default function ShowreelWorks({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="w-full max-w-6xl"
             initial={{ opacity: 0, scale: 0.96, y: 18 }}
+            style={lightboxLayout.panelStyle}
             transition={{ duration: 0.48, ease: revealEase }}
           >
-            <div className="relative aspect-video overflow-hidden rounded-lg border border-white/12 bg-black">
-              {isDirectVideo(activeItem) ? (
-                <video autoPlay data-analytics-play="true" data-analytics-label={activeItem.title} className="h-full w-full" controls loop playsInline src={activeItem.embedUrl} />
+            <div className={`relative overflow-hidden rounded-lg border border-white/12 bg-black ${lightboxLayout.frameClassName}`} style={lightboxLayout.frameStyle}>
+              {activeIsDirect ? (
+                <video
+                  autoPlay
+                  data-analytics-play="true"
+                  data-analytics-label={activeItem.title}
+                  className="h-full w-full"
+                  controls
+                  loop
+                  onLoadedMetadata={(event) => {
+                    const ratio = readVideoRatio(event.currentTarget);
+                    if (ratio) recordVideoRatio(activeItem.id, ratio);
+                  }}
+                  playsInline
+                  poster={activeItem.thumbnailSrc || undefined}
+                  src={activeItem.embedUrl}
+                />
               ) : (
                 <ExternalMediaGate provider={activeItem.platform}><iframe allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen className="h-full w-full" referrerPolicy="strict-origin-when-cross-origin" src={getEmbedUrl(activeItem.embedUrl, true)} title={activeItem.title} /></ExternalMediaGate>
               )}
             </div>
-            <div className="mt-4 flex items-start justify-between gap-5"><div><p className="text-xs uppercase tracking-[0.2em] text-[var(--accent)]">{typeLabels[activeItem.videoType]}</p><h3 className="heading-ui mt-2 text-3xl text-white" id="showreel-dialog-title">{activeItem.title}</h3></div><span className="flex items-center gap-2 text-xs text-white/45"><FaPause /> Esc to close</span></div>
+            <div className="mt-4 flex items-start justify-between gap-5"><div><p className="text-xs uppercase tracking-[0.2em] text-[var(--accent)]">{typeLabels[activeItem.videoType]}</p><h3 className="heading-ui mt-2 text-3xl text-white" id="showreel-dialog-title">{activeItem.title}</h3></div><span className="hidden shrink-0 items-center gap-2 text-xs text-white/45 [@media(hover:hover)]:flex"><FaPause /> Esc to close</span></div>
           </motion.div>
           </div>
           </motion.div>

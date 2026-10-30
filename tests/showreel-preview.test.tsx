@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import ShowreelWorks from "@/components/ShowreelWorks";
+import ShowreelWorks, { getLightboxLayout } from "@/components/ShowreelWorks";
 import ShowreelPageView, {
   type ShowreelPageViewData,
 } from "@/components/video/ShowreelPageView";
@@ -131,5 +131,80 @@ describe("Showreel inert preview regression", () => {
 
     expect(editor).not.toContain('<option value="Other">');
     expect(editor).not.toContain("Other supported embed");
+  });
+});
+
+describe("Showreel playback on phones and touch screens", () => {
+  const directVideoTag = (markup: string) =>
+    markup.match(/<video\b[^>]*>/)?.[0] ?? "";
+
+  it("omits an empty poster attribute and keeps a saved thumbnail", () => {
+    const withoutPoster = renderToStaticMarkup(
+      <ShowreelWorks presentation={presentation} videos={videos} />
+    );
+    expect(directVideoTag(withoutPoster)).not.toContain("poster=");
+
+    const withPoster = renderToStaticMarkup(
+      <ShowreelWorks
+        presentation={presentation}
+        videos={[{ ...videos[0], thumbnailSrc: "/images/reel-poster.jpg" }]}
+      />
+    );
+    expect(directVideoTag(withPoster)).toContain(
+      'poster="/images/reel-poster.jpg"'
+    );
+  });
+
+  it("words the preview hint for hover, touch and reduced motion without hydration-dependent text", () => {
+    const markup = renderToStaticMarkup(
+      <ShowreelWorks presentation={presentation} videos={videos} />
+    );
+    expect(markup).toContain(
+      '<span class="hidden motion-safe:[@media(hover:hover)]:inline">Hover to play</span>'
+    );
+    expect(markup).toContain(
+      '<span class="hidden motion-safe:[@media(hover:none)]:inline">Tap to watch</span>'
+    );
+    expect(markup).toContain('<span class="motion-safe:hidden">Watch video</span>');
+    // The hint must not wrap over a long title on narrow two-column cards.
+    expect(markup).toContain("shrink-0 whitespace-nowrap");
+    expect(markup).not.toContain("Click to edit");
+  });
+
+  it("keeps the editor preview label unchanged", () => {
+    const markup = renderToStaticMarkup(
+      <ShowreelWorks mode="preview" presentation={presentation} videos={videos} />
+    );
+    expect(markup).toContain("Click to edit");
+    expect(markup).not.toContain("Hover to play");
+  });
+
+  it("fits an upright clip to the viewport instead of letterboxing it into 16:9", () => {
+    const upright = getLightboxLayout(576 / 1024);
+    expect(upright.frameClassName).toBe("");
+    expect(upright.frameStyle).toEqual({ aspectRatio: "0.5625" });
+    expect(upright.panelStyle).toEqual({
+      width: "min(100%, calc(72svh * 0.5625))",
+    });
+
+    const landscape = getLightboxLayout(16 / 9);
+    expect(landscape.frameStyle).toEqual({ aspectRatio: "1.7778" });
+  });
+
+  it.each([undefined, 0, Number.NaN, Number.POSITIVE_INFINITY, 0.1, 12])(
+    "falls back to the 16:9 frame for an unknown or implausible ratio (%s)",
+    (ratio) => {
+      expect(getLightboxLayout(ratio)).toEqual({ frameClassName: "aspect-video" });
+    }
+  );
+
+  it("offers the Escape hint only to pointer devices", () => {
+    const source = readFileSync(
+      new URL("../components/ShowreelWorks.tsx", import.meta.url),
+      "utf8"
+    );
+    expect(source).toMatch(
+      /className="hidden shrink-0 items-center gap-2 text-xs text-white\/45 \[@media\(hover:hover\)\]:flex"><FaPause \/> Esc to close/
+    );
   });
 });
