@@ -288,6 +288,7 @@ describe("POST /api/booking", () => {
       expect.objectContaining({
         replyTo: "ada@example.com",
         subject: "New acting inquiry - Ada Lovelace",
+        tags: [{ name: "source", value: "portfolio_booking" }],
       })
     );
     expect(service.inquiryUpdate).toHaveBeenCalledWith(
@@ -297,6 +298,30 @@ describe("POST /api/booking", () => {
       })
     );
     expect(service.analyticsInsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends an email fallback without the Inbox notification tag when persistence fails", async () => {
+    configureEmail();
+    const service = createServiceFixture({
+      data: null,
+      error: { code: "XX000", message: "database unavailable" },
+    });
+    routeMocks.createAdminServiceClient.mockReturnValue(service.client);
+    routeMocks.resendSend.mockResolvedValue({
+      data: { id: "fallback-email-id" },
+      error: null,
+    });
+
+    const response = await postBooking(bookingRequest());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true });
+    expect(routeMocks.resendSend).toHaveBeenCalledTimes(1);
+    expect(routeMocks.resendSend.mock.calls[0][0]).not.toHaveProperty("tags");
+    expect(service.inquiryUpdate).not.toHaveBeenCalled();
+    expect(routeMocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "booking_inquiry_persistence_failed" })
+    );
   });
 
   it("rejects a cross-origin request before reading or persisting it", async () => {

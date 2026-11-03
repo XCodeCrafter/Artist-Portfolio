@@ -18,11 +18,16 @@ const secret = "isolated_test_secret_".repeat(3);
 describe("acceptance target isolation", () => {
   it("pins the distinct local project and endpoints", () => {
     expect(ACCEPTANCE_APP_ORIGIN).toBe("http://127.0.0.1:3101");
-    expect(ACCEPTANCE_API_ORIGIN).toBe("http://127.0.0.1:55431");
-    expect(ACCEPTANCE_PROJECT_ID).toBe("artist-portfolio-acceptance");
+    expect(ACCEPTANCE_API_ORIGIN).toBe("http://127.0.0.1:45431");
+    expect(ACCEPTANCE_PROJECT_ID).toBe("artist-portfolio-acceptance-v3");
     expect(ACCEPTANCE_ADMIN_EMAIL).toBe("owner@portfolio.test");
     expect(validateAcceptanceTarget({ ...ACCEPTANCE_TARGET })).toBe(ACCEPTANCE_TARGET);
     expect(Object.isFrozen(ACCEPTANCE_TARGET)).toBe(true);
+  });
+
+  it.each(["artist-portfolio-acceptance", "artist-portfolio-acceptance-v2"])("uses a different project from preserved %s and rejects its target", (legacyProjectId) => {
+    expect(ACCEPTANCE_PROJECT_ID).not.toBe(legacyProjectId);
+    expect(() => validateAcceptanceTarget({ ...ACCEPTANCE_TARGET, projectId: legacyProjectId })).toThrow("Unsafe acceptance target");
   });
 
   it.each([
@@ -34,7 +39,7 @@ describe("acceptance target isolation", () => {
     expect(() => validateAcceptanceTarget({ ...ACCEPTANCE_TARGET, appOrigin })).toThrow("Unsafe acceptance target");
   });
 
-  it.each(["https://hosted.supabase.co", "http://127.0.0.1:54321", "http://localhost:55431", "http://127.0.0.1:55431/"])(
+  it.each(["https://hosted.supabase.co", "http://127.0.0.1:54321", "http://localhost:45431", "http://127.0.0.1:45431/", "http://127.0.0.1:55431"])(
     "rejects a hosted, default, or aliased API target %s", (apiOrigin) => {
       expect(() => validateAcceptanceTarget({ ...ACCEPTANCE_TARGET, apiOrigin })).toThrow("Unsafe acceptance target");
     },
@@ -58,6 +63,8 @@ describe("acceptance credential metadata guard", () => {
     { anonKey: jwt("authenticated") }, { anonKey: jwt("anon", { iss: "supabase" }) },
     { anonKey: jwt("anon", { ref: "hosted-project" }) },
     { anonKey: jwt("anon", { project_id: "artist-portfolio" }) },
+    { anonKey: jwt("anon", { project_id: "artist-portfolio-acceptance" }) },
+    { anonKey: jwt("anon", { project_id: "artist-portfolio-acceptance-v2" }) },
     { anonKey: jwt("anon", { exp: 1 }) }, { anonKey: jwt("anon", { exp: "later" }) },
     { anonKey: jwt("anon", {}, { alg: "none", typ: "JWT" }) },
     { anonKey: "sb_publishable_hosted" }, { serviceRoleKey: jwt("anon") },

@@ -33,7 +33,7 @@ Required production environment variables:
 SITE_URL=https://your-domain.com
 NEXT_PUBLIC_SITE_URL=https://your-domain.com
 RESEND_API_KEY=...
-RESEND_WEBHOOK_SECRET=random-resend-signing-secret
+RESEND_WEBHOOK_SECRET=copy-the-signing-secret-from-your-resend-webhook
 BOOKING_TO_EMAIL=...
 BOOKING_FROM_EMAIL=...
 NEXT_PUBLIC_SUPABASE_URL=...
@@ -60,6 +60,43 @@ ALLOW_FALLBACK_CONTENT=false
 Production content fails closed when Supabase is unavailable so a stale demo
 identity cannot be indexed. `ALLOW_FALLBACK_CONTENT=true` is only for local
 loopback development; the application ignores it for public site URLs.
+
+## Contact email activation (independent of ImageKit)
+
+The form already saves accepted inquiries in Admin V2 Inbox. Gmail notifications
+need a client-owned Resend account and a verified sending domain; the recipient
+can be an ordinary Gmail address. No Gmail OAuth connection is required.
+
+1. Verify a domain you control in Resend using its supplied DNS records. Do not
+   replace unrelated DNS/MX records. The Vercel-provided `vercel.app` hostname is
+   not an owned sending domain. See [Resend domain setup](https://resend.com/docs/dashboard/domains/introduction).
+2. Set `RESEND_API_KEY`, `BOOKING_FROM_EMAIL` (verified sender) and
+   `BOOKING_TO_EMAIL` (owner-selected recipient) in the deployment's server
+   environment, never in client variables, Git or chat.
+3. Register the public HTTPS `/api/resend/webhook` endpoint in Resend and copy
+   **that webhook's** signing secret into `RESEND_WEBHOOK_SECRET`; do not invent
+   a random substitute. Subscribe to sent, scheduled, delivered, delivery_delayed,
+   bounced, complained, failed and suppressed email events. Redeploy after
+   changing environment variables. Keep provider tracking disabled unless
+   separately reviewed with the site's privacy settings.
+4. With the owner's approval, submit one clearly marked test inquiry. Confirm
+   the Inbox row, actual Gmail receipt, visitor `Reply-To`, and final delivery
+   badge. A configured readiness check or successful API send is not proof of
+   delivery. Archive only the agreed test inquiry after verification.
+
+Persisted booking notifications carry a non-personal `source=portfolio_booking`
+tag. If their signed webhook arrives before the provider ID is attached, the
+endpoint requests a retry within a short five-minute event-age window rather
+than losing the delivery event. Existing notifications still match by exact
+provider ID, regardless of age or tags. Unmatched untagged/unrelated events and
+expired tagged events are acknowledged and audited, not endlessly retried.
+A permanently missing mapping needs investigation; this is not an automatic email resend
+queue. See [Resend retry behavior](https://resend.com/docs/webhooks/retries-and-replays).
+
+Setup does not resend historical failed notifications. Supabase Auth SMTP and
+password-recovery delivery are separate from Contact notifications and require
+their own acceptance test. No ImageKit flags, migrations or domain purchase are
+required for the local code checks.
 
 ## Provider-neutral media rollout
 

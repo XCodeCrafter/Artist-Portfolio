@@ -21,6 +21,65 @@ Music verification: **6,059 tests / 226 files**, TypeScript, ESLint, production
 Webpack build (Supabase/Resend disabled) and disposable PGlite migration checks
 pass. No hosted database was changed.
 
+## Current focus — Contact delivery and non-ImageKit acceptance
+
+Owner explicitly postponed ImageKit account/keys and asked to continue the other
+tasks. This priority overrides older "resume ImageKit next" notes below. Keep
+the provider/pilot/observation flags disabled and Supabase media unchanged.
+No domain purchase, redesign rollout, Classic retirement or GitHub push is
+included in this checkpoint.
+
+- [x] Finish and verify the narrow Contact delivery race repair: only persisted,
+      explicitly tagged booking notifications may request a retry when their
+      provider ID has not been attached yet. Preserve exact-ID matching for
+      legacy notifications; unrelated account email must not cause retry storms.
+      Limit unmatched retries to five minutes after the signed event timestamp
+      (at most 60 seconds of future clock skew); expired/unrelated events remain
+      audited without retries. A webhook retry never sends another email.
+- [x] Repair isolated acceptance preparation: generate its own social-card JPEG
+      instead of expecting an excluded owner photograph; hash generated media
+      into the workspace manifest. No production image is copied or changed.
+- [x] Align the Settings overview regression with the already-committed simplified
+      footer controls; do not restore retired headings/buttons in production.
+- [ ] Owner setup: confirm Resend account + verified sending domain, choose the
+      Gmail recipient, set server-only sender/API/webhook configuration and
+      perform one explicitly approved live Contact -> Inbox -> Gmail check.
+      Never ask for private keys in chat. Auth SMTP/recovery is a separate check.
+      Owner now confirms having neither Resend nor an owned domain: activation
+      is deferred, not completed. Continue independent admin acceptance next.
+- [x] Prepare the 2026-10-08 isolated acceptance snapshot: `artist-portfolio-acceptance-v3`
+      runs on loopback ports 45430–45434, app 3101. Preserve the old stack and
+      stopped v2 copy; do not reset or reuse them. The guarded Windows launcher
+      enforces port bindings before creation and protects existing resources.
+      V3 ran all 58 migrations plus local bootstrap/seed; all 150 checks in
+      0038–0058 pass. The obsolete 0037 five-section assertion is superseded by
+      0055's passing seven-section check, not an unapplied migration.
+      Fictional owner/bucket provisioning, visible login and post-compilation
+      integrity (417 hashes) passed. No production SQL, data or keys used.
+- [x] Owner completed local fixture password/MFA login on 2026-10-09. Protected
+      Admin V2 and Events visibly render; credentials stay private. No agent
+      factor enrollment or manufactured session. All 417 snapshot hashes pass.
+- [ ] Resolve test snapshot drift before current-code acceptance: new BIO/Press/
+      ticket changes and migrations 0059–0061 are absent from the running copy.
+      Preserve the existing workspace, database and login. The preparer currently
+      copies tracked app files only; handle new untracked app files deliberately
+      rather than blindly regenerating or bypassing manifest integrity.
+      Then resume current-code editor acceptance (Events, sharing, blank Hero
+      titles, transitions, framing, safe media lifecycle and authentication).
+      Do not replay owner-confirmed migrations against the hosted database.
+- [ ] Domain, real content and the isolated Home redesign preview remain owner
+      choices; no preview layout is implicitly approved for production.
+
+Verification: **5,704 tests / 209 files** after the isolated namespace rotation;
+the preceding email/media changes passed ESLint and production build (including
+TypeScript). The final v3 startup harness and old-target rejection coverage pass
+**363 tests / eight acceptance suites**, full TypeScript and targeted ESLint.
+Sandbox-only cache/compiler permissions initially prevented
+test execution; approved local reruns passed. Local baseline MFA/login is now
+verified; this is not hosted save/email/MFA or current-editor acceptance.
+No production migration, provider activation,
+commit or push. Current runtime and owner handoff: `docs/local-acceptance.md`.
+
 ## Previous focus — optional Hero headings across all pages
 
 - [x] Allow an empty main Hero title in Home, Bio, Gallery, Music, Showreel and

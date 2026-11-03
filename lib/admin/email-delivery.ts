@@ -1,3 +1,9 @@
+// Identifies notifications with an existing Inbox row, without exposing its ID.
+export const BOOKING_EMAIL_SOURCE_TAG = {
+  name: "source",
+  value: "portfolio_booking",
+} as const;
+
 export const RESEND_DELIVERY_STATUS = {
   "email.sent": "sent",
   "email.scheduled": "pending",

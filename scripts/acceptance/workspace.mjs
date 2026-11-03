@@ -67,19 +67,28 @@ commit;
 `;
 }
 
-async function generateImages(appRoot) {
+export async function generateAcceptanceImages(appRoot) {
   const definitions = [
     ["acceptance-fixtures/portrait.png", 480, 800, "#ad514d"],
     ["acceptance-fixtures/landscape.png", 1200, 675, "#376d7a"],
+    // The sharing image route reads this exact path as JPEG. Supply synthetic
+    // artwork instead of copying the owner's bundled photograph.
+    ["images/home-editorial/press-social.jpg", 1200, 630, "#376d7a"],
     ...[1, 2, 3].map((layer) => [`images/parallax/depth-${layer}.png`, 200, 200, "#151719"]),
   ];
+  /** @type {Record<string, string>} */
+  const hashes = {};
   for (const [relative, width, height, color] of definitions) {
     const target = path.join(appRoot, "public", relative);
     await mkdir(path.dirname(target), { recursive: true });
     // Geometric fiducials make framing/drag checks visible without owner media.
     const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="${color}"/><circle cx="${width / 2}" cy="${height / 4}" r="${Math.min(width, height) / 8}" fill="#e9cd7a"/><path d="M0 ${height / 2}H${width}M${width / 2} 0V${height}" stroke="#fff" stroke-width="6"/><rect x="15" y="15" width="${width - 30}" height="${height - 30}" fill="none" stroke="#ffffff" stroke-width="5"/></svg>`;
-    await sharp(Buffer.from(svg)).png().toFile(target);
+    const image = sharp(Buffer.from(svg));
+    const bytes = await (relative.endsWith(".jpg") ? image.jpeg() : image.png()).toBuffer();
+    await writeFile(target, bytes, { flag: "wx" });
+    hashes[`app/public/${relative}`] = digest(bytes);
   }
+  return hashes;
 }
 
 /** No remote calls, SQL execution, account creation, or production env loading. */
@@ -113,7 +122,7 @@ export async function prepareAcceptanceWorkspace(repoRoot) {
     throw new Error("Install dependencies in this repository before preparing acceptance.");
   }
   await symlink(dependencies, path.join(workspace, "app", "node_modules"), process.platform === "win32" ? "junction" : "dir");
-  await generateImages(path.join(workspace, "app"));
+  Object.assign(hashes, await generateAcceptanceImages(path.join(workspace, "app")));
   const migrationRoot = path.join(repoRoot, "supabase", "migrations");
   const plan = buildMigrationPlan((await readdir(migrationRoot)).filter((name) => name.endsWith(".sql")));
   for (const step of plan) {

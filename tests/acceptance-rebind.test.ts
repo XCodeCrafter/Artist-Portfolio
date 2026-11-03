@@ -4,12 +4,12 @@ import { buildLoopbackClone, verifyLoopbackRuntime } from "../scripts/acceptance
 import { ACCEPTANCE_PROJECT_ID } from "../scripts/acceptance/isolation.mjs";
 
 const workspace = path.resolve("test-fixtures", "isolated-acceptance");
-const network = "portfolio-acceptance-loopback";
+const network = "portfolio-acceptance-v3-loopback";
 const ports = {
-  db: ["5432/tcp", "55432"],
-  kong: ["8000/tcp", "55431"],
-  studio: ["3000/tcp", "55433"],
-  inbucket: ["8025/tcp", "55434"],
+  db: ["5432/tcp", "45432"],
+  kong: ["8000/tcp", "45431"],
+  studio: ["3000/tcp", "45433"],
+  inbucket: ["8025/tcp", "45434"],
 } as const;
 type Role = keyof typeof ports;
 
@@ -97,8 +97,24 @@ describe("acceptance Docker loopback replacement plan", () => {
     ["running container", (container) => { container.State.Running = true; }],
     ["unexpected container name", (container) => { container.Name = "/supabase_db_some-other-project"; }],
     ["different project label", (container) => { container.Config.Labels["com.supabase.cli.project"] = "live-project"; }],
+    ["preserved legacy project", (container) => {
+      container.Name = "/supabase_db_artist-portfolio-acceptance";
+      container.Config.Labels["com.supabase.cli.project"] = "artist-portfolio-acceptance";
+    }],
+    ["preserved v2 project", (container) => {
+      container.Name = "/supabase_db_artist-portfolio-acceptance-v2";
+      container.Config.Labels["com.supabase.cli.project"] = "artist-portfolio-acceptance-v2";
+    }],
     ["different work directory", (container) => { container.Config.Labels["com.supabase.cli.workdir"] = path.resolve(workspace, "another"); }],
     ["host network", (container) => { container.HostConfig.NetworkMode = "host"; }],
+    ["preserved legacy network", (container) => {
+      container.HostConfig.NetworkMode = "portfolio-acceptance-loopback";
+      container.NetworkSettings.Networks = { "portfolio-acceptance-loopback": { Aliases: [] } };
+    }],
+    ["preserved v2 network", (container) => {
+      container.HostConfig.NetworkMode = "portfolio-acceptance-v2-loopback";
+      container.NetworkSettings.Networks = { "portfolio-acceptance-v2-loopback": { Aliases: [] } };
+    }],
     ["wrong network endpoint", (container) => { container.NetworkSettings.Networks = { other: { Aliases: [] } }; }],
     ["multiple network endpoints", (container) => { container.NetworkSettings.Networks.other = { Aliases: [] }; }],
     ["no network endpoint", (container) => { container.NetworkSettings.Networks = {}; }],
@@ -113,9 +129,10 @@ describe("acceptance Docker loopback replacement plan", () => {
   const unsafePortCases: Array<[string, (container: ReturnType<typeof fixture>) => void]> = [
     ["missing port binding", (container) => { container.HostConfig.PortBindings = {}; }],
     ["other host port", (container) => { container.HostConfig.PortBindings["5432/tcp"][0].HostPort = "5432"; }],
+    ["legacy host port", (container) => { container.HostConfig.PortBindings["5432/tcp"][0].HostPort = "55432"; }],
     ["additional published port", (container) => { container.HostConfig.PortBindings["9999/tcp"] = [{ HostIp: "127.0.0.1", HostPort: "9999" }]; }],
-    ["additional IPv6 binding", (container) => { container.HostConfig.PortBindings["5432/tcp"].push({ HostIp: "::", HostPort: "55432" }); }],
-    ["wrong container port", (container) => { container.HostConfig.PortBindings = { "5433/tcp": [{ HostIp: "0.0.0.0", HostPort: "55432" }] }; }],
+    ["additional IPv6 binding", (container) => { container.HostConfig.PortBindings["5432/tcp"].push({ HostIp: "::", HostPort: "45432" }); }],
+    ["wrong container port", (container) => { container.HostConfig.PortBindings = { "5433/tcp": [{ HostIp: "0.0.0.0", HostPort: "45432" }] }; }],
   ];
 
   it.each(unsafePortCases)("rejects %s", (_label, mutate) => {
@@ -237,7 +254,7 @@ describe("acceptance actual Docker runtime port gate", () => {
       ...structuredClone(inventory[0]),
       Names: [`/supabase_db_${ACCEPTANCE_PROJECT_ID}-unbound-backup`],
       State: "exited",
-      Ports: [{ IP: "0.0.0.0", PrivatePort: 5432, PublicPort: 55432 }],
+      Ports: [{ IP: "0.0.0.0", PrivatePort: 5432, PublicPort: 45432 }],
     });
     inventory.push({
       ...structuredClone(inventory[0]),
@@ -257,8 +274,9 @@ describe("acceptance actual Docker runtime port gate", () => {
     ["null actual port binding", (entry) => { entry.NetworkSettings.Ports["5432/tcp"] = null; }],
     ["nonloopback actual binding", (entry) => { entry.NetworkSettings.Ports["5432/tcp"]![0].HostIp = "0.0.0.0"; }],
     ["wrong actual host port", (entry) => { entry.NetworkSettings.Ports["5432/tcp"]![0].HostPort = "5432"; }],
-    ["wrong actual container port", (entry) => { entry.NetworkSettings.Ports = { "5433/tcp": [{ HostIp: "127.0.0.1", HostPort: "55432" }] }; }],
-    ["second actual IPv6 binding", (entry) => { entry.NetworkSettings.Ports["5432/tcp"]!.push({ HostIp: "::", HostPort: "55432" }); }],
+    ["legacy actual host port", (entry) => { entry.NetworkSettings.Ports["5432/tcp"]![0].HostPort = "55432"; }],
+    ["wrong actual container port", (entry) => { entry.NetworkSettings.Ports = { "5433/tcp": [{ HostIp: "127.0.0.1", HostPort: "45432" }] }; }],
+    ["second actual IPv6 binding", (entry) => { entry.NetworkSettings.Ports["5432/tcp"]!.push({ HostIp: "::", HostPort: "45432" }); }],
     ["additional actual loopback port", (entry) => { entry.NetworkSettings.Ports["9999/tcp"] = [{ HostIp: "127.0.0.1", HostPort: "59999" }]; }],
   ];
 

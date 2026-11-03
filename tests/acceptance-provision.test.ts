@@ -231,8 +231,9 @@ describe("local acceptance provisioning", () => {
 
 describe("provisioning HTTP boundary", () => {
   it.each([
-    "http://localhost:55431/auth/v1/admin/users", "http://127.0.0.1:54321/auth/v1/admin/users",
-    "https://hosted.supabase.co/auth/v1/admin/users", "http://user@127.0.0.1:55431/auth/v1/admin/users",
+    "http://localhost:45431/auth/v1/admin/users", "http://127.0.0.1:54321/auth/v1/admin/users",
+    "https://hosted.supabase.co/auth/v1/admin/users", "http://user@127.0.0.1:45431/auth/v1/admin/users",
+    "http://127.0.0.1:55431/auth/v1/admin/users",
     `${ACCEPTANCE_API_ORIGIN}/auth/v1/../admin/users`, `${ACCEPTANCE_API_ORIGIN}/auth/v1/admin/users#x`,
     `${ACCEPTANCE_API_ORIGIN}.example.test/auth/v1/admin/users`,
   ])("rejects wrong, aliased, normalized or credentialed target %s", (url) => {

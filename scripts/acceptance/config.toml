@@ -1,16 +1,16 @@
 # Generated acceptance workspace only. Never replace supabase/config.toml with this.
-project_id = "artist-portfolio-acceptance"
+project_id = "artist-portfolio-acceptance-v3"
 
 [api]
 enabled = true
-port = 55431
+port = 45431
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
-port = 55432
-shadow_port = 55430
+port = 45432
+shadow_port = 45430
 major_version = 17
 
 [db.seed]
@@ -19,12 +19,12 @@ sql_paths = ["./seed.sql"]
 
 [studio]
 enabled = true
-port = 55433
+port = 45433
 api_url = "http://127.0.0.1"
 
 [inbucket]
 enabled = true
-port = 55434
+port = 45434
 
 [storage]
 enabled = true

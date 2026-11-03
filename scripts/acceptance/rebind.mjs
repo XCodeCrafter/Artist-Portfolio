@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import { verifyAcceptanceWorkspace } from "./workspace.mjs";
 import { ACCEPTANCE_PROJECT_ID } from "./isolation.mjs";
 
-const network = "portfolio-acceptance-loopback";
-const roles = { db: ["5432/tcp", "55432"], kong: ["8000/tcp", "55431"], studio: ["3000/tcp", "55433"], inbucket: ["8025/tcp", "55434"] };
+const network = "portfolio-acceptance-v3-loopback";
+const roles = { db: ["5432/tcp", "45432"], kong: ["8000/tcp", "45431"], studio: ["3000/tcp", "45433"], inbucket: ["8025/tcp", "45434"] };
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const nameFor = (role) => `supabase_${role}_${ACCEPTANCE_PROJECT_ID}`;
 

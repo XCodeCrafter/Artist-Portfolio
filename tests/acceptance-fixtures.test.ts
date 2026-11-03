@@ -10,8 +10,9 @@ const config = readFileSync(new URL("../scripts/acceptance/config.toml", import.
 
 describe("isolated acceptance fixtures", () => {
   it("uses dedicated ports/project and the loopback app with real MFA and closed signup", () => {
-    expect(config).toContain('project_id = "artist-portfolio-acceptance"');
-    for (const port of [55430, 55431, 55432, 55433, 55434]) expect(config).toContain(`= ${port}`);
+    expect(config).toContain('project_id = "artist-portfolio-acceptance-v3"');
+    for (const port of [45430, 45431, 45432, 45433, 45434]) expect(config).toContain(`= ${port}`);
+    expect(config).not.toMatch(/5543[0-4]/);
     expect(config).toContain('site_url = "http://127.0.0.1:3101"');
     expect(config).toContain('additional_redirect_urls = ["http://127.0.0.1:3101/admin/auth/callback"]');
     const auth = config.split("[auth]\n")[1]?.split("\n[auth.email]")[0];
@@ -27,6 +28,7 @@ describe("isolated acceptance fixtures", () => {
     expect(ACCEPTANCE_BOOTSTRAP_SQL).toContain("acceptance_bootstrap_requires_empty_fixture_database");
     expect(ACCEPTANCE_BOOTSTRAP_SQL).toContain("exists(select 1 from auth.users)");
     expect(ACCEPTANCE_BOOTSTRAP_SQL).toContain("create schema acceptance_fixture_private");
+    expect(ACCEPTANCE_BOOTSTRAP_SQL).toContain("insert into acceptance_fixture_private.marker values ('artist-portfolio-acceptance')");
     expect(ACCEPTANCE_BOOTSTRAP_SQL).toContain("insert into public.site_settings");
     for (const slug of ACCEPTANCE_HERO_SLUGS) expect(ACCEPTANCE_BOOTSTRAP_SQL).toContain(`('${slug}',`);
     expect(new Set(ACCEPTANCE_HERO_SLUGS).size).toBe(6);

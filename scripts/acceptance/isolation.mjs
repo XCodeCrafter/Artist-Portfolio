@@ -1,7 +1,10 @@
 // No dotenv, filesystem reads, or inherited provider configuration belongs here.
 export const ACCEPTANCE_APP_ORIGIN = "http://127.0.0.1:3101";
-export const ACCEPTANCE_API_ORIGIN = "http://127.0.0.1:55431";
-export const ACCEPTANCE_PROJECT_ID = "artist-portfolio-acceptance";
+export const ACCEPTANCE_API_ORIGIN = "http://127.0.0.1:45431";
+// New Docker namespace leaves earlier runs' containers and volumes intact.
+// The bootstrap's private marker remains the logical fixture kind
+// "artist-portfolio-acceptance"; it is not the Docker/workspace project identity.
+export const ACCEPTANCE_PROJECT_ID = "artist-portfolio-acceptance-v3";
 export const ACCEPTANCE_MEDIA_BUCKET = "portfolio-acceptance-media";
 export const ACCEPTANCE_ADMIN_EMAIL = "owner@portfolio.test";
 

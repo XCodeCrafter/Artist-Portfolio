@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/admin/audit";
+import { BOOKING_EMAIL_SOURCE_TAG } from "@/lib/admin/email-delivery";
 import { keyedDigest } from "@/lib/admin/security-secret";
 import { createAdminServiceClient } from "@/lib/admin/service";
 import { normalizePortfolioType } from "@/lib/content/profile";
@@ -613,6 +614,7 @@ export async function POST(req: Request) {
         replyTo: email,
         subject,
         text,
+        ...(inquiry.ok ? { tags: [BOOKING_EMAIL_SOURCE_TAG] } : {}),
       });
     } catch (error) {
       console.error(error);

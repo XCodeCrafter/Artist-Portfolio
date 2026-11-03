@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { writeAuditLog } from "@/lib/admin/audit";
-import { getResendDeliveryStatus } from "@/lib/admin/email-delivery";
+import {
+  BOOKING_EMAIL_SOURCE_TAG,
+  getResendDeliveryStatus,
+} from "@/lib/admin/email-delivery";
 import { createAdminServiceClient } from "@/lib/admin/service";
 import { readTextBodyWithLimit } from "@/lib/security/json-body";
 
 export const runtime = "nodejs";
 
 const MAX_WEBHOOK_BYTES = 64 * 1024;
+const UNMATCHED_DELIVERY_RETRY_GRACE_MS = 5 * 60 * 1000;
+const MAX_DELIVERY_CLOCK_SKEW_MS = 60 * 1000;
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
@@ -90,6 +95,17 @@ export async function POST(request: Request) {
         webhookId: id,
       },
     });
+    // Briefly retry our send-response race using the signed event creation time.
+    // Deleted rows, permanent mapping failures and unrelated mail must settle.
+    const eventAgeMs = Date.now() - eventAt.getTime();
+    if (
+      "tags" in event.data &&
+      event.data.tags?.[BOOKING_EMAIL_SOURCE_TAG.name] === BOOKING_EMAIL_SOURCE_TAG.value &&
+      eventAgeMs >= -MAX_DELIVERY_CLOCK_SKEW_MS &&
+      eventAgeMs <= UNMATCHED_DELIVERY_RETRY_GRACE_MS
+    ) {
+      return NextResponse.json({ ok: false }, { status: 503 });
+    }
   } else if (delivery.applied) {
     await writeAuditLog({
       action: `booking_email_${status}`,
