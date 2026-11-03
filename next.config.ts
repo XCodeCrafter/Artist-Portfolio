@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 import {
+  MEDIA_DELIVERY_QUERY,
+  getMediaDeliveryEndpoint,
+} from "./lib/media-delivery";
+import {
   getConfiguredImageKitUrlEndpoint,
   getConfiguredR2MediaOrigin,
 } from "./lib/media-source";
@@ -27,6 +31,8 @@ const r2MediaOrigin = getConfiguredR2MediaOrigin();
 const r2MediaHostname = r2MediaOrigin ? new URL(r2MediaOrigin).hostname : "";
 const imageKitUrlEndpoint = getConfiguredImageKitUrlEndpoint();
 const imageKitUrl = imageKitUrlEndpoint ? new URL(imageKitUrlEndpoint) : null;
+const mediaDeliveryEndpoint = getMediaDeliveryEndpoint();
+const mediaDeliveryUrl = mediaDeliveryEndpoint ? new URL(mediaDeliveryEndpoint) : null;
 
 const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
   ...(supabaseStorageHostname
@@ -56,6 +62,19 @@ const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
           port: "",
           pathname: `${imageKitUrl.pathname}/media/**`,
           search: "",
+        },
+      ]
+    : []),
+  // CDN delivery of Supabase Storage objects (lib/media-delivery.ts), only when
+  // enabled: the public storage path with the untouched-original query only.
+  ...(mediaDeliveryUrl
+    ? [
+        {
+          protocol: "https" as const,
+          hostname: mediaDeliveryUrl.hostname,
+          port: "",
+          pathname: `${mediaDeliveryUrl.pathname}/storage/v1/object/public/**`,
+          search: MEDIA_DELIVERY_QUERY,
         },
       ]
     : []),

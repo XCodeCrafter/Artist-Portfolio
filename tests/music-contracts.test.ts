@@ -64,7 +64,7 @@ describe("Music visual editor presentation contract", () => {
       'import MusicPageView from "@/components/music/MusicPageView"'
     );
     expect(publicMusicPage).toContain(
-      "<MusicPageView data={selectMusicPageViewData(content)} />"
+      "<MusicPageView data={withMediaDelivery(selectMusicPageViewData(content))} />"
     );
     expect(sharedMusicView).toContain('<AdaptiveHero {...viewData.hero} />');
     expect(sharedMusicView).toContain("viewData.spotify.heading");

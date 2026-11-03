@@ -5,6 +5,7 @@ import BioPageView, {
 } from "@/components/bio/BioPageView";
 import JsonLd from "@/components/JsonLd";
 import { getPortfolioContent } from "@/lib/content";
+import { withMediaDelivery } from "@/lib/media-delivery";
 import { createBioJsonLd, createPageMetadata } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -35,7 +36,7 @@ export default async function BioPage() {
   return (
     <>
       <JsonLd data={createBioJsonLd(content)} />
-      <BioPageView data={data} />
+      <BioPageView data={withMediaDelivery(data)} />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PressPageView from "@/components/press/PressPageView";
 import { getPortfolioContent } from "@/lib/content";
+import { withMediaDelivery } from "@/lib/media-delivery";
 import { getPublishedHomeDraft } from "@/lib/content/home.server";
 import { createPageMetadata } from "@/lib/seo";
 
@@ -13,7 +14,7 @@ export default async function PressPage() {
   const content = await getPortfolioContent();
   const { press } = await getPublishedHomeDraft(content);
 
-  return <PressPageView data={{
+  return <PressPageView data={withMediaDelivery({
     press,
     footer: {
       artistName: content.settings.artistName,
@@ -23,5 +24,5 @@ export default async function PressPage() {
       socialLinks: content.socialLinks,
       tagline: content.settings.tagline,
     },
-  }} />;
+  })} />;
 }

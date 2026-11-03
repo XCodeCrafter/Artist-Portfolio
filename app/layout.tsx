@@ -12,6 +12,7 @@ import TopNav from "@/components/TopNav";
 import FooterContentProvider from "@/components/FooterContentProvider";
 import PrivacyProvider from "@/components/privacy/PrivacyProvider";
 import { getPortfolioContent } from "@/lib/content";
+import { withMediaDelivery } from "@/lib/media-delivery";
 import { getVisiblePublicPageNavigationItems } from "@/lib/content/navigation";
 import { hasPublishedCncPrograms } from "@/lib/content/cnc-programs.server";
 import {
@@ -88,7 +89,7 @@ export default async function RootLayout({
         />
 
         <div className="relative z-10">
-          <FooterContentProvider content={content.settings.footerContent}><MotionShell>{children}</MotionShell></FooterContentProvider>
+          <FooterContentProvider content={withMediaDelivery(content.settings.footerContent)}><MotionShell>{children}</MotionShell></FooterContentProvider>
         </div>
         </PrivacyProvider>
       </body>

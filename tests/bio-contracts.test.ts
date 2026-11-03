@@ -32,7 +32,7 @@ describe("Bio visual editor presentation contract", () => {
     expect(publicBioPage).toContain(
       'from "@/components/bio/BioPageView"'
     );
-    expect(publicBioPage).toContain("<BioPageView data={data} />");
+    expect(publicBioPage).toContain("<BioPageView data={withMediaDelivery(data)} />");
     expect(publicBioPage).toContain("<JsonLd data={createBioJsonLd(content)} />");
     expect(bioPreviewRuntime).toContain("<BioPageView");
     expect(sharedBioView).toContain("<AdaptiveHero {...data.hero} />");

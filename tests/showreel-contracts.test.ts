@@ -159,7 +159,9 @@ describe("Showreel shared public and preview contract", () => {
     expect(publicPage).toContain(
       'from "@/components/video/ShowreelPageView"'
     );
-    expect(publicPage).toContain("<ShowreelPageView data={data} />");
+    expect(publicPage).toContain(
+      "<ShowreelPageView data={withMediaDelivery(data)} />"
+    );
     expect(previewRuntime).toContain("<ShowreelPageView");
     expect(sharedView).toContain(
       '<AdaptiveHero {...data.hero} staticPreview={mode === "preview"} />'

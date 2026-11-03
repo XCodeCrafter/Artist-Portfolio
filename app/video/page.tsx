@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import ShowreelPageView from "@/components/video/ShowreelPageView";
 import { getPortfolioContent } from "@/lib/content";
+import { withMediaDelivery } from "@/lib/media-delivery";
 import { createPageMetadata } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -25,5 +26,5 @@ export default async function VideoPage() {
     },
   };
 
-  return <ShowreelPageView data={data} />;
+  return <ShowreelPageView data={withMediaDelivery(data)} />;
 }

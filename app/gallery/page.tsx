@@ -3,6 +3,7 @@ import GalleryPageView, {
   type GalleryPageViewData,
 } from "@/components/gallery/GalleryPageView";
 import { getPortfolioContent } from "@/lib/content";
+import { withMediaDelivery } from "@/lib/media-delivery";
 import { createPageMetadata } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -27,5 +28,5 @@ export default async function GalleryPage() {
     },
   };
 
-  return <GalleryPageView data={data} />;
+  return <GalleryPageView data={withMediaDelivery(data)} />;
 }

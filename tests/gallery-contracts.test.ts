@@ -28,7 +28,7 @@ describe("Gallery visual editor presentation contract", () => {
     expect(publicGalleryPage).toContain(
       'from "@/components/gallery/GalleryPageView"'
     );
-    expect(publicGalleryPage).toContain("<GalleryPageView data={data} />");
+    expect(publicGalleryPage).toContain("<GalleryPageView data={withMediaDelivery(data)} />");
     expect(galleryPreviewRuntime).toContain("<GalleryPageView");
     expect(sharedGalleryView).toContain("<AdaptiveHero {...data.hero} />");
     expect(sharedGalleryView).toContain("<GalleryShowcase");

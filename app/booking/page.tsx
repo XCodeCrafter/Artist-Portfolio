@@ -4,6 +4,7 @@ import ContactPageView, {
   type ContactPageViewData,
 } from "@/components/contact/ContactPageView";
 import { getPortfolioContent } from "@/lib/content";
+import { withMediaDelivery } from "@/lib/media-delivery";
 import { createPageMetadata } from "@/lib/seo";
 import { getPublicBookingCalendar } from "@/lib/booking-calendar-data";
 
@@ -28,5 +29,5 @@ export default async function BookingPage() {
     },
   };
 
-  return <ContactPageView data={data} />;
+  return <ContactPageView data={withMediaDelivery(data)} />;
 }
